@@ -961,7 +961,7 @@ lemma iter: "\<forall>a. (iter g (g a) n) = (g (iter g a n))"
   by (induct n) auto
 
 lemma ex_iter': "(\<exists>n. R (iter g a n)) = (R a | (\<exists>n. R (iter g (g a) n)))"
-  by (metis Prover.iter.simps iter not0_implies_Suc)
+  by (metis iter.simps iter not0_implies_Suc)
 
     -- "version suitable for computation"
 lemma ex_iter: "(\<exists>n. R (iter g a n)) = (if R a then True else (\<exists>n. R (iter g (g a) n)))"
