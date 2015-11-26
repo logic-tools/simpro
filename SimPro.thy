@@ -126,7 +126,7 @@ inductive_set
   deriv :: "nseq => (nat * nseq) set"
   for s :: nseq
 where
-  init[simp,intro]: "(0,s) \<in> deriv s"
+  init[intro]: "(0,s) \<in> deriv s"
 | step[intro]: "(n,x) \<in> deriv s ==> y : set (subs x) ==> (Suc n,y) \<in> deriv s"
   -- "the closure of the branch at isaxiom"
 
@@ -220,8 +220,7 @@ locale loc1 =
   assumes f: "f = failing_path (deriv s)"
 
 lemma (in loc1) f0: "infinite (deriv s) ==> f 0 \<in> (deriv s) & fst (f 0) = 0 & infinite (deriv (snd (f 0))) & ~ is_axiom (s_of_ns (snd (f 0)))"
-  apply(simp add: f) apply(rule someI_ex) apply(rule_tac x="(0,s)" in exI) apply(force simp add: deriv_is_axiom)
-  done
+  by (simp add: f) (metis (mono_tags, lifting) deriv.init is_axiom_finite_deriv fst_conv snd_conv someI_ex)
 
 lemma infinite_union: "finite Y ==> infinite (Union (f ` Y)) ==> \<exists>y. y \<in> Y & infinite (f y)"
   by auto
@@ -238,10 +237,8 @@ lemma t: "finite {w. P w} ==> finite {w. Q w & P w}"
 lemma finite_subs: "finite {w. ~is_axiom (s_of_ns y) & w : set (subs y)}"
   by simp
 
-lemma (in loc1) fSuc:
-  shows "[|
-  f n \<in> deriv s & fst (f n) = n & infinite (deriv (snd (f n))) & ~is_axiom (s_of_ns (snd (f n)))
-  |] ==> f (Suc n) \<in> deriv s & fst (f (Suc n)) = Suc n & (snd (f (Suc n))) : set (subs (snd (f n))) & infinite (deriv (snd (f (Suc n)))) & ~is_axiom (s_of_ns (snd (f (Suc n))))"
+lemma (in loc1) fSuc: "f n \<in> deriv s & fst (f n) = n & infinite (deriv (snd (f n))) & ~is_axiom (s_of_ns (snd (f n)))
+  ==> f (Suc n) \<in> deriv s & fst (f (Suc n)) = Suc n & (snd (f (Suc n))) : set (subs (snd (f n))) & infinite (deriv (snd (f (Suc n)))) & ~is_axiom (s_of_ns (snd (f (Suc n))))"
   apply(simp add: Let_def f)
   apply(rule_tac someI_ex)
   apply(simp only: f[symmetric]) 
@@ -337,15 +334,15 @@ lemma fold_compose1: "(% x. f (g x)) = (f o g)"
 
 lemma FEval_subst: "\<forall>e f. (FEval MI e (subst f A)) = (FEval MI (e o f) A)"
   apply(induct A)
-       apply(simp add: Let_def) apply(simp only: fold_compose1 map_map) apply(blast)
-      apply(simp add: Let_def) apply(simp only: fold_compose1 map_map) apply(blast)
+       apply(simp add: Let_def) apply(simp only: fold_compose1) apply(blast)
+      apply(simp add: Let_def) apply(simp only: fold_compose1) apply(blast)
      apply(simp)
     apply(simp)
-   apply(simp (no_asm_use)) apply(simp) apply(rule,rule) apply(rule ball_eq_ball) apply(rule)
+   apply(simp) apply(rule,rule) apply(rule ball_eq_ball) apply(rule)
    apply(subgoal_tac "(%u. case_nat m e (case u of 0 => 0 | Suc n => Suc (f n))) = (case_nat m (%n. e (f n)))") apply(simp)
    apply(rule ext) apply(case_tac u)
     apply(simp) apply(simp)
-  apply(simp (no_asm_use)) apply(simp) apply(rule,rule) apply(rule bex_eq_bex) apply(rule)
+  apply(simp) apply(rule,rule) apply(rule bex_eq_bex) apply(rule)
   apply(subgoal_tac "(%u. case_nat m e (case u of 0 => 0 | Suc n => Suc (f n))) = (case_nat m (%n. e (f n)))") apply(simp)
   apply(rule ext) apply(case_tac u)
    apply(simp) apply(simp)
@@ -748,9 +745,7 @@ lemma (in loc1) contains_propagates_fall: "infinite (deriv s) ==> contains f n (
   done
 
 lemma (in loc1) contains_propagates_fex: "infinite (deriv s) ==> contains f n (m, FEx g) 
-  ==> (\<exists>y. 
-  (contains f (n+y) (0,finst g m))
-  & (contains f (n+y) (Suc m,FEx g)))"
+  ==> (\<exists>y. (contains f (n+y) (0,finst g m)) & (contains f (n+y) (Suc m,FEx g)))"
   apply(subgoal_tac "(\<exists>l. considers f (n+l) (m,FEx g))") defer apply(rule contains_considers) apply(assumption) apply(assumption)
   apply(erule exE)
   apply(rule_tac x="Suc l" in exI)
@@ -849,17 +844,14 @@ lemma (in loc1) [simp]: "infinite (deriv s) ==> init s ==> (contains f n (m,A)) 
   apply(force)
   done
 
-lemma (in loc2) model': 
-  notes [simp] = FEval_subst
-  notes [simp del] = is_axiom.simps
-  shows "infinite (deriv s) ==> init s ==> \<forall>A. size A = h --> (\<forall>m n. contains f n (m,A) --> ~ (FEval mo ntou A))"
+lemma (in loc2) model': "infinite (deriv s) ==> init s ==> \<forall>A. size A = h --> (\<forall>m n. contains f n (m,A) --> ~ (FEval mo ntou A))"
 
   apply(rule_tac nat_less_induct) apply(rule, rule) apply(case_tac A) 
-       apply(rule,rule,rule) apply(simp add: mo Let_def) apply(simp add: model_def Let_def del: map_map) apply(simp only: f[symmetric]) apply(force)
+       apply(rule,rule,rule) apply(simp add: mo Let_def) apply(simp add: model_def Let_def) apply(simp only: f[symmetric]) apply(force)
 
-      apply(rule,rule,rule) apply(simp add: mo Let_def) apply(simp add: model_def Let_def del: map_map) apply(simp only: f[symmetric]) apply(rule ccontr) apply(simp del: map_map) apply(elim exE)
-      apply(subgoal_tac "m = 0 & ma = 0") prefer 2 apply(simp del: map_map)
-      apply(simp del: map_map)
+      apply(rule,rule,rule) apply(simp add: mo Let_def) apply(simp add: model_def Let_def) apply(simp only: f[symmetric]) apply(rule ccontr) apply(simp) apply(elim exE)
+      apply(subgoal_tac "m = 0 & ma = 0") prefer 2 apply(simp)
+      apply(simp)
       apply(rename_tac nat list m na nb ma)
       apply(subgoal_tac "? y. considers f (nb+na+y) (0, PAtom nat list)") prefer 2 apply(rule contains_considers) apply(assumption) 
        apply(rule contains_propagates_patoms) apply(assumption) apply(assumption)
@@ -868,7 +860,7 @@ lemma (in loc2) model':
        apply(subgoal_tac "nb+na=na+nb") 
         apply(simp) apply(subgoal_tac "is_axiom (s_of_ns (snd (f (na+nb+y))))")
          apply(drule_tac is_axiom_finite_deriv) apply(force dest: is_path_f)
-        apply(simp add: contains_def considers_def) apply(case_tac "snd (f (na + nb + y))") apply(simp) apply(simp add: s_of_ns_def is_axiom.simps) apply(force)
+        apply(simp add: contains_def considers_def) apply(case_tac "snd (f (na + nb + y))") apply(simp) apply(simp add: s_of_ns_def) apply(force)
        apply(force)
       apply(force intro: contains_propagates_natoms contains_propagates_patoms)
 
@@ -1037,14 +1029,14 @@ corollary finite_deriv_prove: "finite (deriv s) = prove s"
 subsection "Computation"
 
   -- "a sample formula to prove"
-lemma "(\<exists>x. A x | B x) --> ( (\<exists>x. B x) | (\<exists>x. A x))" by blast
+lemma "(\<exists>x. A x | B x) --> ( (\<exists>x. B x) | (\<exists>x. A x))" by iprover
 
   -- "convert to our form"
 lemma "((\<exists>x. A x | B x) --> ( (\<exists>x. B x) | (\<exists>x. A x)))
-  = ( (\<forall>x. ~ A x & ~ B x) | ( (\<exists>x. B x) | (\<exists>x. A x)))" by blast 
+  = ( (\<forall>x. ~ A x & ~ B x) | ( (\<exists>x. B x) | (\<exists>x. A x)))" by fast
 
 definition my_f :: "form" where
-  "my_f = FDisj 
+  "my_f = FDisj
   (FAll (FConj (NAtom 0 [0]) (NAtom 1 [0])))
   (FDisj (FEx (PAtom 1 [0])) (FEx (PAtom 0 [0])))"
 
