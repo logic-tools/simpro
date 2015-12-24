@@ -2,18 +2,15 @@ theory SimPro
 imports Main
 begin
 
-abbreviation infinite :: "'a set \<Rightarrow> bool"
-  where "infinite S \<equiv> \<not> finite S"
-
 subsection "Formulas"
 
-type_synonym pred = nat
+type_synonym pre = nat
 
 type_synonym var = nat
 
 datatype form = 
-  PAtom pred "var list"
-  | NAtom pred "var list"
+  PAtom pre "var list"
+  | NAtom pre "var list"
   | FConj form form
   | FDisj form form
   | FAll form
@@ -263,9 +260,11 @@ lemma (in loc1) is_path_f: "infinite (deriv s) ==> \<forall>n. f n \<in> deriv s
 
 subsection "Models"
 
-type_synonym model = "nat set * (pred => nat list => bool)"
+type_synonym U = nat
 
-type_synonym env = "var => nat"
+type_synonym model = "U set * (pre => U list => bool)"
+
+type_synonym env = "var => U"
 
 primrec FEval :: "model => env => form => bool"
 where
@@ -819,9 +818,9 @@ lemma (in loc1) FEx_upward: "infinite (deriv s) ==> init s ==> contains f n (m, 
 
 subsection "Models 2"
 
-abbreviation ntou :: "nat => nat" where "ntou == id"
+abbreviation ntou :: "nat => U" where "ntou == id"
 
-abbreviation uton :: "nat => nat" where "uton == id"
+abbreviation uton :: "U => nat" where "uton == id"
 
 subsection "Falsifying Model From Failing Path"
 
@@ -952,12 +951,9 @@ where
 lemma iter: "\<forall>a. (iter g (g a) n) = (g (iter g a n))"
   by (induct n) auto
 
-lemma ex_iter': "(\<exists>n. R (iter g a n)) = (R a | (\<exists>n. R (iter g (g a) n)))"
-  by (metis iter.simps iter not0_implies_Suc)
-
     -- "version suitable for computation"
 lemma ex_iter: "(\<exists>n. R (iter g a n)) = (if R a then True else (\<exists>n. R (iter g (g a) n)))"
-  by (metis ex_iter')
+  by (metis iter.simps iter not0_implies_Suc)
 
 definition
   f :: "nseq list => nat => nseq list" where
@@ -1075,13 +1071,13 @@ fun max x y = if x > y then x else y;
 fun flatten [] = []
   | flatten (a::list) = a @ (flatten list);
 
-type pred = int;
+type pre = int;
 
 type var = int;
 
 datatype form = 
-    PAtom of pred * (var list)
-  | NAtom of pred * (var list)
+    PAtom of pre * (var list)
+  | NAtom of pre * (var list)
   | FConj of form * form
   | FDisj of form * form
   | FAll  of form
