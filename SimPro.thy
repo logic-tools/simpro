@@ -2,56 +2,72 @@ theory SimPro
 imports Main
 begin
 
-subsection "Formulas"
-
 type_synonym pre = nat
 
 type_synonym var = nat
 
-datatype form = 
+datatype form =
   Pos pre "var list"
-  | Neg pre "var list"
-  | Con form form
-  | Dis form form
-  | Uni form
-  | Exi form
+| Neg pre "var list"
+| Con form form
+| Dis form form
+| Uni form
+| Exi form
+
+type_synonym U = nat
+
+type_synonym model = "U set * (pre => U list => bool)"
+
+type_synonym env = "var => U"
+
+primrec semantics :: "model => env => form => bool"
+where
+  "semantics m e (Pos p l) = snd m p (map e l)"
+| "semantics m e (Neg p l) = (\<not> snd m p (map e l))"
+| "semantics m e (Con f g) = (semantics m e f \<and> semantics m e g)"
+| "semantics m e (Dis f g) = (semantics m e f \<or> semantics m e g)"
+| "semantics m e (Uni f) = (\<forall>x \<in> fst m. semantics m (\<lambda>y. case y of 0 => x | Suc n => e n) f)"
+| "semantics m e (Exi f) = (\<exists>x \<in> fst m. semantics m (\<lambda>y. case y of 0 => x | Suc n => e n) f)"
+
+definition
+  is_env :: "model => env => bool" where
+  "is_env m e = (\<forall>v. e v \<in> (fst m))"
+
+primrec SEval :: "model => env => form list => bool"
+where
+  "SEval m e [] = False"
+| "SEval m e (h#t) = (semantics m e h \<or> SEval m e t)"
+
+definition Svalid :: "form list => bool"
+where
+  "Svalid s = (\<forall>m e. is_env m e --> SEval m e s)"
 
 primrec preSuc :: "nat list => nat list"
 where
   "preSuc [] = []"
-| "preSuc (a#list) = (case a of 0 => preSuc list | Suc n => n#(preSuc list))"
+| "preSuc (h#t) = (case h of 0 => preSuc t | Suc n => n#(preSuc t))"
 
-primrec fv :: "form => var list" -- "shouldn't need to be more constructive than this"
+primrec fv :: "form => var list"
 where
-  "fv (Pos p vs) = vs"
-| "fv (Neg p vs) = vs"
-| "fv (Con f g) = (fv f) @ (fv g)"
-| "fv (Dis f g) = (fv f) @ (fv g)"
+  "fv (Pos p l) = l"
+| "fv (Neg p l) = l"
+| "fv (Con f g) = fv f @ fv g"
+| "fv (Dis f g) = fv f @ fv g"
 | "fv (Uni f) = preSuc (fv f)"
 | "fv (Exi f) = preSuc (fv f)"
 
-abbreviation
-  bump :: "(var => var) => (var => var)" -- "substitute a different var for 0" where
-  "bump phi y \<equiv> (case y of 0 => 0 | Suc n => Suc (phi n))"
-
-primrec subst :: "(nat => nat) => form => form"
+primrec subst :: "(var => var) => form => form"
 where
-  "subst r (Pos p vs) = (Pos p (map r vs))"
-| "subst r (Neg p vs) = (Neg p (map r vs))"
+  "subst r (Pos p l) = Pos p (map r l)"
+| "subst r (Neg p l) = Neg p (map r l)"
 | "subst r (Con f g) = Con (subst r f) (subst r g)"
 | "subst r (Dis f g) = Dis (subst r f) (subst r g)"
-| "subst r (Uni f) = Uni (subst (bump r) f)"
-| "subst r (Exi f) = Exi (subst (bump r) f)"
+| "subst r (Uni f) = Uni (subst (\<lambda>y. case y of 0 => 0 | Suc n => Suc (r n)) f)"
+| "subst r (Exi f) = Exi (subst (\<lambda>y. case y of 0 => 0 | Suc n => Suc (r n)) f)"
 
-lemma size_subst[simp]: "\<forall>m. size (subst m f) = size f"
-  by (induct f) simp_all
-
-definition
-  finst :: "form => var => form" where
-  "finst body w = (subst (% v. case v of 0 => w | Suc n => n) body)"
-
-lemma size_finst[simp]: "size (finst f m) = size f"
-  by (simp add: finst_def)
+definition finst :: "form => var => form"
+where
+  "finst f w = (subst (\<lambda>v. case v of 0 => w | Suc n => n) f)"
 
 type_synonym seq = "form list"
 
@@ -59,65 +75,44 @@ type_synonym nform = "nat * form"
 
 type_synonym nseq = "nform list"
 
-definition
-  s_of_ns :: "nseq => seq" where
+definition s_of_ns :: "nseq => seq"
+where
   "s_of_ns ns = map snd ns"
 
-definition
-  ns_of_s :: "seq => nseq" where
-  "ns_of_s s = map (% x. (0,x)) s"
+definition ns_of_s :: "seq => nseq"
+where
+  "ns_of_s s = map (\<lambda>x. (0,x)) s"
 
 primrec flatten :: "'a list list => 'a list"
 where
   "flatten [] = []"
-| "flatten (a#list) = (a@(flatten list))"
+| "flatten (h#t) = h @ flatten t"
 
-definition
-  sfv :: "seq => var list" where
+definition sfv :: "seq => var list"
+where
   "sfv s = flatten (map fv s)"
 
-lemma sfv_nil: "sfv [] = []"
-  by (simp add: sfv_def)
-
-lemma sfv_cons: "sfv (a#list) = (fv a) @ (sfv list)"
-  by (simp add: sfv_def)
-
-primrec maxvar :: "var list => var"
+primrec maxvar :: "nat list => nat"
 where
   "maxvar [] = 0"
-| "maxvar (a#list) = max a (maxvar list)"
+| "maxvar (h#t) = max h (maxvar t)"
 
-lemma maxvar: "\<forall>v \<in> set vs. v \<le> maxvar vs"
-  by (induct vs) (auto simp add: max_def)
-
-definition
-  newvar :: "var list => var" where
-  "newvar vs = (if vs = [] then 0 else Suc (maxvar vs))"
-  -- "note that for newvar to be constructive, need an operation to get a different var from a given set"
-
-lemma newvar: "newvar vs \<notin> (set vs)"
-  using length_pos_if_in_set maxvar newvar_def by force
+definition newvar :: "nat list => nat"
+where
+  "newvar l = (if l = [] then 0 else Suc (maxvar l))"
 
 primrec subs :: "nseq => nseq list"
 where
   "subs [] = [[]]"
-| "subs (x#xs) =
-  (let (m,f) = x in
-                case f of
-                        Pos p vs => if Neg p vs : set (map snd xs) then [] else [xs@[(0,Pos p vs)]]
-                        | Neg p vs => if Pos p vs : set (map snd xs) then [] else [xs@[(0,Neg p vs)]]
-                        | Con f g => [xs@[(0,f)],xs@[(0,g)]]
-                        | Dis f g => [xs@[(0,f),(0,g)]]
-                        | Uni f => [xs@[(0,finst f (newvar (sfv (s_of_ns (x#xs)))))]]
-                        | Exi f => [xs@[(0,finst f m),(Suc m,Exi f)]]
-                )"
-
-subsection "Derivations"
-
-primrec is_axiom :: "seq => bool"
-where
-  "is_axiom [] = False"
-| "is_axiom (a#list) = ((? p vs. a = Pos p vs & Neg p vs : set list) | (? p vs. a = Neg p vs & Pos p vs : set list))"
+| "subs (h#t) = (let (m,f) = h in
+     case f of
+       Pos p l => if Neg p l : set (map snd t) then [] else [t@[(0,Pos p l)]]
+     | Neg p l => if Pos p l : set (map snd t) then [] else [t@[(0,Neg p l)]]
+     | Con f g => [t@[(0,f)],t@[(0,g)]]
+     | Dis f g => [t@[(0,f),(0,g)]]
+     | Uni f => [t@[(0,finst f (newvar (sfv (s_of_ns (h#t)))))]]
+     | Exi f => [t@[(0,finst f m),(Suc m,Exi f)]]
+   )"
 
 inductive_set
   deriv :: "nseq => (nat * nseq) set"
@@ -125,10 +120,16 @@ inductive_set
 where
   init[intro]: "(0,s) \<in> deriv s"
 | step[intro]: "(n,x) \<in> deriv s ==> y : set (subs x) ==> (Suc n,y) \<in> deriv s"
-  -- "the closure of the branch at isaxiom"
 
-lemma patom:  "(n,(m,Pos p vs)#xs) \<in> deriv(nfs) ==> ~is_axiom (s_of_ns ((m,Pos p vs)#xs)) ==> (Suc n,xs@[(0,Pos p vs)]) \<in> deriv(nfs)"
-  and natom:  "(n,(m,Neg p vs)#xs) \<in> deriv(nfs) ==> ~is_axiom (s_of_ns ((m,Neg p vs)#xs)) ==> (Suc n,xs@[(0,Neg p vs)]) \<in> deriv(nfs)"
+proposition "Svalid s = finite (deriv (ns_of_s s))" oops
+
+primrec is_axiom :: "seq => bool"
+where
+  "is_axiom [] = False"
+| "is_axiom (a#list) = ((? p l. a = Pos p l & Neg p l : set list) | (? p l. a = Neg p l & Pos p l : set list))"
+
+lemma patom:  "(n,(m,Pos p l)#xs) \<in> deriv(nfs) ==> ~is_axiom (s_of_ns ((m,Pos p l)#xs)) ==> (Suc n,xs@[(0,Pos p l)]) \<in> deriv(nfs)"
+  and natom:  "(n,(m,Neg p l)#xs) \<in> deriv(nfs) ==> ~is_axiom (s_of_ns ((m,Neg p l)#xs)) ==> (Suc n,xs@[(0,Neg p l)]) \<in> deriv(nfs)"
   and fconj1: "(n,(m,Con f g)#xs) \<in> deriv(nfs) ==> ~is_axiom (s_of_ns ((m,Con f g)#xs)) ==> (Suc n,xs@[(0,f)]) \<in> deriv(nfs)"
   and fconj2: "(n,(m,Con f g)#xs) \<in> deriv(nfs) ==> ~is_axiom (s_of_ns ((m,Con f g)#xs)) ==> (Suc n,xs@[(0,g)]) \<in> deriv(nfs)"
   and fdisj:  "(n,(m,Dis f g)#xs) \<in> deriv(nfs) ==> ~is_axiom (s_of_ns ((m,Dis f g)#xs)) ==> (Suc n,xs@[(0,f),(0,g)]) \<in> deriv(nfs)"
@@ -260,21 +261,6 @@ lemma (in loc1) is_path_f: "infinite (deriv s) ==> \<forall>n. f n \<in> deriv s
 
 subsection "Models"
 
-type_synonym U = nat
-
-type_synonym model = "U set * (pre => U list => bool)"
-
-type_synonym env = "var => U"
-
-primrec FEval :: "model => env => form => bool"
-where
-  "FEval MI e (Pos P vs) = (let IP = (snd MI) P in IP (map e vs))"
-| "FEval MI e (Neg P vs) = (let IP = (snd MI) P in ~ (IP (map e vs)))"
-| "FEval MI e (Con f g) = ((FEval MI e f) & (FEval MI e g))"
-| "FEval MI e (Dis f g) = ((FEval MI e f) | (FEval MI e g))"
-| "FEval MI e (Uni f) = (\<forall>m \<in> (fst MI). FEval MI (% y. case y of 0 => m | Suc n => e n) f)"
-| "FEval MI e (Exi f) = (\<exists>m \<in> (fst MI). FEval MI (% y. case y of 0 => m | Suc n => e n) f)"
-
 lemma ball_eq_ball: "\<forall>x \<in> m. P x = Q x ==> (\<forall>x \<in> m. P x) = (\<forall>x \<in> m. Q x)"
   by blast
 
@@ -284,7 +270,7 @@ lemma bex_eq_bex: "\<forall>x \<in> m. P x = Q x ==> (\<exists>x \<in> m. P x) =
 lemma preSuc[simp]:"Suc n \<in> set A = (n \<in> set (preSuc A))"
   by (induct A) (simp, case_tac a, simp_all)
 
-lemma FEval_cong: "\<forall>e1 e2. (\<forall>x. x \<in> set (fv A) --> e1 x = e2 x) --> FEval MI e1 A = FEval MI e2 A"
+lemma FEval_cong: "\<forall>e1 e2. (\<forall>xx. xx \<in> set (fv A) --> e1 xx = e2 xx) --> semantics mi e1 A = semantics mi e2 A"
   apply(induct_tac A)
        apply(simp add: Let_def )
  apply(intro allI impI) apply(rule arg_cong, rule map_cong) apply(rule) apply(force)
@@ -292,21 +278,16 @@ lemma FEval_cong: "\<forall>e1 e2. (\<forall>x. x \<in> set (fv A) --> e1 x = e2
      apply(simp add: Let_def ) apply(intro allI impI) apply(rule conj_cong) apply(force) apply(force)
     apply(simp add: Let_def ) apply(intro allI impI) apply(rule disj_cong) apply(force) apply(force)
    apply(simp add: Let_def ) apply(intro allI impI) apply(rule ball_eq_ball) apply(rule) 
-   apply(drule_tac x="case_nat m e1" in spec) apply(drule_tac x="case_nat m e2" in spec) apply(erule impE)
+   apply(drule_tac x="case_nat xa e1" in spec) apply(drule_tac x="case_nat xa e2" in spec) apply(erule impE)
     apply(rule) apply(rule) apply(rename_tac x) apply(case_tac x) apply(simp) apply(simp)
    apply(assumption)
   apply(simp add: Let_def ) apply(intro allI impI) apply(rule bex_eq_bex) apply(rule)
-  apply(drule_tac x="case_nat m e1" in spec) apply(drule_tac x="case_nat m e2" in spec) apply(erule impE)
+  apply(drule_tac x="case_nat xa e1" in spec) apply(drule_tac x="case_nat xa e2" in spec) apply(erule impE)
    apply(rule) apply(rule) apply(rename_tac x) apply(case_tac x) apply(simp) apply(simp)
   apply(assumption)
   done
 
-primrec SEval :: "model => env => form list => bool"
-where
-  "SEval m e [] = False"
-| "SEval m e (x#xs) = (FEval m e x | SEval m e xs)"
-
-lemma SEval_def2: "SEval m e s = (\<exists>f. f \<in> set s & FEval m e f)"
+lemma SEval_def2: "SEval m e s = (\<exists>f. f \<in> set s & semantics m e f)"
   by (induct s) auto
 
 lemma SEval_append: "SEval m e (xs@ys) = ( (SEval m e xs) | (SEval m e ys))"
@@ -315,39 +296,37 @@ lemma SEval_append: "SEval m e (xs@ys) = ( (SEval m e xs) | (SEval m e ys))"
 lemma all_eq_all: "\<forall>x. P x = Q x ==> (\<forall>x. P x) = (\<forall>x. Q x)"
   by blast
 
+lemma sfv_nil: "sfv [] = []"
+  by (simp add: sfv_def)
+
+lemma sfv_cons: "sfv (a#list) = (fv a) @ (sfv list)"
+  by (simp add: sfv_def)
+
 lemma SEval_cong: "(\<forall>x. x \<in> set (sfv s) --> e1 x = e2 x) --> SEval m e1 s = SEval m e2 s"
   by (induct s) (simp, metis FEval_cong SEval.simps(2) Un_iff set_append sfv_cons)
-
-definition
-  is_env :: "model => env => bool" where
-  "is_env MI e = (\<forall>x. e x \<in> (fst MI))"
-
-definition
-  Svalid :: "form list => bool" where
-  "Svalid s = (\<forall>MI e. is_env MI e --> SEval MI e s)"
 
 subsection "Soundness"
 
 lemma fold_compose1: "(% x. f (g x)) = (f o g)" 
   by auto
 
-lemma FEval_subst: "\<forall>e f. (FEval MI e (subst f A)) = (FEval MI (e o f) A)"
+lemma FEval_subst: "\<forall>e f. (semantics mi e (subst f A)) = (semantics mi (e o f) A)"
   apply(induct A)
        apply(simp add: Let_def) apply(simp only: fold_compose1) apply(blast)
       apply(simp add: Let_def) apply(simp only: fold_compose1) apply(blast)
      apply(simp)
     apply(simp)
    apply(simp) apply(rule,rule) apply(rule ball_eq_ball) apply(rule)
-   apply(subgoal_tac "(%u. case_nat m e (case u of 0 => 0 | Suc n => Suc (f n))) = (case_nat m (%n. e (f n)))") apply(simp)
+   apply(subgoal_tac "(%u. case_nat x e (case u of 0 => 0 | Suc n => Suc (f n))) = (case_nat x (%n. e (f n)))") apply(simp)
    apply(rule ext) apply(case_tac u)
     apply(simp) apply(simp)
   apply(simp) apply(rule,rule) apply(rule bex_eq_bex) apply(rule)
-  apply(subgoal_tac "(%u. case_nat m e (case u of 0 => 0 | Suc n => Suc (f n))) = (case_nat m (%n. e (f n)))") apply(simp)
+  apply(subgoal_tac "(%u. case_nat x e (case u of 0 => 0 | Suc n => Suc (f n))) = (case_nat x (%n. e (f n)))") apply(simp)
   apply(rule ext) apply(case_tac u)
    apply(simp) apply(simp)
   done
 
-lemma FEval_finst: "FEval mo e (finst A u) = FEval mo (case_nat (e u) e) A"
+lemma FEval_finst: "semantics mo e (finst A u) = semantics mo (case_nat (e u) e) A"
   apply(simp add: finst_def)
   apply(simp add: FEval_subst)
   apply(subgoal_tac "(e o case_nat u (%n. n)) = (case_nat (e u) e)") apply(simp)
@@ -372,19 +351,19 @@ lemma sound_FAll: "u \<notin> set (sfv (Uni f#s)) ==> Svalid (s@[finst f u]) ==>
 
   apply(drule_tac x=M in spec, drule_tac x=I in spec) -- "this is the goal"
 
-  apply(drule_tac x="e(u:=m)" in spec) apply(erule impE) apply(simp add: is_env_def) apply(erule disjE)
+  apply(drule_tac x="e(u:=x)" in spec) apply(erule impE) apply(simp add: is_env_def) apply(erule disjE)
    apply(rule disjI2)
-   apply(subgoal_tac "SEval (M,I) (e(u :=m)) s = SEval (M,I) e s")
+   apply(subgoal_tac "SEval (M,I) (e(u :=x)) s = SEval (M,I) e s")
     apply(simp)
    apply(rule SEval_cong[rule_format]) apply(simp add: sfv_cons) apply(force)
 
   apply(rule disjI1)
   apply(simp)
-  apply(subgoal_tac "FEval (M,I) (case_nat m (e(u :=m))) f = FEval (M,I) (case_nat m e) f")
+  apply(subgoal_tac "semantics (M,I) (case_nat x (e(u :=x))) f = semantics (M,I) (case_nat x e) f")
    apply(simp)
   apply(rule FEval_cong[rule_format])
 
-  apply(case_tac x, simp)
+  apply(case_tac xx, simp)
   apply(simp)
   apply(simp only: preSuc[rule_format, symmetric])
   apply(subgoal_tac "nat \<in> set (fv (Uni f))") prefer 2 apply(simp)
@@ -445,15 +424,15 @@ definition
 definition
   is_FEx :: "form => bool" where
   "is_FEx f = (case f of
-      Pos p vs => False
-    | Neg p vs => False
+      Pos p l => False
+    | Neg p l => False
     | Con f g => False
     | Dis f g => False
     | Uni f => False
     | Exi f => True)"
 
-lemma is_FEx[simp]: "~ is_FEx (Pos p vs)
-  & ~ is_FEx (Neg p vs)
+lemma is_FEx[simp]: "~ is_FEx (Pos p l)
+  & ~ is_FEx (Neg p l)
   & ~ is_FEx (Con f g)
   & ~ is_FEx (Dis f g)
   & ~ is_FEx (Uni f)"
@@ -475,6 +454,12 @@ lemma index0: "init s ==> \<forall>u m A. (n, u) \<in> deriv s --> (m,A) \<in> (
   apply(force simp add: is_FEx_def Let_def s_of_ns_def)
   done
 
+lemma maxvar: "\<forall>v \<in> set l. v \<le> maxvar l"
+  by (induct l) (auto simp add: max_def)
+
+lemma newvar: "newvar l \<notin> (set l)"
+  using length_pos_if_in_set maxvar newvar_def by force
+
 lemma soundness': "init s ==> finite (deriv s) ==> m \<in> (fst ` (deriv s)) ==> \<forall>y u. (y,u) \<in> (deriv s) --> y \<le> m ==> \<forall>n t. h = m - n & (n,t) \<in> deriv s --> Svalid (s_of_ns t)"
   apply(induct_tac h)
     -- "base case"
@@ -488,13 +473,13 @@ lemma soundness': "init s ==> finite (deriv s) ==> m \<in> (fst ` (deriv s)) ==>
     apply(erule disjE) 
       -- "base case, is axiom, starts with Pos"
      apply(elim conjE exE)
-     apply(subgoal_tac "FEval (gs,g) e (Pos p vs) | FEval (gs,g) e (Neg p vs)")
-      apply(erule disjE) apply(force) apply(rule_tac x="Neg p vs" in exI) apply(force)
+     apply(subgoal_tac "semantics (gs,g) e (Pos p l) | semantics (gs,g) e (Neg p l)")
+      apply(erule disjE) apply(force) apply(rule_tac x="Neg p l" in exI) apply(force)
      apply(simp add: Let_def)
       -- "base case, is axiom, starts with Neg"
     apply(elim conjE exE)
-    apply(subgoal_tac "FEval (gs,g) e (Pos p vs) | FEval (gs,g) e (Neg p vs)")
-      apply(erule disjE) apply(rule_tac x="Pos p vs" in exI) apply(force) apply(force)
+    apply(subgoal_tac "semantics (gs,g) e (Pos p l) | semantics (gs,g) e (Neg p l)")
+      apply(erule disjE) apply(rule_tac x="Pos p l" in exI) apply(force) apply(force)
     apply(simp add: Let_def) 
     
     -- "base case, not is axiom: if not a satax, then subs holds... but this can't be"
@@ -510,12 +495,12 @@ lemma soundness': "init s ==> finite (deriv s) ==> m \<in> (fst ` (deriv s)) ==>
     apply(simp add: s_of_ns_def) apply(case_tac t) apply(simp) apply(simp)
     apply(erule disjE)
      apply(elim conjE exE)
-     apply(subgoal_tac "FEval (gs,g) e (Pos p vs) | FEval (gs,g) e (Neg p vs)")
-      apply(erule disjE) apply(force) apply(rule_tac x="Neg p vs" in exI) apply(blast)
+     apply(subgoal_tac "semantics (gs,g) e (Pos p l) | semantics (gs,g) e (Neg p l)")
+      apply(erule disjE) apply(force) apply(rule_tac x="Neg p l" in exI) apply(blast)
      apply(simp add: Let_def)
     apply(elim conjE exE)
-    apply(subgoal_tac "FEval (gs,g) e (Pos p vs) | FEval (gs,g) e (Neg p vs)")
-      apply(erule disjE) apply(rule_tac x="Pos p vs" in exI) apply(blast) apply(simp) apply(force)
+    apply(subgoal_tac "semantics (gs,g) e (Pos p l) | semantics (gs,g) e (Neg p l)")
+      apply(erule disjE) apply(rule_tac x="Pos p l" in exI) apply(blast) apply(simp) apply(force)
     apply(simp add: Let_def)
 
      -- "we hit Uni/ Exi cases first"
@@ -553,19 +538,19 @@ lemma soundness': "init s ==> finite (deriv s) ==> m \<in> (fst ` (deriv s)) ==>
    -- "if not a satax, then subs holds... "
   apply(case_tac a)
   apply(case_tac b)
-       apply(simp del: FEval.simps) apply(frule_tac patom) apply(assumption)
+       apply(simp del: semantics.simps) apply(frule_tac patom) apply(assumption)
        apply(rename_tac nat lista)
        apply(frule_tac x="Suc na" in spec, drule_tac x="list @ [(0, Pos nat lista)]" in spec)
        apply(erule impE) apply(arith)
        apply(drule_tac x=gs in spec, drule_tac x=g in spec, drule_tac x=e in spec) apply(erule impE) apply(simp add: is_env_def)
        apply(elim exE conjE) apply(rule_tac x=f in exI) apply(simp add: s_of_ns_def) -- "weirdly, simp succeeds, force and blast fail"
-      apply(simp del: FEval.simps) apply(frule_tac natom) apply(assumption)
+      apply(simp del: semantics.simps) apply(frule_tac natom) apply(assumption)
       apply(rename_tac nat lista)
       apply(frule_tac x="Suc na" in spec, drule_tac x="list @ [(0, Neg nat lista)]" in spec)
       apply(erule impE) apply(arith)
       apply(drule_tac x=gs in spec, drule_tac x=g in spec, drule_tac x=e in spec) apply(erule impE, simp)
       apply(elim exE conjE) apply(rule_tac x=f in exI) apply(simp add: s_of_ns_def)
-     apply(simp del: FEval.simps) apply(frule_tac fconj1) apply(assumption) apply(frule_tac fconj2) apply(assumption) 
+     apply(simp del: semantics.simps) apply(frule_tac fconj1) apply(assumption) apply(frule_tac fconj2) apply(assumption) 
      apply(rename_tac form1 form2)
      apply(frule_tac x="Suc na" in spec, drule_tac x="list @ [(0, form1)]" in spec)
      apply(erule impE) apply(arith)
@@ -580,7 +565,7 @@ lemma soundness': "init s ==> finite (deriv s) ==> m \<in> (fst ` (deriv s)) ==>
        apply(simp) apply(rule_tac x="fa" in exI) apply(simp)
       apply(simp) apply(rule_tac x="f" in exI) apply(simp)
      apply(rule_tac x="f" in exI, simp)
-    apply(simp del: FEval.simps) apply(frule_tac fdisj) apply(assumption)
+    apply(simp del: semantics.simps) apply(frule_tac fdisj) apply(assumption)
     apply(rename_tac form1 form2)
     apply(frule_tac x="Suc na" in spec, drule_tac x="list @ [(0, form1),(0,form2)]" in spec)
     apply(erule impE) apply(simp)
@@ -665,7 +650,7 @@ lemma (in loc1) contains_considers: "infinite (deriv s) ==> contains f n y ==> (
   apply(force)
   done
 
-lemma (in loc1) contains_propagates_patoms[rule_format]: "infinite (deriv s) ==> contains f n (0, Pos p vs) --> contains f (n+q) (0, Pos p vs)"
+lemma (in loc1) contains_propagates_patoms[rule_format]: "infinite (deriv s) ==> contains f n (0, Pos p l) --> contains f (n+q) (0, Pos p l)"
   apply(induct_tac q) apply(simp)
   apply(rule)
   apply(erule impE) apply(assumption)
@@ -687,7 +672,7 @@ lemma (in loc1) contains_propagates_patoms[rule_format]: "infinite (deriv s) ==>
   apply(force)
   done
 
-lemma (in loc1) contains_propagates_natoms[rule_format]: "infinite (deriv s) ==> contains f n (0, Neg p vs) --> contains f (n+q) (0, Neg p vs)"
+lemma (in loc1) contains_propagates_natoms[rule_format]: "infinite (deriv s) ==> contains f n (0, Neg p l) --> contains f (n+q) (0, Neg p l)"
   apply(induct_tac q) apply(simp)
   apply(rule)
   apply(erule impE) apply(assumption)
@@ -843,7 +828,13 @@ lemma (in loc1) [simp]: "infinite (deriv s) ==> init s ==> (contains f n (m,A)) 
   apply(force)
   done
 
-lemma (in loc2) model': "infinite (deriv s) ==> init s ==> \<forall>A. size A = h --> (\<forall>m n. contains f n (m,A) --> ~ (FEval mo ntou A))"
+lemma size_subst[simp]: "\<forall>m. size (subst m f) = size f"
+  by (induct f) simp_all
+
+lemma size_finst[simp]: "size (finst f m) = size f"
+  by (simp add: finst_def)
+
+lemma (in loc2) model': "infinite (deriv s) ==> init s ==> \<forall>A. size A = h --> (\<forall>m n. contains f n (m,A) --> ~ (semantics mo ntou A))"
 
   apply(rule_tac nat_less_induct) apply(rule, rule) apply(case_tac A) 
        apply(rule,rule,rule) apply(simp add: mo Let_def) apply(simp add: model_def Let_def) apply(simp only: f[symmetric]) apply(force)
@@ -864,21 +855,21 @@ lemma (in loc2) model': "infinite (deriv s) ==> init s ==> \<forall>A. size A = 
       apply(force intro: contains_propagates_natoms contains_propagates_patoms)
 
      apply(intro impI allI)
-     apply(subgoal_tac "m=0") prefer 2 apply(simp) apply(simp del: FEval.simps)
+     apply(subgoal_tac "m=0") prefer 2 apply(simp) apply(simp del: semantics.simps)
      apply(frule_tac contains_propagates_fconj) apply(assumption)
      apply(rename_tac form1 form2 m na)
      apply(frule_tac x="size form1" in spec) apply(erule impE) apply(force) apply(drule_tac x="form1" in spec) apply(drule_tac x="size form2" in spec) apply(erule impE) apply(force) apply(simp)
      apply(force)
 
     apply(intro impI allI)
-    apply(subgoal_tac "m=0") prefer 2 apply(simp) apply(simp del: FEval.simps)
+    apply(subgoal_tac "m=0") prefer 2 apply(simp) apply(simp del: semantics.simps)
     apply(frule_tac contains_propagates_fdisj) apply(assumption)
     apply(rename_tac form1 form2 m na)
     apply(frule_tac x="size form1" in spec) apply(erule impE) apply(force) apply(drule_tac x="form1" in spec) apply(drule_tac x="size form2" in spec) apply(erule impE) apply(force) apply(simp)
     apply(force)
 
    apply(intro impI allI)
-   apply(subgoal_tac "m=0") prefer 2 apply(simp) apply(simp del: FEval.simps)
+   apply(subgoal_tac "m=0") prefer 2 apply(simp) apply(simp del: semantics.simps)
    apply(frule_tac contains_propagates_fall) apply(assumption)
    apply(erule exE) -- "all case"
    apply(rename_tac form m na y)
@@ -886,26 +877,26 @@ lemma (in loc2) model': "infinite (deriv s) ==> init s ==> \<forall>A. size A = 
    apply(erule impE, force) apply(simp add: FEval_finst) apply(rule_tac x="ntou (newvar (sfv (s_of_ns (snd (f (na + y))))))" in bexI) apply(simp)
    using is_env_model_ntou[of s] apply(simp add: is_env_def mo)
 
-  apply(intro impI allI) apply(simp del: FEval.simps)
+  apply(intro impI allI) apply(simp del: semantics.simps)
   apply(frule_tac FEx_upward) apply(assumption) apply(assumption)
   apply(simp)
   apply(rule)
   apply(rename_tac form m na ma)
-  apply(subgoal_tac "\<forall>m'. ~ FEval mo ntou (finst form m')") 
+  apply(subgoal_tac "\<forall>m'. ~ semantics mo ntou (finst form m')") 
    prefer 2 apply(rule)
    apply(drule_tac x="size form" in spec) apply(erule impE, force) 
    apply(drule_tac x="finst form m'" in spec) apply(erule impE, force) apply(erule impE) apply(force) apply(simp add: id_def)
   apply(simp add: FEval_finst id_def)
   done
    
-lemma (in loc2) model: "infinite (deriv s) ==> init s ==> (\<forall>A m n. contains f n (m,A) --> ~ (FEval mo ntou A))"
+lemma (in loc2) model: "infinite (deriv s) ==> init s ==> (\<forall>A m n. contains f n (m,A) --> ~ (semantics mo ntou A))"
   apply(rule)
   apply(frule_tac model') apply(auto)
   done
 
 subsection "Completeness"
 
-lemma (in loc2) completeness': "infinite (deriv s) ==> init s ==> \<forall>mA \<in> set s. ~ FEval mo ntou (snd mA)" -- "FIXME tidy deriv s so that s consists of formulae only?"
+lemma (in loc2) completeness': "infinite (deriv s) ==> init s ==> \<forall>mA \<in> set s. ~ semantics mo ntou (snd mA)" -- "FIXME tidy deriv s so that s consists of formulae only?"
   apply(frule_tac model) apply(assumption)
   apply(rule)
   apply(case_tac mA)
@@ -916,10 +907,10 @@ lemma (in loc2) completeness': "infinite (deriv s) ==> init s ==> \<forall>mA \<
   apply auto
   done -- "FIXME very ugly"
 
-lemma completeness': "infinite (deriv s) ==> init s ==> \<forall>mA \<in> set s. ~ FEval (model s) ntou (snd mA)"
+lemma completeness': "infinite (deriv s) ==> init s ==> \<forall>mA \<in> set s. ~ semantics (model s) ntou (snd mA)"
   by (rule loc2.completeness'[simplified loc2_def loc2_axioms_def loc1_def]) simp
 
-lemma completeness'': "infinite (deriv (ns_of_s s)) ==> init (ns_of_s s) ==> \<forall>A. A \<in> set s --> ~ FEval (model (ns_of_s s)) ntou A"
+lemma completeness'': "infinite (deriv (ns_of_s s)) ==> init (ns_of_s s) ==> \<forall>A. A \<in> set s --> ~ semantics (model (ns_of_s s)) ntou A"
   using completeness' ns_of_s_def by force
 
 lemma completeness: "infinite (deriv (ns_of_s s)) ==> ~ Svalid s"
@@ -936,14 +927,12 @@ lemma completeness: "infinite (deriv (ns_of_s s)) ==> ~ Svalid s"
   done
 -- "FIXME silly splitting of quantified pairs "
 
-subsection "Sound and Complete"
-
-lemma "Svalid s = finite (deriv (ns_of_s s))"
+proposition "Svalid s = finite (deriv (ns_of_s s))"
   using soundness completeness by blast
 
 subsection "Algorithm"
 
-primrec iter :: "('a => 'a) => 'a => nat => 'a" -- "fold for nats"
+primrec iter :: "('a => 'a) => 'a => nat => 'a"
 where
   "iter g a 0 = a"
 | "iter g a (Suc n) = g (iter g a n)"
@@ -951,12 +940,11 @@ where
 lemma iter: "\<forall>a. (iter g (g a) n) = (g (iter g a n))"
   by (induct n) auto
 
-    -- "version suitable for computation"
 lemma ex_iter: "(\<exists>n. R (iter g a n)) = (if R a then True else (\<exists>n. R (iter g (g a) n)))"
   by (metis iter.simps iter not0_implies_Suc)
 
-definition
-  f :: "nseq list => nat => nseq list" where
+definition f :: "nseq list => nat => nseq list"
+where
   "f s n = iter (% x. flatten (map subs x)) s n"
 
 lemma f_upwards: "f s n = [] ==> f s (n+m) = []"
@@ -1020,7 +1008,7 @@ lemma prove': "prove' l = (if l = [] then True else prove' ((% x. flatten (map s
 abbreviation prove :: "nseq => bool" where "prove s \<equiv> prove' [s]"
 
 corollary finite_deriv_prove: "finite (deriv s) = prove s"
-  by (simp add: finite_deriv prove'_def f_def)
+  using finite_deriv prove'_def f_def by simp
 
 subsection "Computation"
 
@@ -1086,15 +1074,15 @@ datatype form =
 fun preSuc [] = []
   | preSuc (a::list) = if a = 0 then preSuc list else (a-1)::(preSuc list);
 
-fun fv (Pos (_,vs)) = vs
-  | fv (Neg (_,vs)) = vs
+fun fv (Pos (_,l)) = l
+  | fv (Neg (_,l)) = l
   | fv (Con (f,g)) = (fv f) @ (fv g)
   | fv (Dis (f,g)) = (fv f) @ (fv g)
   | fv (Uni f) = preSuc (fv f)
   | fv (Exi f) = preSuc (fv f);
 
-fun subst r (Pos (p,vs)) = Pos (p,map r vs)
-  | subst r (Neg (p,vs)) = Neg (p,map r vs)
+fun subst r (Pos (p,l)) = Pos (p,map r l)
+  | subst r (Neg (p,l)) = Neg (p,map r l)
   | subst r (Con (f,g)) = Con (subst r f,subst r g)
   | subst r (Dis (f,g)) = Dis (subst r f,subst r g)
   | subst r (Uni f) = Uni (subst (fn 0 => 0 | v => (r (v-1))+1) f)
@@ -1111,15 +1099,15 @@ fun sfv s = flatten (map fv s);
 fun maxvar [] = 0
   | maxvar (a::list) = max a (maxvar list);
 
-fun newvar vs = if vs = [] then 0 else (maxvar vs)+1;
+fun newvar l = if l = [] then 0 else (maxvar l)+1;
 
 fun test [] _ = false
   | test ((_,y)::list) z = if y = z then true else test list z;
 
 fun subs [] = [[]]
   | subs (x::xs) = let val (n,f') = x in case f' of
-      Pos (p,vs) => if test xs (Neg (p,vs)) then [] else [xs @ [(0,Pos (p,vs))]]
-    | Neg (p,vs) => if test xs (Pos (p,vs)) then [] else [xs @ [(0,Neg (p,vs))]]
+      Pos (p,l) => if test xs (Neg (p,l)) then [] else [xs @ [(0,Pos (p,l))]]
+    | Neg (p,l) => if test xs (Pos (p,l)) then [] else [xs @ [(0,Neg (p,l))]]
     | Con (f,g) => [xs @ [(0,f)],xs @ [(0,g)]]
     | Dis (f,g) => [xs @ [(0,f),(0,g)]]
     | Uni f => [xs @ [(0,finst f (newvar (sfv (s_of_ns (x::xs)))))]]
