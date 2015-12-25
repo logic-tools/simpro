@@ -9,12 +9,12 @@ type_synonym pre = nat
 type_synonym var = nat
 
 datatype form = 
-  PAtom pre "var list"
-  | NAtom pre "var list"
-  | FConj form form
-  | FDisj form form
-  | FAll form
-  | FEx form
+  Pos pre "var list"
+  | Neg pre "var list"
+  | Con form form
+  | Dis form form
+  | Uni form
+  | Exi form
 
 primrec preSuc :: "nat list => nat list"
 where
@@ -23,12 +23,12 @@ where
 
 primrec fv :: "form => var list" -- "shouldn't need to be more constructive than this"
 where
-  "fv (PAtom p vs) = vs"
-| "fv (NAtom p vs) = vs"
-| "fv (FConj f g) = (fv f) @ (fv g)"
-| "fv (FDisj f g) = (fv f) @ (fv g)"
-| "fv (FAll f) = preSuc (fv f)"
-| "fv (FEx f) = preSuc (fv f)"
+  "fv (Pos p vs) = vs"
+| "fv (Neg p vs) = vs"
+| "fv (Con f g) = (fv f) @ (fv g)"
+| "fv (Dis f g) = (fv f) @ (fv g)"
+| "fv (Uni f) = preSuc (fv f)"
+| "fv (Exi f) = preSuc (fv f)"
 
 abbreviation
   bump :: "(var => var) => (var => var)" -- "substitute a different var for 0" where
@@ -36,12 +36,12 @@ abbreviation
 
 primrec subst :: "(nat => nat) => form => form"
 where
-  "subst r (PAtom p vs) = (PAtom p (map r vs))"
-| "subst r (NAtom p vs) = (NAtom p (map r vs))"
-| "subst r (FConj f g) = FConj (subst r f) (subst r g)"
-| "subst r (FDisj f g) = FDisj (subst r f) (subst r g)"
-| "subst r (FAll f) = FAll (subst (bump r) f)"
-| "subst r (FEx f) = FEx (subst (bump r) f)"
+  "subst r (Pos p vs) = (Pos p (map r vs))"
+| "subst r (Neg p vs) = (Neg p (map r vs))"
+| "subst r (Con f g) = Con (subst r f) (subst r g)"
+| "subst r (Dis f g) = Dis (subst r f) (subst r g)"
+| "subst r (Uni f) = Uni (subst (bump r) f)"
+| "subst r (Exi f) = Exi (subst (bump r) f)"
 
 lemma size_subst[simp]: "\<forall>m. size (subst m f) = size f"
   by (induct f) simp_all
@@ -104,12 +104,12 @@ where
 | "subs (x#xs) =
   (let (m,f) = x in
                 case f of
-                        PAtom p vs => if NAtom p vs : set (map snd xs) then [] else [xs@[(0,PAtom p vs)]]
-                        | NAtom p vs => if PAtom p vs : set (map snd xs) then [] else [xs@[(0,NAtom p vs)]]
-                        | FConj f g => [xs@[(0,f)],xs@[(0,g)]]
-                        | FDisj f g => [xs@[(0,f),(0,g)]]
-                        | FAll f => [xs@[(0,finst f (newvar (sfv (s_of_ns (x#xs)))))]]
-                        | FEx f => [xs@[(0,finst f m),(Suc m,FEx f)]]
+                        Pos p vs => if Neg p vs : set (map snd xs) then [] else [xs@[(0,Pos p vs)]]
+                        | Neg p vs => if Pos p vs : set (map snd xs) then [] else [xs@[(0,Neg p vs)]]
+                        | Con f g => [xs@[(0,f)],xs@[(0,g)]]
+                        | Dis f g => [xs@[(0,f),(0,g)]]
+                        | Uni f => [xs@[(0,finst f (newvar (sfv (s_of_ns (x#xs)))))]]
+                        | Exi f => [xs@[(0,finst f m),(Suc m,Exi f)]]
                 )"
 
 subsection "Derivations"
@@ -117,7 +117,7 @@ subsection "Derivations"
 primrec is_axiom :: "seq => bool"
 where
   "is_axiom [] = False"
-| "is_axiom (a#list) = ((? p vs. a = PAtom p vs & NAtom p vs : set list) | (? p vs. a = NAtom p vs & PAtom p vs : set list))"
+| "is_axiom (a#list) = ((? p vs. a = Pos p vs & Neg p vs : set list) | (? p vs. a = Neg p vs & Pos p vs : set list))"
 
 inductive_set
   deriv :: "nseq => (nat * nseq) set"
@@ -127,13 +127,13 @@ where
 | step[intro]: "(n,x) \<in> deriv s ==> y : set (subs x) ==> (Suc n,y) \<in> deriv s"
   -- "the closure of the branch at isaxiom"
 
-lemma patom:  "(n,(m,PAtom p vs)#xs) \<in> deriv(nfs) ==> ~is_axiom (s_of_ns ((m,PAtom p vs)#xs)) ==> (Suc n,xs@[(0,PAtom p vs)]) \<in> deriv(nfs)"
-  and natom:  "(n,(m,NAtom p vs)#xs) \<in> deriv(nfs) ==> ~is_axiom (s_of_ns ((m,NAtom p vs)#xs)) ==> (Suc n,xs@[(0,NAtom p vs)]) \<in> deriv(nfs)"
-  and fconj1: "(n,(m,FConj f g)#xs) \<in> deriv(nfs) ==> ~is_axiom (s_of_ns ((m,FConj f g)#xs)) ==> (Suc n,xs@[(0,f)]) \<in> deriv(nfs)"
-  and fconj2: "(n,(m,FConj f g)#xs) \<in> deriv(nfs) ==> ~is_axiom (s_of_ns ((m,FConj f g)#xs)) ==> (Suc n,xs@[(0,g)]) \<in> deriv(nfs)"
-  and fdisj:  "(n,(m,FDisj f g)#xs) \<in> deriv(nfs) ==> ~is_axiom (s_of_ns ((m,FDisj f g)#xs)) ==> (Suc n,xs@[(0,f),(0,g)]) \<in> deriv(nfs)"
-  and fall:   "(n,(m,FAll f)#xs) \<in> deriv(nfs) ==> ~is_axiom (s_of_ns ((m,FAll f)#xs)) ==> (Suc n,xs@[(0,finst f (newvar (sfv (s_of_ns ((m,FAll f)#xs)))))]) \<in> deriv(nfs)"
-  and fex:    "(n,(m,FEx f)#xs) \<in> deriv(nfs) ==> ~is_axiom (s_of_ns ((m,FEx f)#xs)) ==> (Suc n,xs@[(0,finst f m),(Suc m,FEx f)]) \<in> deriv(nfs)"
+lemma patom:  "(n,(m,Pos p vs)#xs) \<in> deriv(nfs) ==> ~is_axiom (s_of_ns ((m,Pos p vs)#xs)) ==> (Suc n,xs@[(0,Pos p vs)]) \<in> deriv(nfs)"
+  and natom:  "(n,(m,Neg p vs)#xs) \<in> deriv(nfs) ==> ~is_axiom (s_of_ns ((m,Neg p vs)#xs)) ==> (Suc n,xs@[(0,Neg p vs)]) \<in> deriv(nfs)"
+  and fconj1: "(n,(m,Con f g)#xs) \<in> deriv(nfs) ==> ~is_axiom (s_of_ns ((m,Con f g)#xs)) ==> (Suc n,xs@[(0,f)]) \<in> deriv(nfs)"
+  and fconj2: "(n,(m,Con f g)#xs) \<in> deriv(nfs) ==> ~is_axiom (s_of_ns ((m,Con f g)#xs)) ==> (Suc n,xs@[(0,g)]) \<in> deriv(nfs)"
+  and fdisj:  "(n,(m,Dis f g)#xs) \<in> deriv(nfs) ==> ~is_axiom (s_of_ns ((m,Dis f g)#xs)) ==> (Suc n,xs@[(0,f),(0,g)]) \<in> deriv(nfs)"
+  and fall:   "(n,(m,Uni f)#xs) \<in> deriv(nfs) ==> ~is_axiom (s_of_ns ((m,Uni f)#xs)) ==> (Suc n,xs@[(0,finst f (newvar (sfv (s_of_ns ((m,Uni f)#xs)))))]) \<in> deriv(nfs)"
+  and fex:    "(n,(m,Exi f)#xs) \<in> deriv(nfs) ==> ~is_axiom (s_of_ns ((m,Exi f)#xs)) ==> (Suc n,xs@[(0,finst f m),(Suc m,Exi f)]) \<in> deriv(nfs)"
   by (auto simp add: Let_def s_of_ns_def)
 
 lemmas not_is_axiom_subs = patom natom fconj1 fconj2 fdisj fall fex
@@ -161,8 +161,8 @@ lemma deriv_downwards: "(Suc n, x) \<in> deriv s ==> \<exists>y. (n,y) \<in> der
   apply(case_tac a) apply(case_tac b) 
        apply(auto simp add: Let_def)
    apply (rename_tac[!] nat lista a)
-   apply(subgoal_tac "NAtom nat lista \<in> snd ` set list") apply(simp) apply(force)
-  apply(subgoal_tac "PAtom nat lista \<in> snd ` set list") apply(simp) apply(force)
+   apply(subgoal_tac "Neg nat lista \<in> snd ` set list") apply(simp) apply(force)
+  apply(subgoal_tac "Pos nat lista \<in> snd ` set list") apply(simp) apply(force)
   done
 
 lemma deriv_deriv_child[rule_format]: "\<forall>x y. (Suc n,x) \<in> deriv y = (\<exists>z. z : set (subs y) & ~ is_axiom (s_of_ns y) & (n,x) \<in> deriv z)"
@@ -268,12 +268,12 @@ type_synonym env = "var => U"
 
 primrec FEval :: "model => env => form => bool"
 where
-  "FEval MI e (PAtom P vs) = (let IP = (snd MI) P in IP (map e vs))"
-| "FEval MI e (NAtom P vs) = (let IP = (snd MI) P in ~ (IP (map e vs)))"
-| "FEval MI e (FConj f g) = ((FEval MI e f) & (FEval MI e g))"
-| "FEval MI e (FDisj f g) = ((FEval MI e f) | (FEval MI e g))"
-| "FEval MI e (FAll f) = (\<forall>m \<in> (fst MI). FEval MI (% y. case y of 0 => m | Suc n => e n) f)"
-| "FEval MI e (FEx f) = (\<exists>m \<in> (fst MI). FEval MI (% y. case y of 0 => m | Suc n => e n) f)"
+  "FEval MI e (Pos P vs) = (let IP = (snd MI) P in IP (map e vs))"
+| "FEval MI e (Neg P vs) = (let IP = (snd MI) P in ~ (IP (map e vs)))"
+| "FEval MI e (Con f g) = ((FEval MI e f) & (FEval MI e g))"
+| "FEval MI e (Dis f g) = ((FEval MI e f) | (FEval MI e g))"
+| "FEval MI e (Uni f) = (\<forall>m \<in> (fst MI). FEval MI (% y. case y of 0 => m | Suc n => e n) f)"
+| "FEval MI e (Exi f) = (\<exists>m \<in> (fst MI). FEval MI (% y. case y of 0 => m | Suc n => e n) f)"
 
 lemma ball_eq_ball: "\<forall>x \<in> m. P x = Q x ==> (\<forall>x \<in> m. P x) = (\<forall>x \<in> m. Q x)"
   by blast
@@ -358,7 +358,7 @@ lemma FEval_finst: "FEval mo e (finst A u) = FEval mo (case_nat (e u) e) A"
 lemma ball_maxscope: "(\<forall>x \<in> m. P x | Q) ==> (\<forall>x \<in> m. P x) | Q "
   by simp
 
-lemma sound_FAll: "u \<notin> set (sfv (FAll f#s)) ==> Svalid (s@[finst f u]) ==> Svalid (FAll f#s)"
+lemma sound_FAll: "u \<notin> set (sfv (Uni f#s)) ==> Svalid (s@[finst f u]) ==> Svalid (Uni f#s)"
   apply(simp add: Svalid_def del: SEval.simps)
   apply(rule allI) 
   apply(rule allI)
@@ -387,7 +387,7 @@ lemma sound_FAll: "u \<notin> set (sfv (FAll f#s)) ==> Svalid (s@[finst f u]) ==
   apply(case_tac x, simp)
   apply(simp)
   apply(simp only: preSuc[rule_format, symmetric])
-  apply(subgoal_tac "nat \<in> set (fv (FAll f))") prefer 2 apply(simp)
+  apply(subgoal_tac "nat \<in> set (fv (Uni f))") prefer 2 apply(simp)
   
   apply(force simp: sfv_cons)
   done
@@ -395,7 +395,7 @@ lemma sound_FAll: "u \<notin> set (sfv (FAll f#s)) ==> Svalid (s@[finst f u]) ==
     -- "note that we can avoid maxscoping at the cost of instantiating the hyp twice- an additional time for M"
     -- "different proof, instantiating quantifier twice, avoiding maxscoping --- not much better, probably slightly worse"
 
-lemma sound_FEx: "Svalid (s@[finst f u,FEx f]) ==> Svalid (FEx f#s)"
+lemma sound_FEx: "Svalid (s@[finst f u,Exi f]) ==> Svalid (Exi f#s)"
   apply(simp add: Svalid_def del: SEval.simps)
   apply(rule allI)
   apply(rule allI)
@@ -445,18 +445,18 @@ definition
 definition
   is_FEx :: "form => bool" where
   "is_FEx f = (case f of
-      PAtom p vs => False
-    | NAtom p vs => False
-    | FConj f g => False
-    | FDisj f g => False
-    | FAll f => False
-    | FEx f => True)"
+      Pos p vs => False
+    | Neg p vs => False
+    | Con f g => False
+    | Dis f g => False
+    | Uni f => False
+    | Exi f => True)"
 
-lemma is_FEx[simp]: "~ is_FEx (PAtom p vs)
-  & ~ is_FEx (NAtom p vs)
-  & ~ is_FEx (FConj f g)
-  & ~ is_FEx (FDisj f g)
-  & ~ is_FEx (FAll f)"
+lemma is_FEx[simp]: "~ is_FEx (Pos p vs)
+  & ~ is_FEx (Neg p vs)
+  & ~ is_FEx (Con f g)
+  & ~ is_FEx (Dis f g)
+  & ~ is_FEx (Uni f)"
   by (simp add: is_FEx_def)
 
 lemma index0: "init s ==> \<forall>u m A. (n, u) \<in> deriv s --> (m,A) \<in> (set u) --> (~ is_FEx A) --> m = 0"
@@ -486,15 +486,15 @@ lemma soundness': "init s ==> finite (deriv s) ==> m \<in> (fst ` (deriv s)) ==>
      -- "base case, is axiom"
     apply(simp add: s_of_ns_def) apply(case_tac t) apply(simp) apply(simp)
     apply(erule disjE) 
-      -- "base case, is axiom, starts with PAtom"
+      -- "base case, is axiom, starts with Pos"
      apply(elim conjE exE)
-     apply(subgoal_tac "FEval (gs,g) e (PAtom p vs) | FEval (gs,g) e (NAtom p vs)")
-      apply(erule disjE) apply(force) apply(rule_tac x="NAtom p vs" in exI) apply(force)
+     apply(subgoal_tac "FEval (gs,g) e (Pos p vs) | FEval (gs,g) e (Neg p vs)")
+      apply(erule disjE) apply(force) apply(rule_tac x="Neg p vs" in exI) apply(force)
      apply(simp add: Let_def)
-      -- "base case, is axiom, starts with NAtom"
+      -- "base case, is axiom, starts with Neg"
     apply(elim conjE exE)
-    apply(subgoal_tac "FEval (gs,g) e (PAtom p vs) | FEval (gs,g) e (NAtom p vs)")
-      apply(erule disjE) apply(rule_tac x="PAtom p vs" in exI) apply(force) apply(force)
+    apply(subgoal_tac "FEval (gs,g) e (Pos p vs) | FEval (gs,g) e (Neg p vs)")
+      apply(erule disjE) apply(rule_tac x="Pos p vs" in exI) apply(force) apply(force)
     apply(simp add: Let_def) 
     
     -- "base case, not is axiom: if not a satax, then subs holds... but this can't be"
@@ -510,21 +510,21 @@ lemma soundness': "init s ==> finite (deriv s) ==> m \<in> (fst ` (deriv s)) ==>
     apply(simp add: s_of_ns_def) apply(case_tac t) apply(simp) apply(simp)
     apply(erule disjE)
      apply(elim conjE exE)
-     apply(subgoal_tac "FEval (gs,g) e (PAtom p vs) | FEval (gs,g) e (NAtom p vs)")
-      apply(erule disjE) apply(force) apply(rule_tac x="NAtom p vs" in exI) apply(blast)
+     apply(subgoal_tac "FEval (gs,g) e (Pos p vs) | FEval (gs,g) e (Neg p vs)")
+      apply(erule disjE) apply(force) apply(rule_tac x="Neg p vs" in exI) apply(blast)
      apply(simp add: Let_def)
     apply(elim conjE exE)
-    apply(subgoal_tac "FEval (gs,g) e (PAtom p vs) | FEval (gs,g) e (NAtom p vs)")
-      apply(erule disjE) apply(rule_tac x="PAtom p vs" in exI) apply(blast) apply(simp) apply(force)
+    apply(subgoal_tac "FEval (gs,g) e (Pos p vs) | FEval (gs,g) e (Neg p vs)")
+      apply(erule disjE) apply(rule_tac x="Pos p vs" in exI) apply(blast) apply(simp) apply(force)
     apply(simp add: Let_def)
 
-     -- "we hit FAll/ FEx cases first"
+     -- "we hit Uni/ Exi cases first"
   
-  apply(case_tac "\<exists>(a::nat) f list. t = (a,FAll f)#list")
+  apply(case_tac "\<exists>(a::nat) f list. t = (a,Uni f)#list")
    apply(elim exE) apply(simp)
    apply(subgoal_tac "a = 0")
     prefer 2 
-    apply(rule_tac n=na and u=t and A="FAll f" in index0[rule_format])
+    apply(rule_tac n=na and u=t and A="Uni f" in index0[rule_format])
     apply(assumption) apply(simp) apply(simp) apply(simp)
    apply(frule_tac deriv.step) apply(simp add: Let_def)  -- "nice use of simp to instantiate"
    apply(drule_tac x="Suc na" in spec, drule_tac x="list @ [(0, finst f (newvar (sfv (s_of_ns t))))]" in spec) apply(erule impE, simp)
@@ -534,12 +534,12 @@ lemma soundness': "init s ==> finite (deriv s) ==> m \<in> (fst ` (deriv s)) ==>
    apply(simp add: s_of_ns_def)
    apply(frule_tac sound_FAll) apply(simp) apply(simp)
   
-  apply(case_tac "\<exists>a f list. t = (a,FEx f)#list")
+  apply(case_tac "\<exists>a f list. t = (a,Exi f)#list")
    apply(elim exE)
    apply(frule_tac deriv.step) apply(simp add: Let_def) -- "nice use of simp to instantiate"
-   apply(drule_tac x="Suc na" in spec, drule_tac x="list @ [(0, finst f a), (Suc a, FEx f)]" in spec) apply(erule impE, assumption)
-   apply(drule_tac x="Suc na" in spec, drule_tac x="list @ [(0, finst f a), (Suc a, FEx f)]" in spec) apply(erule impE) apply(rule) apply(arith) apply(assumption)
-   apply(subgoal_tac "Svalid (s_of_ns (list@[(0,finst f a), (Suc a, FEx f)]))")
+   apply(drule_tac x="Suc na" in spec, drule_tac x="list @ [(0, finst f a), (Suc a, Exi f)]" in spec) apply(erule impE, assumption)
+   apply(drule_tac x="Suc na" in spec, drule_tac x="list @ [(0, finst f a), (Suc a, Exi f)]" in spec) apply(erule impE) apply(rule) apply(arith) apply(assumption)
+   apply(subgoal_tac "Svalid (s_of_ns (list@[(0,finst f a), (Suc a, Exi f)]))")
     apply(simp add: s_of_ns_def)
     apply(frule_tac sound_FEx) apply(simp) apply(simp)
    
@@ -555,13 +555,13 @@ lemma soundness': "init s ==> finite (deriv s) ==> m \<in> (fst ` (deriv s)) ==>
   apply(case_tac b)
        apply(simp del: FEval.simps) apply(frule_tac patom) apply(assumption)
        apply(rename_tac nat lista)
-       apply(frule_tac x="Suc na" in spec, drule_tac x="list @ [(0, PAtom nat lista)]" in spec)
+       apply(frule_tac x="Suc na" in spec, drule_tac x="list @ [(0, Pos nat lista)]" in spec)
        apply(erule impE) apply(arith)
        apply(drule_tac x=gs in spec, drule_tac x=g in spec, drule_tac x=e in spec) apply(erule impE) apply(simp add: is_env_def)
        apply(elim exE conjE) apply(rule_tac x=f in exI) apply(simp add: s_of_ns_def) -- "weirdly, simp succeeds, force and blast fail"
       apply(simp del: FEval.simps) apply(frule_tac natom) apply(assumption)
       apply(rename_tac nat lista)
-      apply(frule_tac x="Suc na" in spec, drule_tac x="list @ [(0, NAtom nat lista)]" in spec)
+      apply(frule_tac x="Suc na" in spec, drule_tac x="list @ [(0, Neg nat lista)]" in spec)
       apply(erule impE) apply(arith)
       apply(drule_tac x=gs in spec, drule_tac x=g in spec, drule_tac x=e in spec) apply(erule impE, simp)
       apply(elim exE conjE) apply(rule_tac x=f in exI) apply(simp add: s_of_ns_def)
@@ -576,7 +576,7 @@ lemma soundness': "init s ==> finite (deriv s) ==> m \<in> (fst ` (deriv s)) ==>
      apply(simp only: s_of_ns_def) 
      apply(simp)
      apply(elim disjE) 
-        apply(simp) apply(rule_tac x="FConj form1 form2" in exI) apply(simp)
+        apply(simp) apply(rule_tac x="Con form1 form2" in exI) apply(simp)
        apply(simp) apply(rule_tac x="fa" in exI) apply(simp)
       apply(simp) apply(rule_tac x="f" in exI) apply(simp)
      apply(rule_tac x="f" in exI, simp)
@@ -587,8 +587,8 @@ lemma soundness': "init s ==> finite (deriv s) ==> m \<in> (fst ` (deriv s)) ==>
     apply(drule_tac x=gs in spec, drule_tac x=g in spec, drule_tac x=e in spec) apply(erule impE, simp) apply(elim exE conjE)
     apply(simp add: s_of_ns_def)
     apply(elim disjE)
-      apply(simp) apply(rule_tac x="FDisj form1 form2" in exI) apply(simp)
-     apply(simp) apply(rule_tac x="FDisj form1 form2" in exI) apply(simp)
+      apply(simp) apply(rule_tac x="Dis form1 form2" in exI) apply(simp)
+     apply(simp) apply(rule_tac x="Dis form1 form2" in exI) apply(simp)
     apply(rule_tac x="f" in exI) apply(simp)
       -- "all case"
    apply(force)
@@ -665,7 +665,7 @@ lemma (in loc1) contains_considers: "infinite (deriv s) ==> contains f n y ==> (
   apply(force)
   done
 
-lemma (in loc1) contains_propagates_patoms[rule_format]: "infinite (deriv s) ==> contains f n (0, PAtom p vs) --> contains f (n+q) (0, PAtom p vs)"
+lemma (in loc1) contains_propagates_patoms[rule_format]: "infinite (deriv s) ==> contains f n (0, Pos p vs) --> contains f (n+q) (0, Pos p vs)"
   apply(induct_tac q) apply(simp)
   apply(rule)
   apply(erule impE) apply(assumption)
@@ -687,7 +687,7 @@ lemma (in loc1) contains_propagates_patoms[rule_format]: "infinite (deriv s) ==>
   apply(force)
   done
 
-lemma (in loc1) contains_propagates_natoms[rule_format]: "infinite (deriv s) ==> contains f n (0, NAtom p vs) --> contains f (n+q) (0, NAtom p vs)"
+lemma (in loc1) contains_propagates_natoms[rule_format]: "infinite (deriv s) ==> contains f n (0, Neg p vs) --> contains f (n+q) (0, Neg p vs)"
   apply(induct_tac q) apply(simp)
   apply(rule)
   apply(erule impE) apply(assumption)
@@ -709,8 +709,8 @@ lemma (in loc1) contains_propagates_natoms[rule_format]: "infinite (deriv s) ==>
   apply(force)
   done
 
-lemma (in loc1) contains_propagates_fconj: "infinite (deriv s) ==> contains f n (0, FConj g h) ==> (\<exists>y. contains f (n+y) (0,g) | contains f (n+y) (0,h))"
-  apply(subgoal_tac "(\<exists>l. considers f (n+l) (0,FConj g h))") defer apply(rule contains_considers) apply(assumption) apply(assumption)
+lemma (in loc1) contains_propagates_fconj: "infinite (deriv s) ==> contains f n (0, Con g h) ==> (\<exists>y. contains f (n+y) (0,g) | contains f (n+y) (0,h))"
+  apply(subgoal_tac "(\<exists>l. considers f (n+l) (0,Con g h))") defer apply(rule contains_considers) apply(assumption) apply(assumption)
   apply(erule exE)
   apply(rule_tac x="Suc l" in exI)
   apply(simp add: considers_def) apply(case_tac "snd (f (n + l))", simp)
@@ -720,8 +720,8 @@ lemma (in loc1) contains_propagates_fconj: "infinite (deriv s) ==> contains f n 
   apply(frule_tac is_path_f) apply(drule_tac x="n+l" in spec) apply(force)
   done
 
-lemma (in loc1) contains_propagates_fdisj: "infinite (deriv s) ==> contains f n (0, FDisj g h) ==> (\<exists>y. contains f (n+y) (0,g) & contains f (n+y) (0,h))"
-  apply(subgoal_tac "(\<exists>l. considers f (n+l) (0,FDisj g h))") defer apply(rule contains_considers) apply(assumption) apply(assumption)
+lemma (in loc1) contains_propagates_fdisj: "infinite (deriv s) ==> contains f n (0, Dis g h) ==> (\<exists>y. contains f (n+y) (0,g) & contains f (n+y) (0,h))"
+  apply(subgoal_tac "(\<exists>l. considers f (n+l) (0,Dis g h))") defer apply(rule contains_considers) apply(assumption) apply(assumption)
   apply(erule exE)
   apply(rule_tac x="Suc l" in exI)
   apply(simp add: considers_def) apply(case_tac "snd (f (n + l))", simp)
@@ -731,9 +731,9 @@ lemma (in loc1) contains_propagates_fdisj: "infinite (deriv s) ==> contains f n 
   apply(frule_tac is_path_f) apply(drule_tac x="n+l" in spec) apply(force)
   done
 
-lemma (in loc1) contains_propagates_fall: "infinite (deriv s) ==> contains f n (0, FAll g)
+lemma (in loc1) contains_propagates_fall: "infinite (deriv s) ==> contains f n (0, Uni g)
   ==> (\<exists>y. contains f (Suc(n+y)) (0,finst g (newvar (sfv (s_of_ns (snd (f (n+y))))))))" -- "may need constraint on fv"
-  apply(subgoal_tac "(\<exists>l. considers f (n+l) (0,FAll g))") defer apply(rule contains_considers) apply(assumption) apply(assumption)
+  apply(subgoal_tac "(\<exists>l. considers f (n+l) (0,Uni g))") defer apply(rule contains_considers) apply(assumption) apply(assumption)
   apply(erule exE)
   apply(rule_tac x="l" in exI)
   apply(simp add: considers_def) apply(case_tac "snd (f (n + l))", simp)
@@ -743,9 +743,9 @@ lemma (in loc1) contains_propagates_fall: "infinite (deriv s) ==> contains f n (
   apply(frule_tac is_path_f) apply(drule_tac x="n+l" in spec) apply(force)
   done
 
-lemma (in loc1) contains_propagates_fex: "infinite (deriv s) ==> contains f n (m, FEx g) 
-  ==> (\<exists>y. (contains f (n+y) (0,finst g m)) & (contains f (n+y) (Suc m,FEx g)))"
-  apply(subgoal_tac "(\<exists>l. considers f (n+l) (m,FEx g))") defer apply(rule contains_considers) apply(assumption) apply(assumption)
+lemma (in loc1) contains_propagates_fex: "infinite (deriv s) ==> contains f n (m, Exi g) 
+  ==> (\<exists>y. (contains f (n+y) (0,finst g m)) & (contains f (n+y) (Suc m,Exi g)))"
+  apply(subgoal_tac "(\<exists>l. considers f (n+l) (m,Exi g))") defer apply(rule contains_considers) apply(assumption) apply(assumption)
   apply(erule exE)
   apply(rule_tac x="Suc l" in exI)
   apply(simp add: considers_def) apply(case_tac "snd (f (n + l))", simp)
@@ -759,7 +759,7 @@ lemma (in loc1) contains_propagates_fex: "infinite (deriv s) ==> contains f n (m
   -- "existentials: show that for exists formulae, if Suc m is marker, then there must have been m"
   -- "show this by showing that nodes are upwardly closed, i.e. if never contains (m,x), then never contains (Suc m, x), by induction on n"
 
-lemma (in loc1) FEx_downward: "infinite (deriv s) ==> init s ==> \<forall>m. (Suc m,FEx g) \<in> set (snd (f n)) --> (\<exists>n'. (m, FEx g) \<in> set (snd (f n')))"
+lemma (in loc1) FEx_downward: "infinite (deriv s) ==> init s ==> \<forall>m. (Suc m,Exi g) \<in> set (snd (f n)) --> (\<exists>n'. (m, Exi g) \<in> set (snd (f n')))"
   apply(frule_tac is_path_f)
   apply(induct_tac n)
    apply(drule_tac x="0" in spec) apply(case_tac "f 0") apply(force simp: init_def) 
@@ -775,12 +775,12 @@ lemma (in loc1) FEx_downward: "infinite (deriv s) ==> init s ==> \<forall>m. (Su
     apply(force simp add: Let_def)
    apply(force simp add: Let_def)
   apply(rename_tac form)
-  apply(case_tac "(ab, FEx form) = (m, FEx g)")
+  apply(case_tac "(ab, Exi form) = (m, Exi g)")
    apply(rule_tac x=n in exI) apply(force)
   apply(auto simp add: Let_def)
   done
    
-lemma (in loc1) FEx0: "infinite (deriv s) ==> init s ==> \<forall>n. contains f n (m,FEx g) --> (\<exists>n'. contains f n' (0, FEx g))"
+lemma (in loc1) FEx0: "infinite (deriv s) ==> init s ==> \<forall>n. contains f n (m,Exi g) --> (\<exists>n'. contains f n' (0, Exi g))"
   apply(simp add: contains_def)
   apply(induct_tac m)
    apply(force)
@@ -790,7 +790,7 @@ lemma (in loc1) FEx0: "infinite (deriv s) ==> init s ==> \<forall>n. contains f 
   apply(force)
   done
      
-lemma (in loc1) FEx_upward': "infinite (deriv s) ==> init s ==> \<forall>n. contains f n (0, FEx g) --> (\<exists>n'. contains f n' (m, FEx g))"
+lemma (in loc1) FEx_upward': "infinite (deriv s) ==> init s ==> \<forall>n. contains f n (0, Exi g) --> (\<exists>n'. contains f n' (m, Exi g))"
   apply(intro allI impI)
   apply(induct_tac m) apply(force)
   apply(erule exE)
@@ -805,9 +805,9 @@ lemma (in loc1) FEx_upward': "infinite (deriv s) ==> init s ==> \<forall>n. cont
   done
   -- "FIXME contains and considers aren't buying us much"
 
-lemma (in loc1) FEx_upward: "infinite (deriv s) ==> init s ==> contains f n (m, FEx g) ==> (\<forall>m'. \<exists>n'. contains f n' (0, finst g m'))"
+lemma (in loc1) FEx_upward: "infinite (deriv s) ==> init s ==> contains f n (m, Exi g) ==> (\<forall>m'. \<exists>n'. contains f n' (0, finst g m'))"
   apply(intro allI impI)
-  apply(subgoal_tac "\<exists>n'. contains f n' (m', FEx g)") defer
+  apply(subgoal_tac "\<exists>n'. contains f n' (m', Exi g)") defer
   apply(frule_tac m = m and g = g in FEx0) apply(assumption)
   apply(drule_tac x=n in spec)
   apply(simp)
@@ -826,7 +826,7 @@ subsection "Falsifying Model From Failing Path"
 
 definition model :: "nseq => model" where
   "model s = (range ntou, % p ms. (let f = failing_path (deriv s) in
-    (\<forall>n m. ~ contains f n (m,PAtom p (map uton ms)))))"
+    (\<forall>n m. ~ contains f n (m,Pos p (map uton ms)))))"
 
 locale loc2 = loc1 +
   fixes mo
@@ -852,10 +852,10 @@ lemma (in loc2) model': "infinite (deriv s) ==> init s ==> \<forall>A. size A = 
       apply(subgoal_tac "m = 0 & ma = 0") prefer 2 apply(simp)
       apply(simp)
       apply(rename_tac nat list m na nb ma)
-      apply(subgoal_tac "? y. considers f (nb+na+y) (0, PAtom nat list)") prefer 2 apply(rule contains_considers) apply(assumption) 
+      apply(subgoal_tac "? y. considers f (nb+na+y) (0, Pos nat list)") prefer 2 apply(rule contains_considers) apply(assumption) 
        apply(rule contains_propagates_patoms) apply(assumption) apply(assumption)
       apply(erule exE)
-      apply(subgoal_tac "contains f (na+nb+y) (0, NAtom nat list)")
+      apply(subgoal_tac "contains f (na+nb+y) (0, Neg nat list)")
        apply(subgoal_tac "nb+na=na+nb") 
         apply(simp) apply(subgoal_tac "is_axiom (s_of_ns (snd (f (na+nb+y))))")
          apply(drule_tac is_axiom_finite_deriv) apply(force dest: is_path_f)
@@ -1032,9 +1032,9 @@ lemma "((\<exists>x. A x | B x) --> ( (\<exists>x. B x) | (\<exists>x. A x)))
   = ( (\<forall>x. ~ A x & ~ B x) | ( (\<exists>x. B x) | (\<exists>x. A x)))" by fast
 
 definition my_f :: "form" where
-  "my_f = FDisj
-  (FAll (FConj (NAtom 0 [0]) (NAtom 1 [0])))
-  (FDisj (FEx (PAtom 1 [0])) (FEx (PAtom 0 [0])))"
+  "my_f = Dis
+  (Uni (Con (Neg 0 [0]) (Neg 1 [0])))
+  (Dis (Exi (Pos 1 [0])) (Exi (Pos 0 [0])))"
 
   -- "we compute by rewriting"
 
@@ -1076,29 +1076,29 @@ type pre = int;
 type var = int;
 
 datatype form = 
-    PAtom of pre * (var list)
-  | NAtom of pre * (var list)
-  | FConj of form * form
-  | FDisj of form * form
-  | FAll  of form
-  | FEx   of form;
+    Pos of pre * (var list)
+  | Neg of pre * (var list)
+  | Con of form * form
+  | Dis of form * form
+  | Uni of form
+  | Exi of form;
 
 fun preSuc [] = []
   | preSuc (a::list) = if a = 0 then preSuc list else (a-1)::(preSuc list);
 
-fun fv (PAtom (_,vs)) = vs
-  | fv (NAtom (_,vs)) = vs
-  | fv (FConj (f,g)) = (fv f) @ (fv g)
-  | fv (FDisj (f,g)) = (fv f) @ (fv g)
-  | fv (FAll f) = preSuc (fv f)
-  | fv (FEx f)  = preSuc (fv f);
+fun fv (Pos (_,vs)) = vs
+  | fv (Neg (_,vs)) = vs
+  | fv (Con (f,g)) = (fv f) @ (fv g)
+  | fv (Dis (f,g)) = (fv f) @ (fv g)
+  | fv (Uni f) = preSuc (fv f)
+  | fv (Exi f) = preSuc (fv f);
 
-fun subst r (PAtom (p,vs)) = PAtom (p,map r vs)
-  | subst r (NAtom (p,vs)) = NAtom (p,map r vs)
-  | subst r (FConj (f,g)) = FConj (subst r f,subst r g)
-  | subst r (FDisj (f,g)) = FDisj (subst r f,subst r g)
-  | subst r (FAll f) = FAll (subst (fn 0 => 0 | v => (r (v-1))+1) f)
-  | subst r (FEx f)  = FEx  (subst (fn 0 => 0 | v => (r (v-1))+1) f);
+fun subst r (Pos (p,vs)) = Pos (p,map r vs)
+  | subst r (Neg (p,vs)) = Neg (p,map r vs)
+  | subst r (Con (f,g)) = Con (subst r f,subst r g)
+  | subst r (Dis (f,g)) = Dis (subst r f,subst r g)
+  | subst r (Uni f) = Uni (subst (fn 0 => 0 | v => (r (v-1))+1) f)
+  | subst r (Exi f) = Exi  (subst (fn 0 => 0 | v => (r (v-1))+1) f);
 
 fun finst body w = subst (fn 0 => w | v => v-1) body;
 
@@ -1118,12 +1118,12 @@ fun test [] _ = false
 
 fun subs [] = [[]]
   | subs (x::xs) = let val (n,f') = x in case f' of
-      PAtom (p,vs) => if test xs (NAtom (p,vs)) then [] else [xs @ [(0,PAtom (p,vs))]]
-    | NAtom (p,vs) => if test xs (PAtom (p,vs)) then [] else [xs @ [(0,NAtom (p,vs))]]
-    | FConj (f,g) => [xs @ [(0,f)],xs @ [(0,g)]]
-    | FDisj (f,g) => [xs @ [(0,f),(0,g)]]
-    | FAll f => [xs @ [(0,finst f (newvar (sfv (s_of_ns (x::xs)))))]]
-    | FEx f  => [xs @ [(0,finst f n),(n+1,f')]]
+      Pos (p,vs) => if test xs (Neg (p,vs)) then [] else [xs @ [(0,Pos (p,vs))]]
+    | Neg (p,vs) => if test xs (Pos (p,vs)) then [] else [xs @ [(0,Neg (p,vs))]]
+    | Con (f,g) => [xs @ [(0,f)],xs @ [(0,g)]]
+    | Dis (f,g) => [xs @ [(0,f),(0,g)]]
+    | Uni f => [xs @ [(0,finst f (newvar (sfv (s_of_ns (x::xs)))))]]
+    | Exi f => [xs @ [(0,finst f n),(n+1,f')]]
   end;
 
 fun step s = flatten (map subs s);
@@ -1134,9 +1134,9 @@ fun prove s = prove' [s];
 
 fun check f = (prove o ns_of_s) [f];
 
-val my_f = FDisj (
-  (FAll (FConj ((NAtom (0,[0])), (NAtom (1,[0])))),
-  (FDisj ((FEx ((PAtom (1,[0])))), (FEx (PAtom (0,[0])))))));
+val my_f = Dis (
+  (Uni (Con ((Neg (0,[0])), (Neg (1,[0])))),
+  (Dis ((Exi ((Pos (1,[0])))), (Exi (Pos (0,[0])))))));
 
 check my_f;
 
