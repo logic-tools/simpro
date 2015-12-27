@@ -1,16 +1,9 @@
-theory SimPro
-imports Main
-begin
-
-datatype form =
-  Pos string "nat list"
-| Neg string "nat list"
-| Con form form
-| Dis form form
-| Uni form
-| Exi form
+theory SimPro imports Main begin
 
 type_synonym proxy = nat
+
+datatype form = Pos string "nat list" | Con form form | Uni form
+              | Neg string "nat list" | Dis form form | Exi form
 
 type_synonym model = "proxy set \<times> (string \<Rightarrow> proxy list \<Rightarrow> bool)"
 
@@ -150,9 +143,9 @@ lemma deriv_upwards: "(n,list) \<in> deriv s \<Longrightarrow> ~ is_axiom (list_
   apply(case_tac list) apply force
   apply(case_tac a) apply(case_tac b)
        apply(simp add: Let_def) apply(rule) apply(simp add: list_sequent_def) apply(force dest: not_is_axiom_subs)
-      apply(simp add: Let_def) apply(rule) apply(simp add: list_sequent_def) apply(force dest: not_is_axiom_subs)
      apply(simp add: Let_def) apply(force dest: not_is_axiom_subs)
     apply(simp add: Let_def) apply(force dest: not_is_axiom_subs)
+      apply(simp add: Let_def) apply(rule) apply(simp add: list_sequent_def) apply(force dest: not_is_axiom_subs)
    apply(simp add: Let_def) apply(force dest: not_is_axiom_subs)
   apply(simp add: Let_def) apply(force dest: not_is_axiom_subs)
   done
@@ -279,15 +272,14 @@ lemma preSuc[simp]:"Suc n \<in> set A = (n \<in> set (preSuc A))"
 
 lemma FEval_cong: "\<forall>e1 e2. (\<forall>xx. xx \<in> set (fv A) \<longrightarrow> e1 xx = e2 xx) \<longrightarrow> semantics mi e1 A = semantics mi e2 A"
   apply(induct_tac A)
-       apply(simp add: Let_def )
- apply(intro allI impI) apply(rule arg_cong, rule map_cong) apply(rule) apply(force)
-      apply(simp add: Let_def ) apply(intro allI impI) apply(rule arg_cong, rule map_cong) apply(rule) apply(force)
+       apply(simp add: Let_def ) apply(intro allI impI) apply(rule arg_cong, rule map_cong) apply(rule) apply(force)
      apply(simp add: Let_def ) apply(intro allI impI) apply(rule conj_cong) apply(force) apply(force)
-    apply(simp add: Let_def ) apply(intro allI impI) apply(rule disj_cong) apply(force) apply(force)
    apply(simp add: Let_def ) apply(intro allI impI) apply(rule ball_eq_ball) apply(rule) 
    apply(drule_tac x="case_nat xa e1" in spec) apply(drule_tac x="case_nat xa e2" in spec) apply(erule impE)
     apply(rule) apply(rule) apply(rename_tac x) apply(case_tac x) apply(simp) apply(simp)
    apply(assumption)
+      apply(simp add: Let_def ) apply(intro allI impI) apply(rule arg_cong, rule map_cong) apply(rule)  apply(force)
+    apply(simp add: Let_def ) apply(intro allI impI) apply(rule disj_cong) apply(force) apply(force)
   apply(simp add: Let_def ) apply(intro allI impI) apply(rule bex_eq_bex) apply(rule)
   apply(drule_tac x="case_nat xa e1" in spec) apply(drule_tac x="case_nat xa e2" in spec) apply(erule impE)
    apply(rule) apply(rule) apply(rename_tac x) apply(case_tac x) apply(simp) apply(simp)
@@ -320,13 +312,13 @@ lemma fold_compose1: "(% x. f (g x)) = (f o g)"
 lemma FEval_subst: "\<forall>e f. (semantics mi e (subst f A)) = (semantics mi (e o f) A)"
   apply(induct A)
        apply(simp add: Let_def) apply(simp only: fold_compose1) apply(blast)
-      apply(simp add: Let_def) apply(simp only: fold_compose1) apply(blast)
-     apply(simp)
     apply(simp)
    apply(simp) apply(rule,rule) apply(rule ball_eq_ball) apply(rule)
    apply(subgoal_tac "(%u. case_nat x e (case u of 0 \<Rightarrow> 0 | Suc n \<Rightarrow> Suc (f n))) = (case_nat x (%n. e (f n)))") apply(simp)
    apply(rule ext) apply(case_tac u)
     apply(simp) apply(simp)
+      apply(simp add: Let_def) apply(simp only: fold_compose1) apply(blast)
+     apply(simp)
   apply(simp) apply(rule,rule) apply(rule bex_eq_bex) apply(rule)
   apply(subgoal_tac "(%u. case_nat x e (case u of 0 \<Rightarrow> 0 | Suc n \<Rightarrow> Suc (f n))) = (case_nat x (%n. e (f n)))") apply(simp)
   apply(rule ext) apply(case_tac u)
@@ -551,12 +543,6 @@ lemma soundness': "init s \<Longrightarrow> finite (deriv s) \<Longrightarrow> m
        apply(erule impE) apply(arith)
        apply(drule_tac x=gs in spec, drule_tac x=g in spec, drule_tac x=e in spec) apply(erule impE) apply(simp add: is_model_environment_def)
        apply(elim exE conjE) apply(rule_tac x=f in exI) apply(simp add: list_sequent_def) -- "weirdly, simp succeeds, force and blast fail"
-      apply(simp del: semantics.simps) apply(frule_tac natom) apply(assumption)
-      apply(rename_tac nat lista)
-      apply(frule_tac x="Suc na" in spec, drule_tac x="list @ [(0, Neg nat lista)]" in spec)
-      apply(erule impE) apply(arith)
-      apply(drule_tac x=gs in spec, drule_tac x=g in spec, drule_tac x=e in spec) apply(erule impE, simp)
-      apply(elim exE conjE) apply(rule_tac x=f in exI) apply(simp add: list_sequent_def)
      apply(simp del: semantics.simps) apply(frule_tac fconj1) apply(assumption) apply(frule_tac fconj2) apply(assumption) 
      apply(rename_tac form1 form2)
      apply(frule_tac x="Suc na" in spec, drule_tac x="list @ [(0, form1)]" in spec)
@@ -572,6 +558,13 @@ lemma soundness': "init s \<Longrightarrow> finite (deriv s) \<Longrightarrow> m
        apply(simp) apply(rule_tac x="fa" in exI) apply(simp)
       apply(simp) apply(rule_tac x="f" in exI) apply(simp)
      apply(rule_tac x="f" in exI, simp)
+   apply(force)
+      apply(simp del: semantics.simps) apply(frule_tac natom) apply(assumption)
+      apply(rename_tac nat lista)
+      apply(frule_tac x="Suc na" in spec, drule_tac x="list @ [(0, Neg nat lista)]" in spec)
+      apply(erule impE) apply(arith)
+      apply(drule_tac x=gs in spec, drule_tac x=g in spec, drule_tac x=e in spec) apply(erule impE, simp)
+      apply(elim exE conjE) apply(rule_tac x=f in exI) apply(simp add: list_sequent_def)
     apply(simp del: semantics.simps) apply(frule_tac fdisj) apply(assumption)
     apply(rename_tac form1 form2)
     apply(frule_tac x="Suc na" in spec, drule_tac x="list @ [(0, form1),(0,form2)]" in spec)
@@ -583,7 +576,6 @@ lemma soundness': "init s \<Longrightarrow> finite (deriv s) \<Longrightarrow> m
      apply(simp) apply(rule_tac x="Dis form1 form2" in exI) apply(simp)
     apply(rule_tac x="f" in exI) apply(simp)
       -- "all case"
-   apply(force)
   apply(force)
   done
 
@@ -762,9 +754,9 @@ lemma (in loc1) FEx_downward: "infinite (deriv s) \<Longrightarrow> init s \<Lon
   apply(case_tac b) apply(simp)
   apply(case_tac aa) apply(case_tac ba)
        apply(simp add: Let_def split: if_splits)
-      apply(simp add: Let_def split: if_splits)
      apply(force simp add: Let_def)
     apply(force simp add: Let_def)
+      apply(simp add: Let_def split: if_splits)
    apply(force simp add: Let_def)
   apply(rename_tac form)
   apply(case_tac "(ab, Exi form) = (m, Exi g)")
@@ -846,6 +838,22 @@ lemma (in loc2) model': "infinite (deriv s) \<Longrightarrow> init s \<Longright
   apply(rule_tac nat_less_induct) apply(rule, rule) apply(case_tac A) 
        apply(rule,rule,rule) apply(simp add: mo Let_def) apply(simp add: model_def Let_def) apply(simp only: f[symmetric]) apply(force)
 
+     apply(intro impI allI)
+     apply(subgoal_tac "m=0") prefer 2 apply(simp) apply(simp del: semantics.simps)
+     apply(frule_tac contains_propagates_fconj) apply(assumption)
+     apply(rename_tac form1 form2 m na)
+     apply(frule_tac x="size form1" in spec) apply(erule impE) apply(force) apply(drule_tac x="form1" in spec) apply(drule_tac x="size form2" in spec) apply(erule impE) apply(force) apply(simp)
+     apply(force)
+
+   apply(intro impI allI)
+   apply(subgoal_tac "m=0") prefer 2 apply(simp) apply(simp del: semantics.simps)
+   apply(frule_tac contains_propagates_fall) apply(assumption)
+   apply(erule exE) -- "all case"
+   apply(rename_tac form m na y)
+   apply(drule_tac x="size form" in spec) apply(erule impE, force) apply(drule_tac x="finst form (newvar (fv_list (list_sequent (snd (f (na + y))))))" in spec) apply(erule impE, force)
+   apply(erule impE, force) apply(simp add: FEval_finst) apply(rule_tac x="ntou (newvar (fv_list (list_sequent (snd (f (na + y))))))" in bexI) apply(simp)
+   using is_env_model_ntou[of s] apply(simp add: is_model_environment_def mo)
+
       apply(rule,rule,rule) apply(simp add: mo Let_def) apply(simp add: model_def Let_def) apply(simp only: f[symmetric]) apply(rule ccontr) apply(simp) apply(elim exE)
       apply(subgoal_tac "m = 0 & ma = 0") prefer 2 apply(simp)
       apply(simp)
@@ -860,29 +868,12 @@ lemma (in loc2) model': "infinite (deriv s) \<Longrightarrow> init s \<Longright
         apply(simp add: contains_def considers_def) apply(case_tac "snd (f (na + nb + y))") apply(simp) apply(simp add: list_sequent_def) apply(force)
        apply(force)
       apply(force intro: contains_propagates_natoms contains_propagates_patoms)
-
-     apply(intro impI allI)
-     apply(subgoal_tac "m=0") prefer 2 apply(simp) apply(simp del: semantics.simps)
-     apply(frule_tac contains_propagates_fconj) apply(assumption)
-     apply(rename_tac form1 form2 m na)
-     apply(frule_tac x="size form1" in spec) apply(erule impE) apply(force) apply(drule_tac x="form1" in spec) apply(drule_tac x="size form2" in spec) apply(erule impE) apply(force) apply(simp)
-     apply(force)
-
     apply(intro impI allI)
     apply(subgoal_tac "m=0") prefer 2 apply(simp) apply(simp del: semantics.simps)
     apply(frule_tac contains_propagates_fdisj) apply(assumption)
     apply(rename_tac form1 form2 m na)
     apply(frule_tac x="size form1" in spec) apply(erule impE) apply(force) apply(drule_tac x="form1" in spec) apply(drule_tac x="size form2" in spec) apply(erule impE) apply(force) apply(simp)
     apply(force)
-
-   apply(intro impI allI)
-   apply(subgoal_tac "m=0") prefer 2 apply(simp) apply(simp del: semantics.simps)
-   apply(frule_tac contains_propagates_fall) apply(assumption)
-   apply(erule exE) -- "all case"
-   apply(rename_tac form m na y)
-   apply(drule_tac x="size form" in spec) apply(erule impE, force) apply(drule_tac x="finst form (newvar (fv_list (list_sequent (snd (f (na + y))))))" in spec) apply(erule impE, force)
-   apply(erule impE, force) apply(simp add: FEval_finst) apply(rule_tac x="ntou (newvar (fv_list (list_sequent (snd (f (na + y))))))" in bexI) apply(simp)
-   using is_env_model_ntou[of s] apply(simp add: is_model_environment_def mo)
 
   apply(intro impI allI) apply(simp del: semantics.simps)
   apply(frule_tac FEx_upward) apply(assumption) apply(assumption)
