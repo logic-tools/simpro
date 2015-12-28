@@ -58,6 +58,13 @@ primrec fv :: "form \<Rightarrow> nat list" where
 definition fv_list :: "form list \<Rightarrow> nat list" where
   "fv_list s = flatten (map fv s)"
 
+primrec max_list :: "nat list \<Rightarrow> nat" where
+  "max_list [] = 0"
+| "max_list (h # t) = max h (max_list t)"
+
+definition fresh :: "nat list \<Rightarrow> nat" where
+  "fresh l = (if l = [] then 0 else Suc (max_list l))"
+
 primrec substitution :: "(nat \<Rightarrow> nat) \<Rightarrow> form \<Rightarrow> form" where
   "substitution f (Pos i v) = Pos i (map f v)"
 | "substitution f (Neg i v) = Neg i (map f v)"
@@ -69,13 +76,6 @@ primrec substitution :: "(nat \<Rightarrow> nat) \<Rightarrow> form \<Rightarrow
 definition substitution_helper :: "form \<Rightarrow> nat \<Rightarrow> form" where
   "substitution_helper p y = substitution (\<lambda>x. case x of 0 \<Rightarrow> y | Suc n \<Rightarrow> n) p"
 
-primrec max_list :: "nat list \<Rightarrow> nat" where
-  "max_list [] = 0"
-| "max_list (h # t) = max h (max_list t)"
-
-definition fresh :: "nat list \<Rightarrow> nat" where
-  "fresh l = (if l = [] then 0 else Suc (max_list l))"
-
 definition inference :: "sequent \<Rightarrow> sequent list" where
   "inference s = (case s of [] \<Rightarrow> [[]] | ((n,h) # t) \<Rightarrow> (case h of
       Pos i v \<Rightarrow> if member (Neg i v) (list_sequent t) then [] else [t @ [(0,Pos i v)]]
@@ -83,7 +83,7 @@ definition inference :: "sequent \<Rightarrow> sequent list" where
     | Con p q \<Rightarrow> [t @ [(0,p)],t @ [(0,q)]]
     | Dis p q \<Rightarrow> [t @ [(0,p),(0,q)]]
     | Uni p \<Rightarrow> [t @ [(0,substitution_helper p (fresh (fv_list (list_sequent s))))]]
-    | Exi p \<Rightarrow> [t @ [(0,substitution_helper p n),(Suc n,Exi p)]] ))"
+    | Exi p \<Rightarrow> [t @ [(0,substitution_helper p n),(Suc n,h)]] ))"
 
 primrec repeat :: "('a \<Rightarrow> 'a) \<Rightarrow> 'a \<Rightarrow> nat \<Rightarrow> 'a" where
   "repeat f a 0 = a"
@@ -106,7 +106,7 @@ proposition "(\<exists>n. r (repeat f a n)) = (if r a then True else (\<exists>n
 
 inductive_set calculation :: "sequent \<Rightarrow> (nat \<times> sequent) set" for s :: sequent where
   init[intro]: "(0,s) \<in> calculation s"
-| step[intro]: "(n,l) \<in> calculation s \<Longrightarrow> l' \<in> set (inference l) \<Longrightarrow> (Suc n,l') \<in> calculation s"
+| step[intro]: "(n,k) \<in> calculation s \<Longrightarrow> l \<in> set (inference k) \<Longrightarrow> (Suc n,l) \<in> calculation s"
 
 abbreviation(input) calculation_thesis :: bool where
   "calculation_thesis \<equiv> valid = finite \<circ> calculation \<circ> make_sequent"
@@ -114,7 +114,8 @@ abbreviation(input) calculation_thesis :: bool where
 lemma "is_model_environment m e \<Longrightarrow> fst m \<noteq> {}"
   using is_model_environment_def by auto
 
-lemma "\<exists>m. \<forall>e. is_model_environment m e \<and> infinite (fst m)"  using is_model_environment_def infinite_UNIV_nat by auto
+lemma "\<exists>m. \<forall>e. is_model_environment m e \<and> infinite (fst m)"
+  using is_model_environment_def infinite_UNIV_nat by auto
 
 primrec is_axiom :: "form list \<Rightarrow> bool"
 where
@@ -152,8 +153,8 @@ lemma calculation_downwards: "(Suc n, x) \<in> calculation s \<Longrightarrow> \
   apply(erule calculation.cases)
   apply(simp)
   apply(simp add: list_sequent_def Let_def)
-  apply(rule_tac x=l in exI) apply(simp)
-  apply(case_tac l) apply(simp)
+  apply(rule_tac x=k in exI) apply(simp)
+  apply(case_tac k) apply(simp)
   apply(case_tac a) apply(case_tac b) 
        apply(auto simp add: Let_def)
    apply (rename_tac[!] nat lista a)
@@ -1056,7 +1057,7 @@ fun substitution r (Pos (p,l)) = Pos (p,map r l)
   | substitution r (Con (f,g)) = Con (substitution r f,substitution r g)
   | substitution r (Dis (f,g)) = Dis (substitution r f,substitution r g)
   | substitution r (Uni f) = Uni (substitution (fn 0 => 0 | v => (r (v-1))+1) f)
-  | substitution r (Exi f) = Exi  (substitution (fn 0 => 0 | v => (r (v-1))+1) f);
+  | substitution r (Exi f) = Exi (substitution (fn 0 => 0 | v => (r (v-1))+1) f);
 
 fun substitution_helper body w = substitution (fn 0 => w | v => v-1) body;
 
@@ -1101,16 +1102,17 @@ check my_f;
 \<close>
 
 theorem correctness: prover_thesis calculation_thesis
-  using soundness completeness finite_calculation_prover prover_wrapper_def by (auto simp add: comp_def)
+  using soundness completeness finite_calculation_prover prover_wrapper_def
+  by (auto simp add: comp_def)
 
-abbreviation dummy :: "form list \<Rightarrow> bool" where "dummy == prover \<circ> prover_wrapper"
+abbreviation check :: "form list \<Rightarrow> bool" where "check \<equiv> prover \<circ> prover_wrapper"
 
-corollary "(\<exists>l. dummy l) \<and> (\<exists>l. \<not> dummy l)"
+corollary "(\<exists>l. check l) \<and> (\<exists>l. \<not> check l)"
 proof -
   have "\<not> valid []" using valid_def is_model_environment_def by auto
-  then have consistency': "\<not> dummy []" by (simp add: correctness)
+  then have consistency': "\<not> check []" by (simp add: correctness)
   have "valid [my_f]" using search make_sequent_def soundness by simp
-  then have consistency'': "dummy [my_f]" by (simp add: correctness)
+  then have consistency'': "check [my_f]" by (simp add: correctness)
   then show ?thesis using consistency' consistency'' by auto
 qed
 
