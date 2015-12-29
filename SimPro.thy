@@ -74,7 +74,7 @@ definition substitution_helper :: "form \<Rightarrow> nat \<Rightarrow> form" wh
   "substitution_helper p y = substitution (\<lambda>x. case x of 0 \<Rightarrow> y | Suc n \<Rightarrow> n) p"
 
 definition inference :: "sequent \<Rightarrow> sequent list" where
-  "inference s = (case s of [] \<Rightarrow> [[]] | ((n,h) # t) \<Rightarrow> (case h of
+  "inference s = (case s of [] \<Rightarrow> [[]] | (n,h) # t \<Rightarrow> (case h of
       Pos i v \<Rightarrow> if member (Neg i v) (list_sequent t) then [] else [t @ [(0,Pos i v)]]
     | Neg i v \<Rightarrow> if member (Pos i v) (list_sequent t) then [] else [t @ [(0,Neg i v)]]
     | Con p q \<Rightarrow> [t @ [(0,p)],t @ [(0,q)]]
@@ -89,30 +89,30 @@ primrec repeat :: "('a \<Rightarrow> 'a) \<Rightarrow> 'a \<Rightarrow> nat \<Ri
 definition prover :: "sequent list \<Rightarrow> bool" where
   "prover a = (\<exists>n. repeat (flatten \<circ> map inference) a n = [])"
 
-definition prover_wrapper :: "form list \<Rightarrow> sequent list" where
-  "prover_wrapper l = [make_sequent l]"
+definition check :: "form \<Rightarrow> bool" where
+  "check p = prover [make_sequent [p]]"
 
-abbreviation(input) prover_thesis :: bool where
-  "prover_thesis \<equiv> valid = prover \<circ> prover_wrapper"
+abbreviation(input) check_thesis :: bool where
+  "check_thesis \<equiv> check = (\<lambda>p. \<forall>m e. is_model_environment m e \<longrightarrow> semantics m e p)"
 
-lemma repeat: "repeat f (f a) n = f (repeat f a n)"
+lemma repeat_repeat: "repeat f (f a) n = f (repeat f a n)"
   by (induct n) auto
 
 proposition "(\<exists>n. r (repeat f a n)) = (if r a then True else (\<exists>n. r (repeat f (f a) n)))"
-  by (metis repeat.simps repeat not0_implies_Suc)
+  by (metis repeat.simps repeat_repeat not0_implies_Suc)
 
 inductive_set calculation :: "sequent \<Rightarrow> (nat \<times> sequent) set" for s :: sequent where
   init[intro]: "(0,s) \<in> calculation s"
 | step[intro]: "(n,k) \<in> calculation s \<Longrightarrow> l \<in> set (inference k) \<Longrightarrow> (Suc n,l) \<in> calculation s"
 
-abbreviation(input) calculation_thesis :: bool where
-  "calculation_thesis \<equiv> valid = finite \<circ> calculation \<circ> make_sequent"
+abbreviation(input) valid_thesis :: bool where
+  "valid_thesis \<equiv> valid = finite \<circ> calculation \<circ> make_sequent"
 
-lemma "\<forall>e. (is_model_environment m e \<longrightarrow> fst m \<noteq> {})"
+lemma "\<forall>m. \<forall>e. is_model_environment m e \<longrightarrow> fst m \<noteq> {}"
   using is_model_environment_def by auto
 
 lemma "\<exists>m. \<forall>e. is_model_environment m e \<and> infinite (fst m)"
-  using is_model_environment_def infinite_UNIV_nat by auto
+  using is_model_environment_def by auto
 
 (**************************************************************************************************)
 
@@ -1015,7 +1015,7 @@ lemma prover_Nil: "prover []"
   by (metis repeat.simps(1) prover_def)
 
 lemma prover_Cons: "prover (h # t) = prover (inference h @ (flatten \<circ> map inference) t)"
-  using repeat list.simps(8) list.simps(9) flatten.simps
+  using repeat_repeat list.simps(8) list.simps(9) flatten.simps
   by (metis (no_types) repeat.simps(2) comp_def prover_def)
 
 corollary finite_calculation_prover: "finite (calculation s) = prover [s]"
@@ -1065,7 +1065,7 @@ fun substitution f (Pos (i,v)) = Pos (i,map f v)
 
 fun substitution_helper p y = substitution (fn 0 => y | n => n - 1) p;
 
-fun inference s = case s of [] => [[]] | ((n,h) :: t) => case h of
+fun inference s = case s of [] => [[]] | (n,h) :: t => case h of
       Pos (i,v) => if member (Neg (i,v)) (list_sequent t) then [] else [t @ [(0,Pos (i,v))]]
     | Neg (i,v) => if member (Pos (i,v)) (list_sequent t) then [] else [t @ [(0,Neg (i,v))]]
     | Con (p,q) => [t @ [(0,p)],t @ [(0,q)]]
@@ -1075,9 +1075,7 @@ fun inference s = case s of [] => [[]] | ((n,h) :: t) => case h of
 
 fun prover a = if a = [] then true else prover ((flatten o map inference) a);
 
-fun prover_wrapper l = [make_sequent l];
-
-fun check p = (prover o prover_wrapper) [p];
+fun check p = prover [make_sequent [p]];
 
 val test = Dis (
   (Uni (Con ((Neg ("A",[0])), (Neg ("B",[0])))),
@@ -1087,21 +1085,21 @@ check test orelse 0 div 0 = 42;
 
 \<close>
 
-theorem correctness: prover_thesis calculation_thesis
-  using soundness completeness finite_calculation_prover
-  by (auto simp add: prover_wrapper_def comp_def)
-
-abbreviation check :: "form \<Rightarrow> bool" where
-  "check p \<equiv> (prover \<circ> prover_wrapper) [p]"
+theorem correctness: check_thesis valid_thesis
+proof -
+  have check_thesis
+    using soundness completeness finite_calculation_prover check_def valid_def
+      semantics_alternative.simps by metis
+  also have valid_thesis using completeness soundness by force
+  then show check_thesis valid_thesis using calculation by simp_all
+qed
 
 corollary "\<exists>p. check p" "\<exists>p. \<not> check p"
 proof -
   have "\<not> valid [Pos '''' []]" "valid [Dis (Pos '''' []) (Neg '''' [])]"
     using valid_def is_model_environment_def by auto
-  then show "\<exists>p. check p" "\<exists>p. \<not> check p" unfolding correctness by auto
+  then show "\<exists>p. check p" "\<exists>p. \<not> check p"
+    unfolding correctness using check_def correctness(1) finite_calculation_prover by (auto, metis) 
 qed
-
-proposition "check p = (\<forall>m e. is_model_environment m e \<longrightarrow> semantics m e p)"
-  using valid_def unfolding correctness by simp
 
 end
