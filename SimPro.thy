@@ -56,7 +56,7 @@ primrec fv :: "form \<Rightarrow> nat list" where
 | "fv (Exi p) = cut (fv p)"
 
 definition fv_list :: "form list \<Rightarrow> nat list" where
-  "fv_list s = flatten (map fv s)"
+  "fv_list l = flatten (map fv l)"
 
 primrec max_list :: "nat list \<Rightarrow> nat" where
   "max_list [] = 0"
@@ -1012,10 +1012,11 @@ lemmas ss =
   list.simps
 
 lemma prover_Nil: "prover []"
-  by (metis (no_types, lifting) repeat.simps(1) prover_def)
+  by (metis repeat.simps(1) prover_def)
 
 lemma prover_Cons: "prover (x # l) = prover (inference x @ (%x. flatten (map inference x)) l)"
-  by (metis (no_types, lifting) SimPro.repeat.simps(2) flatten.simps(1) flatten.simps(2) repeat list.simps(8) list.simps(9) comp_def prover_def)
+  using repeat list.simps(8) list.simps(9) flatten.simps
+  by (metis (no_types) repeat.simps(2) comp_def prover_def)
 
 corollary finite_calculation_prover: "finite (calculation s) = prover [s]"
   using finite_calculation f_def prover_def by simp
@@ -1035,8 +1036,8 @@ type predicate = int;
 type nat = int;
 
 datatype form =
-    Pos of predicate * (nat list)
-  | Neg of predicate * (nat list)
+    Pos of predicate * nat list
+  | Neg of predicate * nat list
   | Con of form * form
   | Dis of form * form
   | Uni of form
@@ -1047,8 +1048,8 @@ fun cut [] = []
 
 fun fv (Pos (_,l)) = l
   | fv (Neg (_,l)) = l
-  | fv (Con (f,g)) = (fv f) @ (fv g)
-  | fv (Dis (f,g)) = (fv f) @ (fv g)
+  | fv (Con (f,g)) = fv f @ fv g
+  | fv (Dis (f,g)) = fv f @ fv g
   | fv (Uni f) = cut (fv f)
   | fv (Exi f) = cut (fv f);
 
