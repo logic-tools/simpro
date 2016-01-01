@@ -1046,4 +1046,28 @@ val _ = check test orelse 0 div 0 = 42
 
 \<close>
 
+(*
+
+export_code make_sequent inference test in SML module_name SimPro file "SimPro.sml"
+
+SML_file "SimPro.sml"
+
+SML_export "val SimPro_inference = SimPro.inference"
+
+SML_export "val SimPro_make_sequent = SimPro.make_sequent"
+
+SML_export "val SimPro_test = SimPro.test"
+
+ML \<open>
+
+fun SimPro_prover a = if a = [] then true else SimPro_prover ((flatten o map SimPro_inference) a);
+
+fun SimPro_check p = SimPro_prover [SimPro_make_sequent [p]]
+
+val _ = SimPro_check SimPro_test orelse 0 div 0 = 42
+
+\<close>
+
+*)
+
 end
