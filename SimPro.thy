@@ -379,10 +379,10 @@ lemma max_exists: "finite (X::nat set) \<Longrightarrow> X \<noteq> {} \<longrig
   done -- "poor max lemmas in lib"
 
 lemma inj_finite_image_eq_finite: "inj_on f Z \<Longrightarrow> finite (f ` Z) = finite Z"
-  by (blast intro: finite_imageD)
+  using finite_imageD by blast
 
 lemma finite_inc: "finite (inc ` X) = finite X"
-  by (metis finite_imageI inj_inc inv_image_comp)
+  using finite_imageI inj_inc inv_image_comp by metis
 
 lemma finite_calculation_calculation: "finite (calculation s) \<Longrightarrow> finite  (calculation ` {w. \<not> is_axiom (list_sequent s) \<and> w : set (inference s)})"
   by simp
@@ -772,16 +772,16 @@ definition model :: "sequent \<Rightarrow> model" where
 locale loc2 = loc1 + fixes mo assumes mo: "mo = model s"
 
 lemma is_env_model_ntou: "is_model_environment (model s) ntou"
-  by (simp add: is_model_environment_def model_def)
+  using is_model_environment_def model_def by simp
 
 lemma (in loc1) [simp]: "infinite (calculation s) \<Longrightarrow> init s \<Longrightarrow> (contains f n (m,A)) \<Longrightarrow> \<not> is_FEx A \<Longrightarrow> m = 0"
-  by (metis contains_def index0 is_path_f' prod.collapse)
+  using contains_def index0 is_path_f' prod.collapse by metis
 
 lemma size_substitution[simp]: "\<forall>m. size (substitution m f) = size f"
   by (induct f) simp_all
 
 lemma size_substitution_bind[simp]: "size (substitution_bind f m) = size f"
-  by (simp add: substitution_bind_def)
+  using substitution_bind_def by simp
 
 lemma (in loc2) model': "infinite (calculation s) \<Longrightarrow> init s \<Longrightarrow> \<forall>A. size A = h \<longrightarrow> (\<forall>m n. contains f n (m,A) \<longrightarrow> \<not> (semantics mo ntou A))"
 
