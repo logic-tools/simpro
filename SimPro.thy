@@ -255,14 +255,16 @@ lemma FEval_cong: "\<forall>e1 e2. (\<forall>xx. xx \<in> set (fv A) \<longright
   next
     case Con then show ?case using Un_iff fv.simps(3) semantics.simps(3) set_append by metis
   next
-    case Dis then show ?case using  Un_iff fv.simps(4) semantics.simps(4) set_append by metis
+    case Dis then show ?case using Un_iff fv.simps(4) semantics.simps(4) set_append by metis
   next
     case Uni then show ?case
-      by(clarsimp, intro ball_eq_ball) (metis (no_types, lifting) Nitpick.case_nat_unfold Suc_pred' cut not_gr0)
+    using Nitpick.case_nat_unfold cut not_gr0 Suc_pred' fv.simps(5) semantics.simps(5)
+    by (metis (no_types, lifting))
   next
     case Exi then show ?case
-      by (clarsimp, intro bex_eq_bex) (metis (no_types, lifting) Nitpick.case_nat_unfold Suc_pred' cut not_gr0)
-  qed
+    using Nitpick.case_nat_unfold cut not_gr0 Suc_pred' fv.simps(6) semantics.simps(6)
+    by (metis (no_types, lifting))
+   qed
 
 lemma semantics_alternative_def2: "semantics_alternative m e s = (\<exists>p. p \<in> set s \<and> semantics m e p)"
   by (induct s) auto
