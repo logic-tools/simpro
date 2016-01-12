@@ -148,7 +148,7 @@ lemma calculation_upwards:
     case c: (Cons a _) then show ?thesis
     proof (cases a)
       case (Pair _ p)
-      then show ?thesis using c 1 2 list_sequent_def inference_def by (cases p) (auto, fastforce)
+      then show ?thesis using c 1 2 list_sequent_def inference_def by (cases p) fastforce+
     qed
   qed
 
@@ -212,18 +212,9 @@ lemma finite_subs: "finite {w. \<not> is_axiom (list_sequent y) \<and> w : set (
 
 lemma (in loc1) fSuc: "f n \<in> calculation s \<and> fst (f n) = n \<and> infinite (calculation (snd (f n))) \<and> \<not> is_axiom (list_sequent (snd (f n)))
   \<Longrightarrow> f (Suc n) \<in> calculation s \<and> fst (f (Suc n)) = Suc n \<and> (snd (f (Suc n))) : set (inference (snd (f n))) \<and> infinite (calculation (snd (f (Suc n)))) \<and> \<not> is_axiom (list_sequent (snd (f (Suc n))))"
-  apply(simp add: f)
-  apply(rule someI_ex)
-  apply(simp only: f[symmetric])
-  apply(drule subst[OF calculation[of "snd (f n)"] ])
-  apply(subgoal_tac "infinite (\<Union>(calculation ` {w. \<not> is_axiom (list_sequent (snd (f n))) \<and> w : set (inference (snd (f n)))}))")
-   apply(drule infinite_union[OF finite_subs])
-   apply(erule exE)
-   apply(rule exI)
-   apply(cases "f n")
-   apply(fastforce simp: is_axiom_finite_calculation)
-  apply(fastforce simp: infinite_inj_infinite_image inj_inj_on)
-  done
+  by (simp add: f, rule someI_ex, simp only: f[symmetric], drule subst[OF calculation[of "snd (f n)"] ],
+      subgoal_tac "infinite (\<Union>(calculation ` {w. \<not> is_axiom (list_sequent (snd (f n))) \<and> w : set (inference (snd (f n)))}))")
+  (metis (mono_tags, lifting) Collect_cong calculation.step finite_subs fst_conv infinite_union is_axiom_finite_calculation mem_Collect_eq prod.collapse snd_eqD, blast)
 
 lemma (in loc1) is_path_f_0: "infinite (calculation s) \<Longrightarrow> f 0 = (0,s)"
   using calculation0 f0 prod.collapse by metis
@@ -257,7 +248,7 @@ lemma FEval_cong: "\<forall>e1 e2. (\<forall>xx. xx \<in> set (fv A) \<longright
   next
     case Dis then show ?case using Un_iff fv.simps(4) semantics.simps(4) set_append by metis
   next
-    case Uni then show ?case
+    case Uni then show ?case 
     using Nitpick.case_nat_unfold cut not_gr0 Suc_pred' fv.simps(5) semantics.simps(5)
     by (metis (no_types, lifting))
   next
@@ -294,10 +285,10 @@ lemma FEval_substitution: "\<forall>e f. (semantics mi e (substitution f A)) = (
     case Dis then show ?case by (simp add: comp_def)
   next
     case Uni then show ?case
-      by (clarsimp, intro ball_eq_ball) (simp add: FEval_cong Nitpick.case_nat_unfold)
+      by (clarsimp intro!: ball_eq_ball simp: FEval_cong Nitpick.case_nat_unfold)
   next
     case Exi then show ?case
-      by (clarsimp, intro bex_eq_bex) (simp add: FEval_cong Nitpick.case_nat_unfold)
+      by (clarsimp intro!: bex_eq_bex simp: FEval_cong Nitpick.case_nat_unfold)
   qed
 
 lemma FEval_substitution_bind: "semantics mo e (substitution_bind A u) = semantics mo (case_nat (e u) e) A"
@@ -314,7 +305,8 @@ lemma sound_FAll: "u \<notin> set (fv_list (Uni f # s)) \<Longrightarrow> valid 
   apply(rename_tac M I)
   apply(clarsimp simp: semantics_alternative_append FEval_substitution_bind)
 
-  apply(drule_tac x=M in spec, drule_tac x=I in spec) -- "this is the goal"
+  apply(drule_tac x=M in spec)
+  apply(drule_tac x=I in spec)
 
   apply(drule_tac x="e(u:=z)" in spec)
   apply(erule impE)
@@ -324,19 +316,14 @@ lemma sound_FAll: "u \<notin> set (fv_list (Uni f # s)) \<Longrightarrow> valid 
     apply(simp)
    apply(rule semantics_alternative_cong[rule_format])
    apply(clarsimp simp: fv_list_cons)
-  
+ 
   apply(subgoal_tac "semantics (M,I) (case_nat z (e(u:=z))) f = semantics (M,I) (case_nat z e) f")
    apply(simp)
   apply(rule FEval_cong[rule_format])
 
-  apply(case_tac xx)
-    apply(simp)
-  apply(clarsimp simp: fv_list_cons)
+  apply(metis (no_types, lifting) Nitpick.case_nat_unfold Suc_pred' Un_iff cut fun_upd_apply fv.simps(5) fv_list_cons not_gr0 set_append)
   done
-    -- "phew, that really was a bit more difficult than expected"
-    -- "note that we can avoid maxscoping at the cost of instantiating the hyp twice- an additional time for M"
-    -- "different proof, instantiating quantifier twice, avoiding maxscoping --- not much better, probably slightly worse"
-
+ 
 lemma sound_FEx: "valid (s@[substitution_bind f u,Exi f]) \<Longrightarrow> valid (Exi f # s)"
   by (simp add: valid_def semantics_alternative_append FEval_substitution_bind)
      (metis is_model_environment_def prod.sel(1))
@@ -365,18 +352,13 @@ lemma is_FEx[simp]: "\<not> is_FEx (Pos i v) \<and> \<not> is_FEx (Neg i v) \<an
   using is_FEx_def by simp
 
 lemma index0: "init s \<Longrightarrow> \<forall>u m A. (n, u) \<in> calculation s \<longrightarrow> (m,A) \<in> (set u) \<longrightarrow> (\<not> is_FEx A) \<longrightarrow> m = 0"
-  apply(induct n)
-   apply(fastforce simp: init_def)
-  apply(clarsimp)
-  -- {*inversion on @{term "(Suc n, u) \<in> calculation s"}*}
-  apply(drule calculation_downwards)
-  apply(elim exE)
-  apply(case_tac y)
-   apply(simp add: inference_def)
-  apply(case_tac a)
-  apply(case_tac b)
-        apply(fastforce simp: is_FEx_def list_sequent_def inference_def)+
-  done
+  proof (induct n)
+    case 0 then show ?case using init_def by fastforce
+  next
+    case Suc then show ?case
+      by (clarsimp dest!: calculation_downwards, case_tac y, simp add: inference_def, case_tac a, case_tac b)
+         (fastforce simp: inference_def list_sequent_def is_FEx_def)+
+  qed
 
 lemma max_list: "\<forall>v \<in> set l. v \<le> max_list l"
   by (induct l) (auto simp: max_def)
@@ -386,29 +368,19 @@ lemma fresh: "fresh l \<notin> (set l)"
 
 lemma soundness': "init s \<Longrightarrow> finite (calculation s) \<Longrightarrow> m \<in> (fst ` (calculation s)) \<Longrightarrow> \<forall>y u. (y,u) \<in> (calculation s) \<longrightarrow> y \<le> m \<Longrightarrow> \<forall>n t. h = m - n \<and> (n,t) \<in> calculation s \<longrightarrow> valid (list_sequent t)"
   using inference_def fv_list_def
-  apply(induct_tac h)
+  apply(induct h)
     -- "base case"
-   apply(rule allI, rule allI, rule impI)
-   apply(elim conjE)
-    apply(subgoal_tac "n=m") prefer 2
-    apply(fastforce)
-   apply(simp add: valid_def)
-   apply(rule allI, rule allI)
-   apply(rename_tac gs g)
-   apply(rule allI)
-   apply(rule impI)
-   apply(simp add: semantics_alternative_def2)
+   apply(intro allI impI)
+   apply(subgoal_tac "n=m")
+    prefer 2 apply(fastforce)
+   apply(clarsimp simp: valid_def semantics_alternative_def2)
    apply(case_tac "is_axiom (list_sequent t)")
      -- "base case, is axiom"
     apply(simp add: list_sequent_def)
     apply(case_tac t)
      apply(simp)
     apply(simp)
-    apply(erule disjE) 
-      -- "base case, is axiom, starts with Pos"
-     apply (metis semantics.simps(1) semantics.simps(2))
-       -- "base case, is axiom, starts with Neg"
-    apply (metis semantics.simps(1) semantics.simps(2))
+    apply (metis (no_types, lifting) semantics.simps(1) semantics.simps(2))
    
     -- "base case, not is axiom: if not a satax, then inference holds... but this can't be"
    apply (meson calculation_upwards le_SucI le_antisym n_not_Suc_n)
@@ -419,58 +391,33 @@ lemma soundness': "init s \<Longrightarrow> finite (calculation s) \<Longrightar
 
   apply(case_tac "is_axiom (list_sequent t)")
     -- "step case, is axiom"
-   apply(simp add: valid_def)
-   apply(rule allI, rule allI)
-   apply(rename_tac gs g)
-   apply(rule allI)
-   apply(rule impI)
-   apply(simp add: semantics_alternative_def2 list_sequent_def)
+   apply(clarsimp simp: valid_def semantics_alternative_def2 list_sequent_def)
    apply(case_tac t)
     apply(simp)
    apply(simp)
-   apply(erule disjE)
-    apply (metis semantics.simps(1) semantics.simps(2))
-   apply (metis semantics.simps(1) semantics.simps(2))
+   apply(metis (no_types, lifting) semantics.simps(1) semantics.simps(2))
    -- "we hit Uni/ Exi cases first"
   apply(case_tac "\<exists>(a::nat) f list. t = (a,Uni f) # list")
    apply(elim exE)
    apply(simp)
    apply(subgoal_tac "a = 0")
-    prefer 2
-    apply(rule_tac n=na and u=t and A="Uni f" in index0[rule_format])
-       apply(assumption)
-      apply(simp)
-     apply(simp)
-    apply(simp)
+    prefer 2 apply (meson index0 is_FEx list.set_intros(1))
    apply(frule calculation.step)
     apply(simp)
-   apply(drule_tac x="Suc na" in spec, drule_tac x="list @ [(0, substitution_bind f (fresh ((flatten \<circ> map fv) (list_sequent t))))]" in spec)
-   apply(erule impE)
-    apply(simp)
-   using fresh list_sequent_def sound_FAll apply fastforce
-  
+    apply(metis (no_types, lifting) Suc_diff_Suc Suc_leD diff_diff_cancel diff_le_self fresh le_simps(3) list.simps(8) list.simps(9) list_sequent_def map_append snd_eqD sound_FAll)
   apply(case_tac "\<exists>a f list. t = (a,Exi f) # list")
    apply(elim exE)
    apply(frule calculation.step)
     apply(simp)
-   apply(drule_tac x="Suc na" in spec, drule_tac x="list @ [(0, substitution_bind f a), (Suc a, Exi f)]" in spec)
-   apply(erule impE)
-    apply(assumption)
-   apply(drule_tac x="Suc na" in spec, drule_tac x="list @ [(0, substitution_bind f a), (Suc a, Exi f)]" in spec)
-   apply(erule impE)
-    apply(simp)
-   apply(subgoal_tac "valid (list_sequent (list@[(0,substitution_bind f a), (Suc a, Exi f)]))")
-    apply (simp add: list_sequent_def sound_FEx)
-   apply(simp)
-  -- "now for other cases"
+   apply (metis (no_types, lifting) Suc_diff_Suc Suc_leD diff_diff_cancel diff_le_self le_simps(3) list.simps(8) list.simps(9) list_sequent_def map_append snd_eqD sound_FEx)
+   -- "now for other cases"
       -- "case empty list"
   apply(case_tac t)
-   apply(frule step)
-    apply(simp)
-   apply(metis add_Suc_shift add_right_cancel diff_add)
+   apply (metis (no_types, lifting) Suc_diff_Suc Suc_leD Un_iff append_Nil2 calculation_upwards diff_diff_cancel diff_le_self insert_iff le_simps(3) list.set(2) list.simps(4) set_append split_list_first)
    
   apply(simp add: valid_def semantics_alternative_def2)
-  apply(rule allI, rule allI)
+  apply(rule allI)
+  apply(rule allI)
   apply(rename_tac gs g)
   apply(rule allI)
   apply(rule impI)
@@ -478,67 +425,35 @@ lemma soundness': "init s \<Longrightarrow> finite (calculation s) \<Longrightar
    -- "if not a satax, then inference holds... "
   apply(case_tac a)
   apply(case_tac b)
-       apply(simp del: semantics.simps)
-       apply(frule patom)
-        apply(assumption)
-       apply(rename_tac nat lista)
-       apply(frule_tac x="Suc na" in spec, drule_tac x="list @ [(0, Pos nat lista)]" in spec)
-       apply(erule impE)
-        apply(simp)
-       apply(drule_tac x=gs in spec, drule_tac x=g in spec, drule_tac x=e in spec)
-       apply(erule impE)
-        apply(simp add: is_model_environment_def)
-       apply(elim exE conjE)
-       apply(rule_tac x=p in exI)
-       apply(simp add: list_sequent_def)
+       apply(fastforce simp: list_sequent_def dest!: patom)
       apply(simp del: semantics.simps)
-      apply(frule_tac fconj1)
+      apply(frule fconj1)
        apply(assumption)
-      apply(frule_tac fconj2)
+      apply(frule fconj2)
        apply(assumption)
       apply(rename_tac form1 form2)
-      apply(frule_tac x="Suc na" in spec, drule_tac x="list @ [(0, form1)]" in spec)
-      apply(erule impE)
-       apply(arith)
-      apply(drule_tac x=gs in spec, drule_tac x=g in spec, drule_tac x=e in spec)
-      apply(erule impE)
-       apply(simp)
-      apply(elim exE conjE)
-      apply(drule_tac x="Suc na" in spec, drule_tac x="list @ [(0, form2)]" in spec)
+      apply(frule_tac x="Suc n" in spec, drule_tac x="list @ [(0, form1)]" in spec)
       apply(erule impE)
        apply(simp)
       apply(drule_tac x=gs in spec, drule_tac x=g in spec, drule_tac x=e in spec)
       apply(erule impE)
        apply(simp)
       apply(elim exE conjE)
-      apply(simp add: list_sequent_def)
-      apply(auto)[1]
-     apply(fastforce)
-    apply(simp del: semantics.simps)
-    apply(frule natom)
-     apply(assumption)
-    apply(rename_tac nat lista)
-    apply(frule_tac x="Suc na" in spec, drule_tac x="list @ [(0, Neg nat lista)]" in spec)
-    apply(erule impE)
-     apply(simp)
-    apply(drule_tac x=gs in spec, drule_tac x=g in spec, drule_tac x=e in spec)
-    apply(erule impE)
-     apply(simp)
-    apply(elim exE conjE)
-    apply(rule_tac x=p in exI)
-    apply(simp add: list_sequent_def)
-   apply(simp del: semantics.simps)
-   apply(frule_tac fdisj)
+      apply(drule_tac x="Suc n" in spec, drule_tac x="list @ [(0, form2)]" in spec)
+      apply(erule impE)
+       apply(simp)
+      apply(metis (no_types, lifting) Un_iff append_Nil2 insert_iff list.set(2) list.set_intros(1) list.simps(9) list_sequent_def map_append semantics.simps(3) set_append snd_conv)
+     apply(blast)
+    apply(fastforce simp: list_sequent_def dest!: natom)
+   apply(simp)
+   apply(frule fdisj)
     apply(assumption)
    apply(rename_tac form1 form2)
-   apply(frule_tac x="Suc na" in spec, drule_tac x="list @ [(0, form1),(0,form2)]" in spec)
+   apply(frule_tac x="Suc n" in spec, drule_tac x="list @ [(0, form1),(0,form2)]" in spec)
    apply(erule impE)
     apply(simp)
-   apply(drule_tac x=gs in spec, drule_tac x=g in spec, drule_tac x=e in spec)
-   apply(erule impE)
-    apply(simp)
-   using list_sequent_def snd_eqD apply auto[1]
-  -- "all case"
+   apply(metis (no_types, lifting) Un_iff append_Nil2 insert_iff list.set(2) list.set_intros(1) list.simps(9) list_sequent_def map_append semantics.simps(4) set_append snd_conv)
+    -- "all case"
   apply(blast)
   done
 
@@ -576,27 +491,13 @@ lemma (in loc1) progress:
 qed
 
 lemma (in loc1) contains_considers'[rule_format]: "infinite (calculation s) \<Longrightarrow> \<forall>n y ys. snd (f n) = xs@y # ys \<longrightarrow> (\<exists>m zs'. snd (f (n+m)) = y # zs')"
-  apply(induct xs)
-   apply(simp)
-   apply (metis Nat.add_0_right)
-  
-  apply(rule allI, rule allI, rule allI, rule impI)
-  apply(simp)
-  apply(frule progress)
-  apply(erule impE)
-   apply(assumption)
-  apply(erule exE)
- 
-  apply(drule_tac x="Suc n" in spec)
-  apply(case_tac y)
-  apply(rename_tac u v)
-  apply(drule_tac x="u" in spec)
-  apply(drule_tac x="v" in spec)
-  apply(erule impE)
-   apply(simp)
-  
-  apply(metis add_Suc_shift)
-  done
+  proof (induct xs)
+    case Nil then show ?case by simp (metis Nat.add_0_right)
+  next
+    case Cons then show ?case
+      by (clarsimp, clarsimp dest!: progress, elim impE)
+         (simp, metis add_Suc_shift append_Cons append_assoc)
+  qed
 
 lemma list_decomp[rule_format]: "v \<in> set p \<longrightarrow> (\<exists>xs ys. p = xs@(v # ys) \<and> v \<notin> set xs)"
   by (meson split_list_first)
@@ -605,163 +506,91 @@ lemma (in loc1) contains_considers: "infinite (calculation s) \<Longrightarrow> 
   by (simp add: contains_def, frule list_decomp, elim exE conjE, frule contains_considers')
      (assumption, metis (mono_tags, lifting) considers_def list.simps(5))
 
-lemma (in loc1) contains_propagates_patoms[rule_format]: "infinite (calculation s) \<Longrightarrow> contains f n (0, Pos i v) \<longrightarrow> contains f (n+q) (0, Pos i v)"
-  using inference_def
-  apply(induct_tac q)
+lemma (in loc1) contains_propagates_patoms[rule_format]: "infinite (calculation s) \<Longrightarrow> contains f n (0, Pos i v) \<Longrightarrow> contains f (n+q) (0, Pos i v)"
+  apply(induct q)
    apply(simp)
-  apply(rule impI)
-  apply(erule impE)
-   apply(assumption)
-  apply(subgoal_tac "\<not> is_axiom (list_sequent (snd (f (n+na))))") defer
-   apply(subgoal_tac "infinite (calculation (snd (f (n+na))))") defer
-    apply(fastforce dest: is_path_f) defer
-   apply(rule notI)
-   apply(simp add: calculation_is_axiom)
-  apply(simp add: contains_def)
-  apply(drule_tac p="snd (f (n + na))" in list_decomp) 
-  apply(elim exE conjE)
+  apply(clarsimp simp: contains_def dest!: list_decomp)
   apply(case_tac xs)
-   apply(subgoal_tac "(snd (f (Suc (n + na)))) : set (inference (snd (f (n + na))))")
-    apply(simp split: if_splits)
-   apply(frule is_path_f)
-   apply(drule_tac x="n+na" in spec)
-   apply(simp)
-  apply(drule progress)
-  apply(erule impE)
-   apply(simp)
-  apply(clarsimp)
+   apply(subgoal_tac "(snd (f (Suc (n + q)))) \<in> set (inference (snd (f (n + q))))")
+    apply(simp add: inference_def split: if_splits)
+   apply(blast dest: is_path_f)
+  apply(fastforce dest: progress)
   done
 
-lemma (in loc1) contains_propagates_natoms[rule_format]: "infinite (calculation s) \<Longrightarrow> contains f n (0, Neg i v) \<longrightarrow> contains f (n+q) (0, Neg i v)"
-  using inference_def
-  apply(induct_tac q)
+lemma (in loc1) contains_propagates_natoms[rule_format]: "infinite (calculation s) \<Longrightarrow> contains f n (0, Neg i v) \<Longrightarrow> contains f (n+q) (0, Neg i v)"
+  apply(induct q)
    apply(simp)
-  apply(rule impI)
-  apply(erule impE)
-   apply(assumption)
-  apply(subgoal_tac "\<not> is_axiom (list_sequent (snd (f (n+na))))") defer
-   apply(subgoal_tac "infinite (calculation (snd (f (n+na))))") defer
-    apply(fastforce dest: is_path_f) defer
-   apply(rule notI)
-   apply(simp add: calculation_is_axiom)
-  apply(simp add: contains_def)
-  apply(drule_tac p = "snd (f (n + na))" in list_decomp) 
-  apply(elim exE conjE)
+  apply(clarsimp simp: contains_def dest!: list_decomp)
   apply(case_tac xs)
-   apply(simp)
-   apply(subgoal_tac "(snd (f (Suc (n + na)))) : set (inference (snd (f (n + na))))")
-    apply(simp split: if_splits)
-   apply(frule_tac is_path_f)
-   apply(drule_tac x="n+na" in spec)
-   apply(simp)
-  apply(drule_tac progress)
-  apply(erule impE)
-   apply(simp)
-  apply(clarsimp)
+   apply(subgoal_tac "(snd (f (Suc (n + q)))) \<in> set (inference (snd (f (n + q))))")
+    apply(simp add: inference_def split: if_splits)
+   apply(blast dest: is_path_f)
+  apply(fastforce dest: progress)
   done
 
 lemma (in loc1) contains_propagates_fconj: "infinite (calculation s) \<Longrightarrow> contains f n (0, Con g h) \<Longrightarrow> (\<exists>y. contains f (n+y) (0,g) \<or> contains f (n+y) (0,h))"
-  apply(subgoal_tac "(\<exists>l. considers f (n+l) (0,Con g h))") defer
-   apply(rule contains_considers)
-    apply(assumption)
-   apply(assumption)
-  apply(erule exE)
-  apply(rule_tac x="Suc l" in exI)
-  apply(simp add: considers_def)
+  apply(subgoal_tac "(\<exists>l. considers f (n+l) (0,Con g h))")
+   prefer 2 apply(blast dest: contains_considers)
+  apply(clarsimp simp: considers_def)
+  apply(subgoal_tac "(snd (f (Suc (n + l)))) \<in> set (inference (snd (f (n + l))))")
+   prefer 2 apply(blast dest: is_path_f)
   apply(case_tac "snd (f (n + l))")
    apply(simp)
-  apply(subgoal_tac "(snd (f (Suc (n + l)))) : set (inference (snd (f (n + l))))")
-   apply(fastforce simp: contains_def inference_def)
-  apply(frule_tac is_path_f)
-  apply(drule_tac x="n+l" in spec)
-  apply(simp)
+  apply(rule_tac x="Suc l" in exI)
+  apply(fastforce simp: contains_def inference_def)
   done
 
 lemma (in loc1) contains_propagates_fdisj: "infinite (calculation s) \<Longrightarrow> contains f n (0, Dis g h) \<Longrightarrow> (\<exists>y. contains f (n+y) (0,g) \<and> contains f (n+y) (0,h))"
   apply(subgoal_tac "(\<exists>l. considers f (n+l) (0,Dis g h))")
-   defer
-   apply(rule contains_considers)
-    apply(assumption)
-   apply(assumption)
-  apply(erule exE)
-  apply(rule_tac x="Suc l" in exI)
-  apply(simp add: considers_def)
+   prefer 2 apply(blast dest: contains_considers)
+  apply(clarsimp simp: considers_def)
+  apply(subgoal_tac "(snd (f (Suc (n + l)))) \<in> set (inference (snd (f (n + l))))")
+   prefer 2 apply(blast dest: is_path_f)
   apply(case_tac "snd (f (n + l))")
    apply(simp)
-  apply(subgoal_tac " (snd (f (Suc (n + l)))) : set (inference (snd (f (n + l))))")
-   apply(simp add: contains_def inference_def) 
-  apply(frule_tac is_path_f)
-  apply(drule_tac x="n+l" in spec)
-  apply(simp)
+  apply(rule_tac x="Suc l" in exI)
+  apply(simp add: contains_def inference_def)
   done
 
 lemma (in loc1) contains_propagates_fall: "infinite (calculation s) \<Longrightarrow> contains f n (0, Uni g)
-  \<Longrightarrow> (\<exists>y. contains f (Suc(n+y)) (0,substitution_bind g (fresh (fv_list (list_sequent (snd (f (n+y))))))))" -- "may need constraint on fv"
-using fv_list_def
-  apply(subgoal_tac "(\<exists>l. considers f (n+l) (0,Uni g))") defer
-   apply(rule contains_considers)
-    apply(assumption)
-   apply(assumption)
-  apply(erule exE)
-  apply(rule_tac x="l" in exI)
-  apply(simp add: considers_def)
+  \<Longrightarrow> (\<exists>y. contains f (Suc(n+y)) (0,substitution_bind g (fresh (fv_list (list_sequent (snd (f (n+y))))))))"
+  apply(subgoal_tac "(\<exists>l. considers f (n+l) (0,Uni g))")
+    prefer 2 apply(blast dest: contains_considers)
+  apply(clarsimp simp: considers_def)
+  apply(subgoal_tac "(snd (f (Suc (n + l)))) \<in> set (inference (snd (f (n + l))))")
+   prefer 2 apply(blast dest: is_path_f)
   apply(case_tac "snd (f (n + l))")
    apply(simp)
-  apply(subgoal_tac "(snd (f (Suc (n + l)))) : set (inference (snd (f (n + l))))")
-   apply(simp add: contains_def inference_def)
-  apply(frule_tac is_path_f)
-  apply(drule_tac x="n+l" in spec)
-  apply(simp)
+  apply(rule_tac x="l" in exI)
+  apply(simp add: contains_def inference_def fv_list_def)
   done
 
 lemma (in loc1) contains_propagates_fex: "infinite (calculation s) \<Longrightarrow> contains f n (m, Exi g) 
   \<Longrightarrow> (\<exists>y. (contains f (n+y) (0,substitution_bind g m)) \<and> (contains f (n+y) (Suc m,Exi g)))"
-  apply(subgoal_tac "(\<exists>l. considers f (n+l) (m,Exi g))") defer
-   apply(rule contains_considers)
-    apply(assumption)
-   apply(assumption)
-  apply(erule exE)
-  apply(rule_tac x="Suc l" in exI)
-  apply(simp add: considers_def)
+  apply(subgoal_tac "(\<exists>l. considers f (n+l) (m,Exi g))")
+   prefer 2 apply(blast dest: contains_considers)
+  apply(clarsimp simp: considers_def)
+  apply(subgoal_tac "(snd (f (Suc (n + l)))) \<in> set (inference (snd (f (n + l))))")
+   prefer 2 apply(blast dest: is_path_f)
   apply(case_tac "snd (f (n + l))")
    apply(simp)
-  apply(subgoal_tac " (snd (f (Suc (n + l)))) : set (inference (snd (f (n + l))))")
-   apply(simp add: contains_def inference_def)
-  apply(frule_tac is_path_f)
-  apply(drule_tac x="n+l" in spec)
-  apply(simp)
+  apply(rule_tac x="Suc l" in exI)
+  apply(simp add: contains_def inference_def)
   done
 
-  -- "also need that if contains one, then contained an original at beginning"
-  -- "existentials: show that for exists formulae, if Suc m is marker, then there must have been m"
-  -- "show this by showing that nodes are upwardly closed, i.e. if never contains (m,x), then never contains (Suc m, x), by induction on n"
-
 lemma (in loc1) FEx_downward: "infinite (calculation s) \<Longrightarrow> init s \<Longrightarrow> \<forall>m. (Suc m, Exi g) \<in> set (snd (f n)) \<longrightarrow> (\<exists>n'. (m, Exi g) \<in> set (snd (f n')))"
-  using inference_def
-  apply(frule_tac is_path_f)
+  apply(frule is_path_f)
   apply(induct_tac n)
-   apply(drule_tac x="0" in spec)
-   apply(case_tac "f 0")
-   apply(force simp: init_def) 
-  apply(intro allI impI)
-  apply(frule_tac x="Suc n" in spec)
-  apply(drule_tac x="n" in spec, elim conjE)
-  apply(thin_tac "(snd (f (Suc (Suc n)))) : set (inference (snd (f (Suc n))))")
+   apply(fastforce simp: init_def is_path_f_0)
+  apply(drule_tac x="n" in spec)
   apply(case_tac "f n")
   apply(case_tac b)
-   apply(simp)
+   apply(simp add: inference_def)
   apply(case_tac aa)
   apply(case_tac ba)
-       apply(simp split: if_splits)
-      apply(fastforce)
-     apply(fastforce)
-    apply(simp split: if_splits)
-   apply(fastforce)
-  apply(rename_tac form)
-  apply(case_tac "(ab, Exi form) = (m, Exi g)")
-   apply(rule_tac x=n in exI)
-   apply(simp)
-  apply(auto)
+       apply(auto split: if_splits simp: inference_def)[5]
+  apply(simp add: inference_def)
+  apply(metis list.set_intros(1) snd_eqD)
   done
    
 lemma (in loc1) FEx0: "infinite (calculation s) \<Longrightarrow> init s \<Longrightarrow> \<forall>n. contains f n (m,Exi g) \<longrightarrow> (\<exists>n'. contains f n' (0, Exi g))"
@@ -796,58 +625,63 @@ lemma size_substitution[simp]: "\<forall>m. size (substitution m f) = size f"
 
 lemma size_substitution_bind[simp]: "size (substitution_bind f m) = size f"
   using substitution_bind_def by simp
-
+ 
 lemma (in loc2) model': "infinite (calculation s) \<Longrightarrow> init s \<Longrightarrow> \<forall>A. size A = h \<longrightarrow> (\<forall>m n. contains f n (m,A) \<longrightarrow> \<not> (semantics mo ntou A))"
-  apply(rule_tac nat_less_induct) apply(rule, rule) apply(case_tac A) 
-       apply(rule,rule,rule) apply(simp add: mo Let_def) apply(simp add: model_def Let_def) apply(simp only: f[symmetric]) apply(force)
-
+  apply(rule nat_less_induct)
+  apply(rule allI)
+  apply(case_tac A)
+       apply(clarsimp simp: mo model_def f[symmetric])
+       apply(blast)
+      apply(clarsimp)
+      apply(metis (mono_tags, lifting) contains_def index0 is_FEx is_path_f less_add_Suc1 less_add_Suc2 contains_propagates_fconj prod.collapse)
      apply(intro impI allI)
-     apply(subgoal_tac "m=0") prefer 2 apply(simp) apply(simp del: semantics.simps)
-     apply(frule_tac contains_propagates_fconj) apply(assumption)
-     apply(rename_tac form1 form2 m na)
-     apply(frule_tac x="size form1" in spec) apply(erule impE) apply(force) apply(drule_tac x="form1" in spec) apply(drule_tac x="size form2" in spec) apply(erule impE) apply(force) apply(simp)
-     apply(force)
-
-   apply(intro impI allI)
-   apply(subgoal_tac "m=0") prefer 2 apply(simp) apply(simp del: semantics.simps)
-   apply(frule_tac contains_propagates_fall) apply(assumption)
-   apply(erule exE) -- "all case"
-   apply(rename_tac form m na y)
-   apply(drule_tac x="size form" in spec) apply(erule impE, force) apply(drule_tac x="substitution_bind form (fresh (fv_list (list_sequent (snd (f (na + y))))))" in spec) apply(erule impE, force)
-   apply(erule impE, force) apply(simp add: FEval_substitution_bind) apply(rule_tac x="ntou (fresh (fv_list (list_sequent (snd (f (na + y))))))" in bexI) apply(simp)
-   using is_env_model_ntou[of s] apply(simp add: is_model_environment_def mo)
-
-      apply(rule,rule,rule) apply(simp add: mo Let_def) apply(simp add: model_def Let_def) apply(simp only: f[symmetric]) apply(rule ccontr) apply(simp) apply(elim exE)
-      apply(subgoal_tac "m = 0 \<and> ma = 0") prefer 2 apply(simp)
+     apply(subgoal_tac "m=0")
+      prefer 2 apply(simp)
+     apply(simp)
+     apply(frule contains_propagates_fall)
+      apply(assumption)
+     apply(erule exE) -- "all case"
+     apply(rename_tac form m na y)
+     apply(drule_tac x="size form" in spec)
+     apply(erule impE)
       apply(simp)
-      apply(rename_tac nat list m na nb ma)
-      apply(subgoal_tac "\<exists>y. considers f (nb+na+y) (0, Pos nat list)") prefer 2 apply(rule contains_considers) apply(assumption) 
-       apply(rule contains_propagates_patoms) apply(assumption) apply(assumption)
-      apply(erule exE)
-      apply(subgoal_tac "contains f (na+nb+y) (0, Neg nat list)")
-       apply(subgoal_tac "nb+na=na+nb") 
-        apply(simp) apply(subgoal_tac "is_axiom (list_sequent (snd (f (na+nb+y))))")
-         apply(drule_tac is_axiom_finite_calculation) apply(force dest: is_path_f)
-        apply(simp add: contains_def considers_def) apply(case_tac "snd (f (na + nb + y))") apply(simp) apply(simp add: list_sequent_def) apply(force)
-       apply(force)
-      apply(force intro: contains_propagates_natoms contains_propagates_patoms)
-    apply(intro impI allI)
-    apply(subgoal_tac "m=0") prefer 2 apply(simp) apply(simp del: semantics.simps)
-    apply(frule_tac contains_propagates_fdisj) apply(assumption)
-    apply(rename_tac form1 form2 m na)
-    apply(frule_tac x="size form1" in spec) apply(erule impE) apply(force) apply(drule_tac x="form1" in spec) apply(drule_tac x="size form2" in spec) apply(erule impE) apply(force) apply(simp)
-    apply(force)
-
-  apply(intro impI allI) apply(simp del: semantics.simps)
-  apply(frule_tac FEx_upward) apply(assumption) apply(assumption)
-  apply(simp)
-  apply(rule)
+     apply(drule_tac x="substitution_bind form (fresh (fv_list (list_sequent (snd (f (na + y))))))" in spec)
+     apply(simp add: FEval_substitution_bind)
+     apply(erule impE)
+      apply(blast)
+     apply(rule_tac x="ntou (fresh (fv_list (list_sequent (snd (f (na + y))))))" in bexI)
+      apply(simp)
+     using is_env_model_ntou is_model_environment_def mo apply(blast)
+    
+    apply(clarsimp simp: mo model_def f[symmetric])
+    apply(subgoal_tac "m = 0 \<and> ma = 0")
+     prefer 2 apply(simp)
+    apply(rename_tac nat list m na nb ma)
+    apply(subgoal_tac "\<exists>y. considers f (nb+na+y) (0, Pos nat list)")
+     prefer 2 apply(simp add: contains_considers contains_propagates_patoms)
+    apply(erule exE)
+    apply(subgoal_tac "contains f (na+nb+y) (0, Neg nat list)")
+     apply(subgoal_tac "nb+na=na+nb")
+      apply(subgoal_tac "is_axiom (list_sequent (snd (f (na+nb+y))))")
+       apply(blast dest: is_path_f is_axiom_finite_calculation)
+      apply(simp add: contains_def considers_def)
+      apply(case_tac "snd (f (na + nb + y))")
+       apply(simp)
+      apply(force simp: list_sequent_def)
+     apply(simp)
+    apply(simp add: contains_propagates_natoms)
+   apply(metis (no_types, lifting) contains_def add.right_neutral add_Suc_right form.size(11) index0 is_FEx is_path_f less_add_Suc1 less_add_Suc2 contains_propagates_fdisj prod.collapse semantics.simps(4))
+ 
+  apply(clarsimp)
   apply(rename_tac form m na ma)
-  apply(subgoal_tac "\<forall>m'. \<not> semantics mo ntou (substitution_bind form m')") 
-   prefer 2 apply(rule)
-   apply(drule_tac x="size form" in spec) apply(erule impE, force) 
-   apply(drule_tac x="substitution_bind form m'" in spec) apply(erule impE, force) apply(erule impE) apply(force) apply(simp add: id_def)
-  apply(simp add: FEval_substitution_bind id_def)
+  apply(subgoal_tac "\<forall>m'. \<not> semantics mo ntou (substitution_bind form m')")
+   apply(simp add: FEval_substitution_bind id_def)
+  apply(intro allI)
+  apply(drule_tac x="size form" in spec)
+  apply(erule impE)
+   apply(simp)
+  apply(drule_tac x="substitution_bind form m'" in spec)
+  apply(fastforce simp: id_def dest: FEx_upward)
   done
    
 lemma (in loc2) model: "infinite (calculation s) \<Longrightarrow> init s \<Longrightarrow> (\<forall>A m n. contains f n (m,A) \<longrightarrow> \<not> (semantics mo ntou A))"
@@ -883,56 +717,42 @@ lemma set_flatten: "set (flatten xs) = Union (set ` set xs)"
   by (induct xs) auto
 
 lemma loop: "\<forall>x. ((n,x) \<in> calculation s) = (x \<in> set (loop [s] n))"
-  apply(induct n)
-   apply(simp add: loop_def)
-  apply(rule allI)
-  apply(rule iffI)
-   apply(drule calculation_downwards)
-   apply(elim exE conjE)
-   apply(drule_tac x=y in spec)
-   apply(simp)
-   apply(drule list_decomp)
-   apply(elim exE conjE)
-   apply(simp add: flatten_append loop_def)
-  apply(simp add: loop_def set_flatten)
-  apply(blast)
-  done
+  proof (induct n)
+    case 0 then show ?case using loop_def by simp
+  next
+    case Suc then show ?case
+      using loop_def
+      by (intro allI iffI, clarsimp dest!: calculation_downwards)
+         (clarsimp dest!: list_decomp spec simp: flatten_append, fastforce simp: set_flatten)
+qed
 
 lemma calculation_f: "calculation s = UNION UNIV (\<lambda>x. set (map (\<lambda>y. (x,y)) (loop [s] x)))"
   using loop by fastforce
 
 lemma finite_calculation: "finite (calculation s) = (\<exists>m. loop [s] m = [])"
-  apply(rule iffI)
-   apply(subgoal_tac "finite (fst ` (calculation s))") prefer 2 apply(simp)
+  apply(intro iffI)
+   apply(subgoal_tac "finite (fst ` (calculation s))")
+    prefer 2 apply(simp)
    apply(frule max_exists)
    apply(erule impE)
-    apply(subgoal_tac "(0,s) \<in> calculation s")
-     apply(fastforce)
-    apply(simp)
+    apply(blast)
    apply(elim exE conjE)
-   apply(rule_tac x="Suc x" in exI)
    apply(rule ccontr)
    apply(case_tac "loop [s] (Suc x)")
-    apply(simp) 
+    apply(simp)
    apply(subgoal_tac "(Suc x, a) \<in> calculation s")
     apply(fastforce)
    apply(simp add: loop)
   apply(erule exE)
   apply(subgoal_tac "\<forall>y. loop [s] (m+y) = []") 
-   prefer 2 apply(rule allI)
-   apply(rule loop_upwards)
-   apply(assumption)
+   prefer 2 apply(simp add: loop_upwards)
   apply(simp add: calculation_f)
   apply(subgoal_tac "(UNIV::nat set) = {y. y < m} Un {y. m \<le> y}")
-   prefer 2 apply fastforce
-  apply(erule_tac t="UNIV::nat set" in ssubst) 
-  apply(simp)
+   prefer 2 apply(fastforce)
+  apply(erule_tac t="UNIV::nat set" in ssubst)
   apply(subgoal_tac "(UN x:Collect (op \<le> m). Pair x ` set (loop [s] x)) =  (UN x:Collect (op \<le> m). {})")
    apply(simp)
-  apply(rule SUP_cong)
-   apply(simp)
-  apply(drule_tac x="x-m" in spec)
-  apply(simp)
+  apply(metis (no_types, lifting) SUP_cong image_is_empty le_Suc_ex mem_Collect_eq set_empty)
   done
 
 (**************************************************************************************************)
