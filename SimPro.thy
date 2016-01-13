@@ -132,7 +132,7 @@ lemma patom:  "(n,(m,Pos i v) # xs) \<in> calculation(nfs) \<Longrightarrow> \<n
   and fdisj:  "(n,(m,Dis f g) # xs) \<in> calculation(nfs) \<Longrightarrow> \<not> is_axiom (list_sequent ((m,Dis f g) # xs)) \<Longrightarrow> (Suc n,xs@[(0,f),(0,g)]) \<in> calculation(nfs)"
   and fall:   "(n,(m,Uni f) # xs) \<in> calculation(nfs) \<Longrightarrow> \<not> is_axiom (list_sequent ((m,Uni f) # xs)) \<Longrightarrow> (Suc n,xs@[(0,substitution_bind f (fresh ((flatten \<circ> map fv) (list_sequent ((m,Uni f) # xs)))))]) \<in> calculation(nfs)"
   and fex:    "(n,(m,Exi f) # xs) \<in> calculation(nfs) \<Longrightarrow> \<not> is_axiom (list_sequent ((m,Exi f) # xs)) \<Longrightarrow> (Suc n,xs@[(0,substitution_bind f m),(Suc m,Exi f)]) \<in> calculation(nfs)"
-  by (auto simp: inference_def list_sequent_def comp_def)
+  by (auto simp: inference_def list_sequent_def)
 
 lemmas not_is_axiom_subs = patom natom fconj1 fconj2 fdisj fall fex
 
@@ -510,73 +510,101 @@ lemma (in loc1) contains_propagates_patoms[rule_format]: "infinite (calculation 
   apply(induct q)
    apply(simp)
   apply(clarsimp simp: contains_def dest!: list_decomp)
+  apply(subgoal_tac "(snd (f (Suc (n + q)))) \<in> set (inference (snd (f (n + q))))")
+   prefer 2 apply(blast dest: is_path_f)
   apply(case_tac xs)
-   apply(subgoal_tac "(snd (f (Suc (n + q)))) \<in> set (inference (snd (f (n + q))))")
     apply(simp add: inference_def split: if_splits)
-   apply(blast dest: is_path_f)
   apply(fastforce dest: progress)
-  done
+  done   
 
 lemma (in loc1) contains_propagates_natoms[rule_format]: "infinite (calculation s) \<Longrightarrow> contains f n (0, Neg i v) \<Longrightarrow> contains f (n+q) (0, Neg i v)"
   apply(induct q)
    apply(simp)
-  apply(clarsimp simp: contains_def dest!: list_decomp)
+  apply(subgoal_tac "(snd (f (Suc (n + q)))) \<in> set (inference (snd (f (n + q))))")
+   prefer 2 apply(blast dest: is_path_f)
+  apply(simp add: contains_def)
+  apply(drule list_decomp)
+  apply(elim exE)
   apply(case_tac xs)
-   apply(subgoal_tac "(snd (f (Suc (n + q)))) \<in> set (inference (snd (f (n + q))))")
-    apply(simp add: inference_def split: if_splits)
-   apply(blast dest: is_path_f)
+   apply(simp add: inference_def split: if_splits)
   apply(fastforce dest: progress)
   done
 
-lemma (in loc1) contains_propagates_fconj: "infinite (calculation s) \<Longrightarrow> contains f n (0, Con g h) \<Longrightarrow> (\<exists>y. contains f (n+y) (0,g) \<or> contains f (n+y) (0,h))"
-  apply(subgoal_tac "(\<exists>l. considers f (n+l) (0,Con g h))")
-   prefer 2 apply(blast dest: contains_considers)
-  apply(clarsimp simp: considers_def)
-  apply(subgoal_tac "(snd (f (Suc (n + l)))) \<in> set (inference (snd (f (n + l))))")
-   prefer 2 apply(blast dest: is_path_f)
-  apply(case_tac "snd (f (n + l))")
-   apply(simp)
-  apply(rule_tac x="Suc l" in exI)
-  apply(fastforce simp: contains_def inference_def)
-  done
+lemma (in loc1) contains_propagates_fconj:
+  assumes 1: "infinite (calculation s)" and 2: "contains f n (0, Con g h)"
+  shows "(\<exists>y. contains f (n+y) (0,g) \<or> contains f (n+y) (0,h))"
+  proof -
+    have 3: "(\<exists>l. considers f (n+l) (0, Con g h))" using 1 2 by (blast dest: contains_considers)
+    then obtain l where 4: "considers f (n+l) (0,Con g h)" by blast
+    then have 5: "(snd (f (Suc (n + l)))) \<in> set (inference (snd (f (n + l))))"
+      using 1 by (blast dest: is_path_f)
+    then show ?thesis proof (case_tac "snd (f (n + l))")
+      assume "snd (f (n + l)) = []"
+      then show ?thesis using 4 considers_def by simp
+    next
+      fix a list
+      assume "snd (f (n + l)) = a # list"
+      then show ?thesis using 4 5 considers_def contains_def inference_def
+        by (rule_tac x="Suc l" in exI) auto
+    qed
+  qed
 
-lemma (in loc1) contains_propagates_fdisj: "infinite (calculation s) \<Longrightarrow> contains f n (0, Dis g h) \<Longrightarrow> (\<exists>y. contains f (n+y) (0,g) \<and> contains f (n+y) (0,h))"
-  apply(subgoal_tac "(\<exists>l. considers f (n+l) (0,Dis g h))")
-   prefer 2 apply(blast dest: contains_considers)
-  apply(clarsimp simp: considers_def)
-  apply(subgoal_tac "(snd (f (Suc (n + l)))) \<in> set (inference (snd (f (n + l))))")
-   prefer 2 apply(blast dest: is_path_f)
-  apply(case_tac "snd (f (n + l))")
-   apply(simp)
-  apply(rule_tac x="Suc l" in exI)
-  apply(simp add: contains_def inference_def)
-  done
+lemma (in loc1) contains_propagates_fdisj:
+  assumes 1: "infinite (calculation s)" and 2: "contains f n (0, Dis g h)"
+  shows "(\<exists>y. contains f (n+y) (0,g) \<and> contains f (n+y) (0,h))"
+  proof -
+    have 3: "(\<exists>l. considers f (n+l) (0, Dis g h))" using 1 2 by (blast dest: contains_considers)
+    then obtain l where 4: "considers f (n+l) (0, Dis g h)" by blast
+    then have 5: "(snd (f (Suc (n + l)))) \<in> set (inference (snd (f (n + l))))"
+      using 1 by (blast dest: is_path_f)
+    then show ?thesis proof (case_tac "snd (f (n + l))")
+      assume "snd (f (n + l)) = []"
+      then show ?thesis using 4 considers_def by simp
+    next
+      fix a list
+      assume "snd (f (n + l)) = a # list"
+      then show ?thesis using 4 5 considers_def contains_def inference_def
+        by (rule_tac x="Suc l" in exI) simp
+    qed
+  qed
 
-lemma (in loc1) contains_propagates_fall: "infinite (calculation s) \<Longrightarrow> contains f n (0, Uni g)
-  \<Longrightarrow> (\<exists>y. contains f (Suc(n+y)) (0,substitution_bind g (fresh (fv_list (list_sequent (snd (f (n+y))))))))"
-  apply(subgoal_tac "(\<exists>l. considers f (n+l) (0,Uni g))")
-    prefer 2 apply(blast dest: contains_considers)
-  apply(clarsimp simp: considers_def)
-  apply(subgoal_tac "(snd (f (Suc (n + l)))) \<in> set (inference (snd (f (n + l))))")
-   prefer 2 apply(blast dest: is_path_f)
-  apply(case_tac "snd (f (n + l))")
-   apply(simp)
-  apply(rule_tac x="l" in exI)
-  apply(simp add: contains_def inference_def fv_list_def)
-  done
+lemma (in loc1) contains_propagates_fall:
+  assumes 1: "infinite (calculation s)" and 2: "contains f n (0, Uni g)"
+  shows "(\<exists>y. contains f (Suc(n+y)) (0,substitution_bind g (fresh (fv_list (list_sequent (snd (f (n+y))))))))"
+  proof -
+    have 3: "(\<exists>l. considers f (n+l) (0, Uni g))" using 1 2 by (blast dest: contains_considers)
+    then obtain l where 4: "considers f (n+l) (0, Uni g)" by blast
+    then have 5: "(snd (f (Suc (n + l)))) \<in> set (inference (snd (f (n + l))))"
+      using 1 by (blast dest: is_path_f)
+    then show ?thesis proof (case_tac "snd (f (n + l))")
+      assume "snd (f (n + l)) = []"
+      then show ?thesis using 4 considers_def by simp
+    next
+      fix a list
+      assume "snd (f (n + l)) = a # list"
+      then show ?thesis using 4 5 considers_def contains_def inference_def
+        by (rule_tac x="l" in exI) (simp add: fv_list_def)
+    qed
+  qed
 
-lemma (in loc1) contains_propagates_fex: "infinite (calculation s) \<Longrightarrow> contains f n (m, Exi g) 
-  \<Longrightarrow> (\<exists>y. (contains f (n+y) (0,substitution_bind g m)) \<and> (contains f (n+y) (Suc m,Exi g)))"
-  apply(subgoal_tac "(\<exists>l. considers f (n+l) (m,Exi g))")
-   prefer 2 apply(blast dest: contains_considers)
-  apply(clarsimp simp: considers_def)
-  apply(subgoal_tac "(snd (f (Suc (n + l)))) \<in> set (inference (snd (f (n + l))))")
-   prefer 2 apply(blast dest: is_path_f)
-  apply(case_tac "snd (f (n + l))")
-   apply(simp)
-  apply(rule_tac x="Suc l" in exI)
-  apply(simp add: contains_def inference_def)
-  done
+lemma (in loc1) contains_propagates_fex:
+  assumes 1: "infinite (calculation s)" and 2: "contains f n (m, Exi g)"
+  shows "(\<exists>y. (contains f (n+y) (0,substitution_bind g m)) \<and> (contains f (n+y) (Suc m, Exi g)))"
+  proof -
+    have 3: "(\<exists>l. considers f (n+l) (m, Exi g))" using 1 2 by (blast dest: contains_considers)
+    then obtain l where 4: "considers f (n+l) (m, Exi g)" by (blast dest: is_path_f)
+    then have 5: "(snd (f (Suc (n + l)))) \<in> set (inference (snd (f (n + l))))"
+      using 1 by (blast dest: is_path_f)
+    then show ?thesis proof (case_tac "snd (f (n + l))")
+      assume "snd (f (n + l)) = []"
+      then show ?thesis using 4 considers_def by simp
+    next
+      fix a list
+      assume "snd (f (n + l)) = a # list"
+      then show ?thesis using 4 5 considers_def contains_def inference_def
+        by (rule_tac x="Suc l" in exI) simp
+    qed
+  qed
 
 lemma (in loc1) FEx_downward: "infinite (calculation s) \<Longrightarrow> init s \<Longrightarrow> \<forall>m. (Suc m, Exi g) \<in> set (snd (f n)) \<longrightarrow> (\<exists>n'. (m, Exi g) \<in> set (snd (f n')))"
   apply(frule is_path_f)
