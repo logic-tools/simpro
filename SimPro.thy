@@ -499,23 +499,22 @@ lemma (in loc1) contains_considers'[rule_format]: "infinite (calculation s) \<Lo
          (simp, metis add_Suc_shift append_Cons append_assoc)
   qed
 
-lemma list_decomp[rule_format]: "v \<in> set p \<longrightarrow> (\<exists>xs ys. p = xs@(v # ys) \<and> v \<notin> set xs)"
-  by (meson split_list_first)
- 
 lemma (in loc1) contains_considers: "infinite (calculation s) \<Longrightarrow> contains f n y \<Longrightarrow> (\<exists>m. considers f (n+m) y)"
-  by (simp add: contains_def, frule list_decomp, elim exE conjE, frule contains_considers')
+  by (simp add: contains_def, frule split_list_first, elim exE conjE, frule contains_considers')
      (assumption, metis (mono_tags, lifting) considers_def list.simps(5))
 
 lemma (in loc1) contains_propagates_patoms[rule_format]: "infinite (calculation s) \<Longrightarrow> contains f n (0, Pos i v) \<Longrightarrow> contains f (n+q) (0, Pos i v)"
   apply(induct q)
    apply(simp)
-  apply(clarsimp simp: contains_def dest!: list_decomp)
   apply(subgoal_tac "(snd (f (Suc (n + q)))) \<in> set (inference (snd (f (n + q))))")
    prefer 2 apply(blast dest: is_path_f)
-  apply(case_tac xs)
+  apply(simp add: contains_def)
+  apply(drule split_list_first)
+  apply(elim exE)
+  apply(case_tac ys)
     apply(simp add: inference_def split: if_splits)
   apply(fastforce dest: progress)
-  done   
+  done
 
 lemma (in loc1) contains_propagates_natoms[rule_format]: "infinite (calculation s) \<Longrightarrow> contains f n (0, Neg i v) \<Longrightarrow> contains f (n+q) (0, Neg i v)"
   apply(induct q)
@@ -523,9 +522,9 @@ lemma (in loc1) contains_propagates_natoms[rule_format]: "infinite (calculation 
   apply(subgoal_tac "(snd (f (Suc (n + q)))) \<in> set (inference (snd (f (n + q))))")
    prefer 2 apply(blast dest: is_path_f)
   apply(simp add: contains_def)
-  apply(drule list_decomp)
+  apply(drule split_list_first)
   apply(elim exE)
-  apply(case_tac xs)
+  apply(case_tac ys)
    apply(simp add: inference_def split: if_splits)
   apply(fastforce dest: progress)
   done
@@ -751,7 +750,7 @@ lemma loop: "\<forall>x. ((n,x) \<in> calculation s) = (x \<in> set (loop [s] n)
     case Suc then show ?case
       using loop_def
       by (intro allI iffI, clarsimp dest!: calculation_downwards)
-         (clarsimp dest!: list_decomp spec simp: flatten_append, fastforce simp: set_flatten)
+         (clarsimp dest!: split_list_first spec simp: flatten_append, fastforce simp: set_flatten)
 qed
 
 lemma calculation_f: "calculation s = UNION UNIV (\<lambda>x. set (map (\<lambda>y. (x,y)) (loop [s] x)))"
