@@ -316,7 +316,7 @@ lemma FEval_substitution_bind: "semantics mo e (substitution_bind A u) = semanti
   using substitution_bind_def FEval_substitution FEval_cong
   by (simp add: Nitpick.case_nat_unfold)
 
-lemma sound_FAll: "u \<notin> set (fv_list (Uni f # s)) \<Longrightarrow> valid (s@[substitution_bind f u]) \<Longrightarrow> valid (Uni f # s)"
+lemma sound_uni: "u \<notin> set (fv_list (Uni f # s)) \<Longrightarrow> valid (s@[substitution_bind f u]) \<Longrightarrow> valid (Uni f # s)"
   apply(clarsimp simp: valid_def fv_list_cons)
   apply(rename_tac M I e z)
   apply(subgoal_tac "semantics (M,I) (case_nat z (e(u:=z))) f = semantics (M,I) (case_nat z e) f")
@@ -330,7 +330,7 @@ lemma sound_FAll: "u \<notin> set (fv_list (Uni f # s)) \<Longrightarrow> valid 
   apply(metis fun_upd_other semantics_alternative_cong)
   done
  
-lemma sound_FEx: "valid (s@[substitution_bind f u,Exi f]) \<Longrightarrow> valid (Exi f # s)"
+lemma sound_exi: "valid (s@[substitution_bind f u,Exi f]) \<Longrightarrow> valid (Exi f # s)"
   by (simp add: valid_def semantics_alternative_append FEval_substitution_bind)
      (metis is_model_environment_def prod.sel(1))
 
@@ -410,12 +410,12 @@ lemma soundness': "init s \<Longrightarrow> finite (calculation s) \<Longrightar
     prefer 2 apply (meson index0 is_FEx list.set_intros(1))
    apply(frule calculation.step)
     apply(simp)
-    apply(metis (no_types, lifting) Suc_diff_Suc Suc_leD diff_diff_cancel diff_le_self fresh le_simps(3) list.simps(8) list.simps(9) list_sequent_def map_append snd_eqD sound_FAll)
+    apply(metis (no_types, lifting) Suc_diff_Suc Suc_leD diff_diff_cancel diff_le_self fresh le_simps(3) list.simps(8) list.simps(9) list_sequent_def map_append snd_eqD sound_uni)
   apply(case_tac "\<exists>a f list. t = (a,Exi f) # list")
    apply(elim exE)
    apply(frule calculation.step)
     apply(simp)
-   apply(metis (no_types, lifting) Suc_diff_Suc Suc_leD diff_diff_cancel diff_le_self le_simps(3) list.simps(8) list.simps(9) list_sequent_def map_append snd_eqD sound_FEx)
+   apply(metis (no_types, lifting) Suc_diff_Suc Suc_leD diff_diff_cancel diff_le_self le_simps(3) list.simps(8) list.simps(9) list_sequent_def map_append snd_eqD sound_exi)
    -- "now for other cases"
       -- "case empty list"
   apply(case_tac t)
@@ -506,34 +506,56 @@ lemma (in loc1) contains_considers'[rule_format]: "infinite (calculation s) \<Lo
   qed
 
 lemma (in loc1) contains_considers: "infinite (calculation s) \<Longrightarrow> contains f n y \<Longrightarrow> (\<exists>m. considers f (n+m) y)"
-  by (simp add: contains_def, frule split_list_first, elim exE conjE, frule contains_considers')
-     (assumption, metis (mono_tags, lifting) considers_def list.simps(5))
+  by (clarsimp simp: contains_def considers_def dest!: split_list_first, frule contains_considers')
+     (assumption, metis (mono_tags, lifting) list.simps(5))
 
-lemma (in loc1) contains_propagates_pos[rule_format]: "infinite (calculation s) \<Longrightarrow> contains f n (0, Pos i v) \<Longrightarrow> contains f (n+q) (0, Pos i v)"
-  apply(induct q)
-   apply(simp)
-  apply(subgoal_tac "(snd (f (Suc (n + q)))) \<in> set (inference (snd (f (n + q))))")
-   prefer 2 apply(blast dest: is_path_f)
-  apply(simp add: contains_def)
-  apply(drule split_list_first)
-  apply(elim exE)
-  apply(case_tac ys)
-    apply(simp add: inference_def split: if_splits)
-  apply(fastforce dest: progress)
-  done
+lemma (in loc1) contains_propagates_pos[rule_format]:
+  assumes "infinite (calculation s)" and "contains f n (0, Pos i v)"
+  shows "contains f (n+q) (0, Pos i v)"
+  proof (induct q)
+    case 0 then show ?case using assms by simp
+  next
+    case (Suc q')
+    then have IH: "contains f (n + q') (0, Pos i v)" by simp
+    then have "\<exists>ys zs. snd (f (n + q')) = ys @ (0, Pos i v) # zs \<and> (0, Pos i v) \<notin> set ys"
+      by (meson contains_def split_list_first)
+    then obtain ys and zs where 4: "snd (f (n + q')) = ys @ (0, Pos i v) # zs \<and> (0, Pos i v) \<notin> set ys"
+      by blast
+    then have 5: "(snd (f (Suc (n + q')))) \<in> set (inference (snd (f (n + q'))))"
+      using assms by (blast dest: is_path_f)
+    then show ?case proof (cases ys)
+      case Nil
+      then show ?thesis using 4 5 contains_def inference_def
+        by (simp split: if_splits)
+    next
+      case Cons then show ?thesis using assms 4 contains_def progress
+        by simp (metis IH Un_iff set_ConsD set_append)
+    qed
+  qed
 
-lemma (in loc1) contains_propagates_neg[rule_format]: "infinite (calculation s) \<Longrightarrow> contains f n (0, Neg i v) \<Longrightarrow> contains f (n+q) (0, Neg i v)"
-  apply(induct q)
-   apply(simp)
-  apply(subgoal_tac "(snd (f (Suc (n + q)))) \<in> set (inference (snd (f (n + q))))")
-   prefer 2 apply(blast dest: is_path_f)
-  apply(simp add: contains_def)
-  apply(drule split_list_first)
-  apply(elim exE)
-  apply(case_tac ys)
-   apply(simp add: inference_def split: if_splits)
-  apply(fastforce dest: progress)
-  done
+lemma (in loc1) contains_propagates_neg[rule_format]:
+  assumes "infinite (calculation s)" and "contains f n (0, Neg i v)"
+  shows "contains f (n+q) (0, Neg i v)"
+  proof (induct q)
+    case 0 then show ?case using assms by simp
+  next
+    case (Suc q')
+    then have IH: "contains f (n + q') (0, Neg i v)" by simp
+    then have "\<exists>ys zs. snd (f (n + q')) = ys @ (0, Neg i v) # zs \<and> (0, Neg i v) \<notin> set ys"
+      by (meson contains_def split_list_first)
+    then obtain ys and zs where 4: "snd (f (n + q')) = ys @ (0, Neg i v) # zs \<and> (0, Neg i v) \<notin> set ys"
+      by blast
+    then have 5: "(snd (f (Suc (n + q')))) \<in> set (inference (snd (f (n + q'))))"
+      using assms by (blast dest: is_path_f)
+    then show ?case proof (cases ys)
+      case Nil
+      then show ?thesis using 4 5 contains_def inference_def
+        by (simp split: if_splits)
+    next
+      case Cons then show ?thesis using assms 4 contains_def progress
+        by simp (metis IH Un_iff set_ConsD set_append)
+    qed
+  qed
 
 lemma (in loc1) contains_propagates_con:
   assumes 1: "infinite (calculation s)" and 2: "contains f n (0, Con g h)"
