@@ -125,16 +125,16 @@ primrec is_axiom :: "form list \<Rightarrow> bool" where
 
 lemma member_set[simp]: "member a l = (a \<in> (set l))" by (induct l) auto
 
-lemma patom:  "(n,(m,Pos i v) # xs) \<in> calculation(nfs) \<Longrightarrow> \<not> is_axiom (list_sequent ((m,Pos i v) # xs)) \<Longrightarrow> (Suc n,xs@[(0,Pos i v)]) \<in> calculation(nfs)"
-  and natom:  "(n,(m,Neg i v) # xs) \<in> calculation(nfs) \<Longrightarrow> \<not> is_axiom (list_sequent ((m,Neg i v) # xs)) \<Longrightarrow> (Suc n,xs@[(0,Neg i v)]) \<in> calculation(nfs)"
-  and fconj1: "(n,(m,Con f g) # xs) \<in> calculation(nfs) \<Longrightarrow> \<not> is_axiom (list_sequent ((m,Con f g) # xs)) \<Longrightarrow> (Suc n,xs@[(0,f)]) \<in> calculation(nfs)"
-  and fconj2: "(n,(m,Con f g) # xs) \<in> calculation(nfs) \<Longrightarrow> \<not> is_axiom (list_sequent ((m,Con f g) # xs)) \<Longrightarrow> (Suc n,xs@[(0,g)]) \<in> calculation(nfs)"
-  and fdisj:  "(n,(m,Dis f g) # xs) \<in> calculation(nfs) \<Longrightarrow> \<not> is_axiom (list_sequent ((m,Dis f g) # xs)) \<Longrightarrow> (Suc n,xs@[(0,f),(0,g)]) \<in> calculation(nfs)"
-  and fall:   "(n,(m,Uni f) # xs) \<in> calculation(nfs) \<Longrightarrow> \<not> is_axiom (list_sequent ((m,Uni f) # xs)) \<Longrightarrow> (Suc n,xs@[(0,substitution_bind f (fresh ((flatten \<circ> map fv) (list_sequent ((m,Uni f) # xs)))))]) \<in> calculation(nfs)"
-  and fex:    "(n,(m,Exi f) # xs) \<in> calculation(nfs) \<Longrightarrow> \<not> is_axiom (list_sequent ((m,Exi f) # xs)) \<Longrightarrow> (Suc n,xs@[(0,substitution_bind f m),(Suc m,Exi f)]) \<in> calculation(nfs)"
+lemma pos:  "(n,(m,Pos i v) # xs) \<in> calculation(nfs) \<Longrightarrow> \<not> is_axiom (list_sequent ((m,Pos i v) # xs)) \<Longrightarrow> (Suc n,xs@[(0,Pos i v)]) \<in> calculation(nfs)"
+  and neg:  "(n,(m,Neg i v) # xs) \<in> calculation(nfs) \<Longrightarrow> \<not> is_axiom (list_sequent ((m,Neg i v) # xs)) \<Longrightarrow> (Suc n,xs@[(0,Neg i v)]) \<in> calculation(nfs)"
+  and con1: "(n,(m,Con f g) # xs) \<in> calculation(nfs) \<Longrightarrow> \<not> is_axiom (list_sequent ((m,Con f g) # xs)) \<Longrightarrow> (Suc n,xs@[(0,f)]) \<in> calculation(nfs)"
+  and con2: "(n,(m,Con f g) # xs) \<in> calculation(nfs) \<Longrightarrow> \<not> is_axiom (list_sequent ((m,Con f g) # xs)) \<Longrightarrow> (Suc n,xs@[(0,g)]) \<in> calculation(nfs)"
+  and dis:  "(n,(m,Dis f g) # xs) \<in> calculation(nfs) \<Longrightarrow> \<not> is_axiom (list_sequent ((m,Dis f g) # xs)) \<Longrightarrow> (Suc n,xs@[(0,f),(0,g)]) \<in> calculation(nfs)"
+  and uni:  "(n,(m,Uni f) # xs) \<in> calculation(nfs) \<Longrightarrow> \<not> is_axiom (list_sequent ((m,Uni f) # xs)) \<Longrightarrow> (Suc n,xs@[(0,substitution_bind f (fresh ((flatten \<circ> map fv) (list_sequent ((m,Uni f) # xs)))))]) \<in> calculation(nfs)"
+  and exi:  "(n,(m,Exi f) # xs) \<in> calculation(nfs) \<Longrightarrow> \<not> is_axiom (list_sequent ((m,Exi f) # xs)) \<Longrightarrow> (Suc n,xs@[(0,substitution_bind f m),(Suc m,Exi f)]) \<in> calculation(nfs)"
   by (auto simp: inference_def list_sequent_def)
 
-lemmas not_is_axiom_subs = patom natom fconj1 fconj2 fdisj fall fex
+lemmas not_is_axiom_subs = pos neg con1 con2 dis uni exi
 
 lemma calculation_init[simp]: "(0,k) \<in> calculation s = (k = s)"
   using calculation.cases by blast
@@ -240,7 +240,7 @@ lemma (in loc1) is_path_f_0: "infinite (calculation s) \<Longrightarrow> f 0 = (
   using calculation_init f0 prod.collapse by metis
 
 lemma (in loc1) is_path_f': "infinite (calculation s) \<Longrightarrow> f n \<in> calculation s \<and> fst (f n) = n \<and> infinite (calculation (snd (f n))) \<and> \<not> is_axiom (list_sequent (snd (f n)))"
-  using f0 fSuc by (induct n) auto
+  using f0 fSuc by (induct n) simp_all
 
 lemma (in loc1) is_path_f: "infinite (calculation s) \<Longrightarrow> \<forall>n. f n \<in> calculation s \<and> fst (f n) = n \<and> (snd (f (Suc n))) \<in> set (inference (snd (f n))) \<and> infinite (calculation (snd (f n)))"
   using is_path_f' fSuc by simp
@@ -252,7 +252,7 @@ lemma cut[simp]: "Suc n \<in> set A = (n \<in> set (cut A))"
     case (Cons m _) then show ?case by (cases m) simp_all
   qed
 
-lemma FEval_cong: "\<forall>e1 e2. (\<forall>x. x \<in> set (fv A) \<longrightarrow> e1 x = e2 x) \<longrightarrow> semantics mi e1 A = semantics mi e2 A"
+lemma eval_cong: "\<forall>e1 e2. (\<forall>x. x \<in> set (fv A) \<longrightarrow> e1 x = e2 x) \<longrightarrow> semantics mi e1 A = semantics mi e2 A"
   proof (induct A)
     case Pos then show ?case using map_cong fv.simps(1) semantics.simps(1) by metis
   next
@@ -284,7 +284,7 @@ lemma fv_list_cons: "fv_list (a # list) = (fv a) @ (fv_list list)"
   by (simp add: fv_list_def)
 
 lemma semantics_alternative_cong: "(\<forall>x. x \<in> set (fv_list s) \<longrightarrow> e1 x = e2 x) \<longrightarrow> semantics_alternative m e1 s = semantics_alternative m e2 s" 
- by (induct s) (simp, metis FEval_cong semantics_alternative.simps(2) Un_iff set_append fv_list_cons)
+ by (induct s) (simp, metis eval_cong semantics_alternative.simps(2) Un_iff set_append fv_list_cons)
 
 section "Soundness"
 
@@ -294,7 +294,7 @@ lemma ball_eq_ball: "\<forall>x \<in> m. P x = Q x \<Longrightarrow> (\<forall>x
 lemma bex_eq_bex: "\<forall>x \<in> m. P x = Q x \<Longrightarrow> (\<exists>x \<in> m. P x) = (\<exists>x \<in> m. Q x)"
   by simp
 
-lemma FEval_substitution: "\<forall>e f. (semantics mi e (substitution f A)) = (semantics mi (e \<circ> f) A)"
+lemma eval_substitution: "\<forall>e f. (semantics mi e (substitution f A)) = (semantics mi (e \<circ> f) A)"
   proof (induct A)
     case Pos then show ?case by (simp add: comp_def)
   next
@@ -306,32 +306,31 @@ lemma FEval_substitution: "\<forall>e f. (semantics mi e (substitution f A)) = (
   next
     case Uni
     then show ?case
-      by (clarsimp intro!: ball_eq_ball simp: FEval_cong Nitpick.case_nat_unfold)
+      by (clarsimp intro!: ball_eq_ball simp: eval_cong Nitpick.case_nat_unfold)
   next
     case Exi then show ?case
-      by (clarsimp intro!: bex_eq_bex simp: FEval_cong Nitpick.case_nat_unfold)
+      by (clarsimp intro!: bex_eq_bex simp: eval_cong Nitpick.case_nat_unfold)
   qed
 
-lemma FEval_substitution_bind: "semantics mo e (substitution_bind A u) = semantics mo (case_nat (e u) e) A"
-  using substitution_bind_def FEval_substitution FEval_cong
+lemma eval_substitution_bind: "semantics mo e (substitution_bind A u) = semantics mo (case_nat (e u) e) A"
+  using substitution_bind_def eval_substitution eval_cong
   by (simp add: Nitpick.case_nat_unfold)
 
-lemma sound_uni: "u \<notin> set (fv_list (Uni f # s)) \<Longrightarrow> valid (s@[substitution_bind f u]) \<Longrightarrow> valid (Uni f # s)"
-  apply(clarsimp simp: valid_def fv_list_cons)
+lemma sound_Uni: "u \<notin> set (fv_list (Uni f # s)) \<Longrightarrow> valid (s@[substitution_bind f u]) \<Longrightarrow> valid (Uni f # s)"
+  apply(clarsimp simp: valid_def)
   apply(rename_tac M I e z)
   apply(subgoal_tac "semantics (M,I) (case_nat z (e(u:=z))) f = semantics (M,I) (case_nat z e) f")
    prefer 2
-   apply(intro FEval_cong[rule_format])
-   apply(metis (no_types, lifting) Nitpick.case_nat_unfold Suc_pred' cut fun_upd_apply not_gr0)
+   apply(clarsimp simp: Nitpick.case_nat_unfold fv_list_cons intro!: eval_cong[rule_format])
+   apply(metis One_nat_def Suc_pred' cut)
+  apply(clarsimp simp: fv_list_cons semantics_alternative_cong semantics_alternative_append eval_substitution_bind is_model_environment_def)
   apply(drule_tac x=M in spec)
   apply(drule_tac x=I in spec)
-  apply(drule_tac x="e(u:=z)" in spec)
-  apply(simp add: semantics_alternative_append FEval_substitution_bind is_model_environment_def)
-  apply(metis fun_upd_other semantics_alternative_cong)
+  apply(metis (no_types, lifting) fun_upd_apply semantics_alternative_cong)
   done
  
-lemma sound_exi: "valid (s@[substitution_bind f u,Exi f]) \<Longrightarrow> valid (Exi f # s)"
-  by (simp add: valid_def semantics_alternative_append FEval_substitution_bind)
+lemma sound_Exi: "valid (s@[substitution_bind f u,Exi f]) \<Longrightarrow> valid (Exi f # s)"
+  by (simp add: valid_def semantics_alternative_append eval_substitution_bind)
      (metis is_model_environment_def prod.sel(1))
 
 lemma max_exists: "finite (X::nat set) \<Longrightarrow> X \<noteq> {} \<longrightarrow> (\<exists>x. x \<in> X \<and> (\<forall>y. y \<in> X \<longrightarrow> y \<le> x))"
@@ -349,21 +348,21 @@ lemma finite_calculation_calculation: "finite (calculation s) \<Longrightarrow> 
 definition init :: "sequent \<Rightarrow> bool" where
   "init s = (\<forall>x \<in> (set s). fst x = 0)"
 
-definition is_FEx :: "form \<Rightarrow> bool" where
-  "is_FEx f = (case f of
+definition is_Exi :: "form \<Rightarrow> bool" where
+  "is_Exi f = (case f of
     Exi _ \<Rightarrow> True |
     _     \<Rightarrow> False)"
 
-lemma is_FEx[simp]: "\<not> is_FEx (Pos i v) \<and> \<not> is_FEx (Neg i v) \<and> \<not> is_FEx (Con f g) \<and> \<not> is_FEx (Dis f g) \<and> \<not> is_FEx (Uni f)"
-  using is_FEx_def by simp
+lemma is_Exi[simp]: "\<not> is_Exi (Pos i v) \<and> \<not> is_Exi (Neg i v) \<and> \<not> is_Exi (Con f g) \<and> \<not> is_Exi (Dis f g) \<and> \<not> is_Exi (Uni f)"
+  using is_Exi_def by simp
 
-lemma index0: "init s \<Longrightarrow> \<forall>u m A. (n, u) \<in> calculation s \<longrightarrow> (m,A) \<in> (set u) \<longrightarrow> (\<not> is_FEx A) \<longrightarrow> m = 0"
+lemma index0: "init s \<Longrightarrow> \<forall>u m A. (n, u) \<in> calculation s \<longrightarrow> (m,A) \<in> (set u) \<longrightarrow> (\<not> is_Exi A) \<longrightarrow> m = 0"
   proof (induct n)
     case 0 then show ?case using init_def by fastforce
   next
     case Suc then show ?case
       by (clarsimp dest!: calculation_downwards, case_tac t, simp add: inference_def, case_tac a, case_tac b)
-         (fastforce simp: inference_def list_sequent_def is_FEx_def)+
+         (fastforce simp: inference_def list_sequent_def is_Exi_def)+
   qed
 
 lemma max_list: "\<forall>v \<in> set l. v \<le> max_list l"
@@ -407,15 +406,15 @@ lemma soundness': "init s \<Longrightarrow> finite (calculation s) \<Longrightar
    apply(elim exE)
    apply(simp)
    apply(subgoal_tac "a = 0")
-    prefer 2 apply (meson index0 is_FEx list.set_intros(1))
+    prefer 2 apply (meson index0 is_Exi list.set_intros(1))
    apply(frule calculation.step)
     apply(simp)
-    apply(metis (no_types, lifting) Suc_diff_Suc Suc_leD diff_diff_cancel diff_le_self fresh le_simps(3) list.simps(8) list.simps(9) list_sequent_def map_append snd_eqD sound_uni)
+    apply(metis (no_types, lifting) Suc_diff_Suc Suc_leD diff_diff_cancel diff_le_self fresh le_simps(3) list.simps(8) list.simps(9) list_sequent_def map_append snd_eqD sound_Uni)
   apply(case_tac "\<exists>a f list. t = (a,Exi f) # list")
    apply(elim exE)
    apply(frule calculation.step)
     apply(simp)
-   apply(metis (no_types, lifting) Suc_diff_Suc Suc_leD diff_diff_cancel diff_le_self le_simps(3) list.simps(8) list.simps(9) list_sequent_def map_append snd_eqD sound_exi)
+   apply(metis (no_types, lifting) Suc_diff_Suc Suc_leD diff_diff_cancel diff_le_self le_simps(3) list.simps(8) list.simps(9) list_sequent_def map_append snd_eqD sound_Exi)
    -- "now for other cases"
       -- "case empty list"
   apply(case_tac t)
@@ -431,11 +430,11 @@ lemma soundness': "init s \<Longrightarrow> finite (calculation s) \<Longrightar
    -- "if not a satax, then inference holds... "
   apply(case_tac a)
   apply(case_tac b)
-       apply(fastforce simp: list_sequent_def dest!: patom)
+       apply(fastforce simp: list_sequent_def dest!: pos)
       apply(simp del: semantics.simps)
-      apply(frule fconj1)
+      apply(frule con1)
        apply(assumption)
-      apply(frule fconj2)
+      apply(frule con2)
        apply(assumption)
       apply(rename_tac form1 form2)
       apply(frule_tac x="Suc n" in spec, drule_tac x="list @ [(0, form1)]" in spec)
@@ -450,9 +449,9 @@ lemma soundness': "init s \<Longrightarrow> finite (calculation s) \<Longrightar
        apply(simp)
       apply(metis (no_types, lifting) Un_iff append_Nil2 insert_iff list.set(2) list.set_intros(1) list.simps(9) list_sequent_def map_append semantics.simps(3) set_append snd_conv)
      apply(blast)
-    apply(fastforce simp: list_sequent_def dest!: natom)
+    apply(fastforce simp: list_sequent_def dest!: neg)
    apply(simp)
-   apply(frule fdisj)
+   apply(frule dis)
     apply(assumption)
    apply(rename_tac form1 form2)
    apply(frule_tac x="Suc n" in spec, drule_tac x="list @ [(0, form1),(0,form2)]" in spec)
@@ -509,7 +508,7 @@ lemma (in loc1) contains_considers: "infinite (calculation s) \<Longrightarrow> 
   by (clarsimp simp: contains_def considers_def dest!: split_list_first, frule contains_considers')
      (assumption, metis (mono_tags, lifting) list.simps(5))
 
-lemma (in loc1) contains_propagates_pos[rule_format]:
+lemma (in loc1) contains_propagates_Pos[rule_format]:
   assumes "infinite (calculation s)" and "contains f n (0, Pos i v)"
   shows "contains f (n+q) (0, Pos i v)"
   proof (induct q)
@@ -533,7 +532,7 @@ lemma (in loc1) contains_propagates_pos[rule_format]:
     qed
   qed
 
-lemma (in loc1) contains_propagates_neg[rule_format]:
+lemma (in loc1) contains_propagates_Neg[rule_format]:
   assumes "infinite (calculation s)" and "contains f n (0, Neg i v)"
   shows "contains f (n+q) (0, Neg i v)"
   proof (induct q)
@@ -557,7 +556,7 @@ lemma (in loc1) contains_propagates_neg[rule_format]:
     qed
   qed
 
-lemma (in loc1) contains_propagates_con:
+lemma (in loc1) contains_propagates_Con:
   assumes 1: "infinite (calculation s)" and 2: "contains f n (0, Con g h)"
   shows "(\<exists>y. contains f (n+y) (0,g) \<or> contains f (n+y) (0,h))"
   proof -
@@ -576,7 +575,7 @@ lemma (in loc1) contains_propagates_con:
     qed
   qed
 
-lemma (in loc1) contains_propagates_dis:
+lemma (in loc1) contains_propagates_Dis:
   assumes 1: "infinite (calculation s)" and 2: "contains f n (0, Dis g h)"
   shows "(\<exists>y. contains f (n+y) (0,g) \<and> contains f (n+y) (0,h))"
   proof -
@@ -595,7 +594,7 @@ lemma (in loc1) contains_propagates_dis:
     qed
   qed
 
-lemma (in loc1) contains_propagates_uni:
+lemma (in loc1) contains_propagates_Uni:
   assumes 1: "infinite (calculation s)" and 2: "contains f n (0, Uni g)"
   shows "(\<exists>y. contains f (Suc(n+y)) (0,substitution_bind g (fresh (fv_list (list_sequent (snd (f (n+y))))))))"
   proof -
@@ -614,7 +613,7 @@ lemma (in loc1) contains_propagates_uni:
     qed
   qed
 
-lemma (in loc1) contains_propagates_exi:
+lemma (in loc1) contains_propagates_Exi:
   assumes 1: "infinite (calculation s)" and 2: "contains f n (m, Exi g)"
   shows "(\<exists>y. (contains f (n+y) (0,substitution_bind g m)) \<and> (contains f (n+y) (Suc m, Exi g)))"
   proof -
@@ -633,7 +632,7 @@ lemma (in loc1) contains_propagates_exi:
     qed
   qed
 
-lemma (in loc1) FEx_downward: "infinite (calculation s) \<Longrightarrow> init s \<Longrightarrow> \<forall>m. (Suc m, Exi g) \<in> set (snd (f n)) \<longrightarrow> (\<exists>n'. (m, Exi g) \<in> set (snd (f n')))"
+lemma (in loc1) Exi_downward: "infinite (calculation s) \<Longrightarrow> init s \<Longrightarrow> \<forall>m. (Suc m, Exi g) \<in> set (snd (f n)) \<longrightarrow> (\<exists>n'. (m, Exi g) \<in> set (snd (f n')))"
   apply(frule is_path_f)
   apply(induct_tac n)
    apply(fastforce simp: init_def is_path_f_0)
@@ -648,15 +647,21 @@ lemma (in loc1) FEx_downward: "infinite (calculation s) \<Longrightarrow> init s
   apply(metis list.set_intros(1) snd_eqD)
   done
    
-lemma (in loc1) FEx0: "infinite (calculation s) \<Longrightarrow> init s \<Longrightarrow> \<forall>n. contains f n (m,Exi g) \<longrightarrow> (\<exists>n'. contains f n' (0, Exi g))"
-  using FEx_downward contains_def by (induct m) (simp, blast)
+lemma (in loc1) Exi0: "infinite (calculation s) \<Longrightarrow> init s \<Longrightarrow> \<forall>n. contains f n (m,Exi g) \<longrightarrow> (\<exists>n'. contains f n' (0, Exi g))"
+  using Exi_downward contains_def by (induct m) (simp, blast)
      
-lemma (in loc1) FEx_upward': "infinite (calculation s) \<Longrightarrow> init s \<Longrightarrow> \<forall>n. contains f n (0, Exi g) \<longrightarrow> (\<exists>n'. contains f n' (m, Exi g))"
-  using contains_propagates_exi by (induct m) (simp, blast)
+lemma (in loc1) Exi_upward': "infinite (calculation s) \<Longrightarrow> init s \<Longrightarrow> \<forall>n. contains f n (0, Exi g) \<longrightarrow> (\<exists>n'. contains f n' (m, Exi g))"
+  using contains_propagates_Exi by (induct m) (simp, blast)
 
-lemma (in loc1) FEx_upward: "infinite (calculation s) \<Longrightarrow> init s \<Longrightarrow> contains f n (m, Exi g) \<Longrightarrow> (\<forall>m'. \<exists>n'. contains f n' (0, substitution_bind g m'))"
-  using contains_propagates_exi FEx0 FEx_upward'
-  by (intro allI, subgoal_tac "\<exists>n'. contains f n' (m', Exi g)") (blast, blast)
+lemma (in loc1) Exi_upward:
+  assumes "infinite (calculation s)" and "init s" and "contains f n (m, Exi g)"
+  shows "(\<forall>m'. \<exists>n'. contains f n' (0, substitution_bind g m'))"
+  proof -
+    fix m'
+    have "\<exists>n'. contains f n' (m', Exi g)" using assms Exi0 Exi_upward' by blast
+    then show ?thesis using assms contains_propagates_Exi Exi0
+      by simp (blast dest: Exi_upward')
+  qed
 
 abbreviation ntou :: "nat \<Rightarrow> proxy" where "ntou \<equiv> id"
 
@@ -672,7 +677,7 @@ locale loc2 = loc1 + fixes mo assumes mo: "mo = model s"
 lemma is_env_model_ntou: "is_model_environment (model s) ntou"
   using is_model_environment_def model_def by simp
 
-lemma (in loc1) [simp]: "infinite (calculation s) \<Longrightarrow> init s \<Longrightarrow> (contains f n (m,A)) \<Longrightarrow> \<not> is_FEx A \<Longrightarrow> m = 0"
+lemma (in loc1) [simp]: "infinite (calculation s) \<Longrightarrow> init s \<Longrightarrow> (contains f n (m,A)) \<Longrightarrow> \<not> is_Exi A \<Longrightarrow> m = 0"
   using contains_def index0 is_path_f' prod.collapse by metis
 
 lemma size_substitution[simp]: "\<forall>m. size (substitution m f) = size f"
@@ -688,12 +693,12 @@ lemma (in loc2) model': "infinite (calculation s) \<Longrightarrow> init s \<Lon
        apply(clarsimp simp: mo model_def f[symmetric])
        apply(blast)
       apply(clarsimp)
-      apply(metis (mono_tags, lifting) contains_def index0 is_FEx is_path_f less_add_Suc1 less_add_Suc2 contains_propagates_con prod.collapse)
+      apply(metis (mono_tags, lifting) contains_def index0 is_Exi is_path_f less_add_Suc1 less_add_Suc2 contains_propagates_Con prod.collapse)
      apply(intro impI allI)
      apply(subgoal_tac "m=0")
       prefer 2 apply(simp)
      apply(simp)
-     apply(frule contains_propagates_uni)
+     apply(frule contains_propagates_Uni)
       apply(assumption)
      apply(erule exE) -- "all case"
      apply(rename_tac form m na y)
@@ -701,7 +706,7 @@ lemma (in loc2) model': "infinite (calculation s) \<Longrightarrow> init s \<Lon
      apply(erule impE)
       apply(simp)
      apply(drule_tac x="substitution_bind form (fresh (fv_list (list_sequent (snd (f (na + y))))))" in spec)
-     apply(simp add: FEval_substitution_bind)
+     apply(simp add: eval_substitution_bind)
      apply(erule impE)
       apply(blast)
      apply(rule_tac x="ntou (fresh (fv_list (list_sequent (snd (f (na + y))))))" in bexI)
@@ -713,7 +718,7 @@ lemma (in loc2) model': "infinite (calculation s) \<Longrightarrow> init s \<Lon
      prefer 2 apply(simp)
     apply(rename_tac nat list m na nb ma)
     apply(subgoal_tac "\<exists>y. considers f (nb+na+y) (0, Pos nat list)")
-     prefer 2 apply(simp add: contains_considers contains_propagates_pos)
+     prefer 2 apply(simp add: contains_considers contains_propagates_Pos)
     apply(erule exE)
     apply(subgoal_tac "contains f (na+nb+y) (0, Neg nat list)")
      apply(subgoal_tac "nb+na=na+nb")
@@ -724,19 +729,19 @@ lemma (in loc2) model': "infinite (calculation s) \<Longrightarrow> init s \<Lon
        apply(simp)
       apply(force simp: list_sequent_def)
      apply(simp)
-    apply(simp add: contains_propagates_neg)
-   apply(metis (no_types, lifting) contains_def add.right_neutral add_Suc_right form.size(11) index0 is_FEx is_path_f less_add_Suc1 less_add_Suc2 contains_propagates_dis prod.collapse semantics.simps(4))
+    apply(simp add: contains_propagates_Neg)
+   apply(metis (no_types, lifting) contains_def add.right_neutral add_Suc_right form.size(11) index0 is_Exi is_path_f less_add_Suc1 less_add_Suc2 contains_propagates_Dis prod.collapse semantics.simps(4))
  
   apply(clarsimp)
   apply(rename_tac form m na ma)
   apply(subgoal_tac "\<forall>m'. \<not> semantics mo ntou (substitution_bind form m')")
-   apply(simp add: FEval_substitution_bind id_def)
+   apply(simp add: eval_substitution_bind id_def)
   apply(intro allI)
   apply(drule_tac x="size form" in spec)
   apply(erule impE)
    apply(simp)
   apply(drule_tac x="substitution_bind form m'" in spec)
-  apply(fastforce simp: id_def dest: FEx_upward)
+  apply(fastforce simp: id_def dest: Exi_upward)
   done
    
 lemma (in loc2) model: "infinite (calculation s) \<Longrightarrow> init s \<Longrightarrow> (\<forall>A m n. contains f n (m,A) \<longrightarrow> \<not> (semantics mo ntou A))"
