@@ -140,15 +140,15 @@ lemma calculation_init[simp]: "(0,k) \<in> calculation s = (k = s)"
   using calculation.cases by blast
 
 lemma calculation_upwards:
-  assumes 1: "(n,k) \<in> calculation s" and 2: "\<not> is_axiom (list_sequent (k))"
+  assumes "(n,k) \<in> calculation s" and "\<not> is_axiom (list_sequent (k))"
   shows "(\<exists>l. (Suc n, l) \<in> calculation s \<and> l \<in> set (inference k))"
   proof (cases k)
-    case Nil then show ?thesis using 1 inference_def by auto
+    case Nil then show ?thesis using assms(1) inference_def by auto
   next
     case c: (Cons a _) then show ?thesis
     proof (cases a)
       case (Pair _ p)
-      then show ?thesis using c 1 2 list_sequent_def inference_def by (cases p) fastforce+
+      then show ?thesis using c assms by (cases p) (fastforce simp: list_sequent_def inference_def)+
     qed
   qed
 
@@ -314,7 +314,7 @@ lemma eval_substitution: "\<forall>e f. (semantics mi e (substitution f A)) = (s
 
 lemma eval_substitution_bind: "semantics mo e (substitution_bind A u) = semantics mo (case_nat (e u) e) A"
   using substitution_bind_def eval_substitution eval_cong
-  by (simp add: Nitpick.case_nat_unfold)
+  by (simp add: Nitpick.case_nat_unfold)      
 
 lemma sound_Uni: "u \<notin> set (fv_list (Uni f # s)) \<Longrightarrow> valid (s@[substitution_bind f u]) \<Longrightarrow> valid (Uni f # s)"
   apply(clarsimp simp: valid_def)
@@ -323,9 +323,9 @@ lemma sound_Uni: "u \<notin> set (fv_list (Uni f # s)) \<Longrightarrow> valid (
    prefer 2
    apply(clarsimp simp: Nitpick.case_nat_unfold fv_list_cons intro!: eval_cong[rule_format])
    apply(metis One_nat_def Suc_pred' cut)
-  apply(clarsimp simp: fv_list_cons semantics_alternative_cong semantics_alternative_append eval_substitution_bind is_model_environment_def)
   apply(drule_tac x=M in spec)
   apply(drule_tac x=I in spec)
+  apply(clarsimp simp: fv_list_cons semantics_alternative_append eval_substitution_bind is_model_environment_def)
   apply(metis (no_types, lifting) fun_upd_apply semantics_alternative_cong)
   done
  
@@ -357,13 +357,16 @@ lemma is_Exi[simp]: "\<not> is_Exi (Pos i v) \<and> \<not> is_Exi (Neg i v) \<an
   using is_Exi_def by simp
 
 lemma index0: "init s \<Longrightarrow> \<forall>u m A. (n, u) \<in> calculation s \<longrightarrow> (m,A) \<in> (set u) \<longrightarrow> (\<not> is_Exi A) \<longrightarrow> m = 0"
-  proof (induct n)
-    case 0 then show ?case using init_def by fastforce
-  next
-    case Suc then show ?case
-      by (clarsimp dest!: calculation_downwards, case_tac t, simp add: inference_def, case_tac a, case_tac b)
-         (fastforce simp: inference_def list_sequent_def is_Exi_def)+
-  qed
+  apply(induct n)
+   apply(fastforce simp: init_def)
+  apply(clarsimp simp: inference_def is_Exi_def dest!: calculation_downwards)
+  apply(case_tac t)
+   apply(simp)
+  apply(case_tac a)
+  apply(case_tac b)
+         apply(simp_all add: list_sequent_def)
+         apply(fastforce)+
+  done
 
 lemma max_list: "\<forall>v \<in> set l. v \<le> max_list l"
   by (induct l) (auto simp: max_def)
@@ -371,93 +374,87 @@ lemma max_list: "\<forall>v \<in> set l. v \<le> max_list l"
 lemma fresh: "fresh l \<notin> (set l)"
   using length_pos_if_in_set max_list fresh_def by fastforce
 
-lemma soundness': "init s \<Longrightarrow> finite (calculation s) \<Longrightarrow> m \<in> (fst ` (calculation s)) \<Longrightarrow> \<forall>y u. (y,u) \<in> (calculation s) \<longrightarrow> y \<le> m \<Longrightarrow> \<forall>n t. h = m - n \<and> (n,t) \<in> calculation s \<longrightarrow> valid (list_sequent t)"
-  using inference_def fv_list_def
+lemma soundness': "init s \<Longrightarrow>  m \<in> (fst ` (calculation s)) \<Longrightarrow> \<forall>y u. (y,u) \<in> (calculation s) \<longrightarrow> y \<le> m \<Longrightarrow> \<forall>n t. h = m - n \<and> (n,t) \<in> calculation s \<longrightarrow> valid (list_sequent t)"
   apply(induct h)
     -- "base case"
    apply(intro allI impI)
-   apply(subgoal_tac "n=m")
-    prefer 2 apply(fastforce)
-   apply(clarsimp simp: valid_def semantics_alternative_def2)
+
    apply(case_tac "is_axiom (list_sequent t)")
      -- "base case, is axiom"
-    apply(simp add: list_sequent_def)
+    apply(clarsimp simp: list_sequent_def valid_def semantics_alternative_def2)
     apply(case_tac t)
      apply(simp)
     apply(simp)
-    apply (metis (no_types, lifting) semantics.simps(1) semantics.simps(2))
+    apply(metis (no_types, lifting) semantics.simps(1) semantics.simps(2))
    
-    -- "base case, not is axiom: if not a satax, then inference holds... but this can't be"
-   apply (meson calculation_upwards le_SucI le_antisym n_not_Suc_n)
+   -- "base case, not is axiom: if not a satax, then inference holds... but this can't be"
+   apply(subgoal_tac "n=m")
+    prefer 2 apply(fastforce)
+   apply(meson calculation_upwards le_SucI le_antisym n_not_Suc_n)
    
-     -- "step case, by case analysis"
+  -- "step case, by case analysis"
   apply(intro allI impI)
   apply(elim exE conjE)
 
   apply(case_tac "is_axiom (list_sequent t)")
     -- "step case, is axiom"
-   apply(clarsimp simp: valid_def semantics_alternative_def2 list_sequent_def)
+   apply(clarsimp simp: list_sequent_def valid_def semantics_alternative_def2)
    apply(case_tac t)
     apply(simp)
    apply(simp)
    apply(metis (no_types, lifting) semantics.simps(1) semantics.simps(2))
-   -- "we hit Uni/ Exi cases first"
-  apply(case_tac "\<exists>(a::nat) f list. t = (a,Uni f) # list")
+ 
+  -- "we hit Uni/ Exi cases first"
+  apply(case_tac "\<exists>a f list. t = (a,Uni f) # list")
    apply(elim exE)
-   apply(simp)
-   apply(subgoal_tac "a = 0")
-    prefer 2 apply (meson index0 is_Exi list.set_intros(1))
    apply(frule calculation.step)
-    apply(simp)
-    apply(metis (no_types, lifting) Suc_diff_Suc Suc_leD diff_diff_cancel diff_le_self fresh le_simps(3) list.simps(8) list.simps(9) list_sequent_def map_append snd_eqD sound_Uni)
+    using fv_list_def
+    apply(simp add: inference_def)
+   apply(metis (no_types, lifting) Suc_diff_Suc Suc_leD diff_diff_cancel diff_le_self fresh le_simps(3) list.simps(8) list.simps(9) list_sequent_def map_append snd_eqD sound_Uni)
+ 
   apply(case_tac "\<exists>a f list. t = (a,Exi f) # list")
    apply(elim exE)
    apply(frule calculation.step)
-    apply(simp)
+    apply(simp add: inference_def)
    apply(metis (no_types, lifting) Suc_diff_Suc Suc_leD diff_diff_cancel diff_le_self le_simps(3) list.simps(8) list.simps(9) list_sequent_def map_append snd_eqD sound_Exi)
+
    -- "now for other cases"
-      -- "case empty list"
   apply(case_tac t)
-   apply (metis (no_types, lifting) Suc_diff_Suc Suc_leD Un_iff append_Nil2 calculation_upwards diff_diff_cancel diff_le_self insert_iff le_simps(3) list.set(2) list.simps(4) set_append split_list_first)
+   -- "case empty list"
+   apply(metis (no_types, lifting) Suc_diff_Suc Suc_leD Un_iff append_Nil2 calculation_upwards diff_diff_cancel diff_le_self insert_iff le_simps(3) list.set(2) list.simps(4) set_append split_list_first inference_def)
    
   apply(simp add: valid_def semantics_alternative_def2)
-  apply(rule allI)
-  apply(rule allI)
+  apply(intro allI impI)
   apply(rename_tac gs g)
-  apply(rule allI)
-  apply(rule impI)
-  -- "na t in calculation, so too is inference"
-   -- "if not a satax, then inference holds... "
   apply(case_tac a)
   apply(case_tac b)
        apply(fastforce simp: list_sequent_def dest!: pos)
-      apply(simp del: semantics.simps)
+      apply(clarsimp)
       apply(frule con1)
        apply(assumption)
       apply(frule con2)
        apply(assumption)
-      apply(rename_tac form1 form2)
-      apply(frule_tac x="Suc n" in spec, drule_tac x="list @ [(0, form1)]" in spec)
+      apply(rename_tac form1 form2 bb)
+      apply(frule_tac x="Suc n" in spec)
+      apply(frule_tac x="list @ [(0, form1)]" in spec)
+      apply(frule_tac x="Suc n" in spec)
+      apply(frule_tac x="list @ [(0, form2)]" in spec)
+      apply(clarsimp simp: list_sequent_def)
       apply(erule impE)
        apply(simp)
-      apply(drule_tac x=gs in spec, drule_tac x=g in spec, drule_tac x=e in spec)
       apply(erule impE)
        apply(simp)
-      apply(elim exE conjE)
-      apply(drule_tac x="Suc n" in spec, drule_tac x="list @ [(0, form2)]" in spec)
-      apply(erule impE)
-       apply(simp)
-      apply(metis (no_types, lifting) Un_iff append_Nil2 insert_iff list.set(2) list.set_intros(1) list.simps(9) list_sequent_def map_append semantics.simps(3) set_append snd_conv)
+      apply(metis (no_types, lifting) semantics.simps(3))
      apply(blast)
     apply(fastforce simp: list_sequent_def dest!: neg)
-   apply(simp)
-   apply(frule dis)
-    apply(assumption)
-   apply(rename_tac form1 form2)
-   apply(frule_tac x="Suc n" in spec, drule_tac x="list @ [(0, form1),(0,form2)]" in spec)
+   apply(clarsimp dest!: dis)
+   apply(rename_tac form1 form2 bb)
+   apply(frule_tac x="Suc n" in spec)
+   apply(drule_tac x="list @ [(0, form1),(0,form2)]" in spec)
+   apply(clarsimp simp: list_sequent_def)
    apply(erule impE)
     apply(simp)
-   apply(metis (no_types, lifting) Un_iff append_Nil2 insert_iff list.set(2) list.set_intros(1) list.simps(9) list_sequent_def map_append semantics.simps(4) set_append snd_conv)
+   apply(metis (no_types, lifting) semantics.simps(4))
     -- "all case"
   apply(blast)
   done
@@ -642,8 +639,8 @@ lemma (in loc1) Exi_downward: "infinite (calculation s) \<Longrightarrow> init s
    apply(simp add: inference_def)
   apply(case_tac aa)
   apply(case_tac ba)
-       apply(auto split: if_splits simp: inference_def)[5]
-  apply(simp add: inference_def)
+       apply(simp_all split: if_splits add: inference_def)
+   apply(fastforce)
   apply(metis list.set_intros(1) snd_eqD)
   done
    
