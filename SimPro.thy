@@ -184,8 +184,7 @@ lemma calculation_progress:
       using assms by (cases p) (auto dest: not_is_axiom_subs)
   qed
 
-definition
-  inc :: "nat \<times> sequent \<Rightarrow> nat \<times> sequent" where
+definition inc :: "nat \<times> sequent \<Rightarrow> nat \<times> sequent" where
   "inc = (\<lambda>(n,fs). (Suc n, fs))"
 
 lemma inj_inc: "inj inc"
@@ -230,12 +229,6 @@ lemma (in fpc) f0: "infinite (calculation s) \<Longrightarrow> f 0 \<in> (calcul
 lemma infinite_union: "finite Y \<Longrightarrow> infinite (Union (f ` Y)) \<Longrightarrow> \<exists>y. y \<in> Y \<and> infinite (f y)"
   by auto
 
-lemma inj_inj_on: "inj f \<Longrightarrow> inj_on f A"
-  using subset_inj_on by blast
-
-lemma t: "finite {w. P w} \<Longrightarrow> finite {w. Q w \<and> P w}"
-  using finite_subset by simp
-
 lemma finite_subs: "finite {w. \<not> is_axiom (list_sequent y) \<and> w \<in> set (inference y)}"
   by simp
 
@@ -259,15 +252,15 @@ lemma (in fpc) is_path_f': "infinite (calculation s) \<Longrightarrow> f n \<in>
 lemma (in fpc) is_path_f: "infinite (calculation s) \<Longrightarrow> \<forall>n. f n \<in> calculation s \<and> fst (f n) = n \<and> (snd (f (Suc n))) \<in> set (inference (snd (f n))) \<and> infinite (calculation (snd (f n)))"
   using is_path_f' fSuc by simp
 
-lemma cut: "Suc n \<in> set A = (n \<in> set (cut A))"
-  proof (induct A)
+lemma cut: "Suc n \<in> set l = (n \<in> set (cut l))"
+  proof (induct l)
     case Nil then show ?case by simp
   next
     case (Cons m _) then show ?case by (cases m) simp_all
   qed
 
-lemma eval_cong: "\<forall>e1 e2. (\<forall>x. x \<in> set (fv p) \<longrightarrow> e1 x = e2 x) \<longrightarrow> semantics mi e1 p = semantics mi e2 p"
-  proof (induct p)
+lemma eval_cong: "\<forall>x. x \<in> set (fv p) \<longrightarrow> e x = e' x \<Longrightarrow> semantics m e p = semantics m e' p"
+  proof (induct p arbitrary: e e')
     case Pos then show ?case using map_cong fv.simps(1) semantics.simps(1) by metis
   next
     case Neg then show ?case using map_cong fv.simps(2) semantics.simps(2) by metis
@@ -277,13 +270,13 @@ lemma eval_cong: "\<forall>e1 e2. (\<forall>x. x \<in> set (fv p) \<longrightarr
     case Dis then show ?case using Un_iff fv.simps(4) semantics.simps(4) set_append by metis
   next
     case Uni then show ?case 
-     using Nitpick.case_nat_unfold cut not_gr0 Suc_pred' fv.simps(5) semantics.simps(5)
-     by (metis (no_types, lifting))
+      using Nitpick.case_nat_unfold cut not_gr0 Suc_pred' fv.simps(5) semantics.simps(5)
+      by (metis (no_types, lifting))
   next
     case Exi then show ?case
       using Nitpick.case_nat_unfold cut not_gr0 Suc_pred' fv.simps(6) semantics.simps(6)
       by (metis (no_types, lifting))
-   qed
+  qed
 
 lemma semantics_alternative_def2: "semantics_alternative m e s = (\<exists>p. p \<in> set s \<and> semantics m e p)"
   by (induct s) auto
@@ -299,32 +292,14 @@ lemma semantics_alternative_cong: "(\<forall>x. x \<in> set (fv_list s) \<longri
 
 section "Soundness"
 
-lemma ball_eq_ball: "\<forall>x \<in> m. P x = Q x \<Longrightarrow> (\<forall>x \<in> m. P x) = (\<forall>x \<in> m. Q x)"
+lemma ball: "\<forall>x \<in> m. P x = Q x \<Longrightarrow> (\<forall>x \<in> m. P x) = (\<forall>x \<in> m. Q x) \<and> (\<exists>x \<in> m. P x) = (\<exists>x \<in> m. Q x)"
   by simp
 
-lemma bex_eq_bex: "\<forall>x \<in> m. P x = Q x \<Longrightarrow> (\<exists>x \<in> m. P x) = (\<exists>x \<in> m. Q x)"
-  by simp
+lemma eval_substitution: "semantics m e (substitution f p) = semantics m (e \<circ> f) p"
+  using eval_cong by (induct p arbitrary: e f) (simp_all add: Nitpick.case_nat_unfold comp_def ball)
 
-lemma eval_substitution: "\<forall>e f. (semantics mi e (substitution f p)) = (semantics mi (e \<circ> f) p)"
-  proof (induct p)
-    case Pos then show ?case by (simp add: comp_def)
-  next
-    case Neg then show ?case by (simp add: comp_def)
-  next
-    case Con then show ?case by (simp add: comp_def)
-  next
-    case Dis then show ?case by (simp add: comp_def)
-  next
-    case Uni then show ?case
-      by (clarsimp intro!: ball_eq_ball simp: eval_cong Nitpick.case_nat_unfold)
-  next
-    case Exi then show ?case
-      by (clarsimp intro!: bex_eq_bex simp: eval_cong Nitpick.case_nat_unfold)
-  qed
-
-lemma eval_substitution_bind: "semantics m e (substitution_bind p u) = semantics m (case_nat (e u) e) p"
-  using substitution_bind_def eval_substitution eval_cong
-  by (simp add: Nitpick.case_nat_unfold)      
+lemma eval_substitution_bind: "semantics m e (substitution_bind p n) = semantics m (case_nat (e n) e) p"
+  using eval_cong eval_substitution unfolding substitution_bind_def by (simp add: Nitpick.case_nat_unfold)
 
 lemma sound_Uni:
   assumes "u \<notin> set (fv_list (Uni p # s))"
