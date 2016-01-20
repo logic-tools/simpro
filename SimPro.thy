@@ -123,7 +123,7 @@ primrec is_axiom :: "form list \<Rightarrow> bool" where
   "is_axiom [] = False"
 | "is_axiom (p # t) = ((\<exists>i v. p = Pos i v \<and> Neg i v \<in> set t) \<or> (\<exists>i v. p = Neg i v \<and> Pos i v \<in> set t))"
 
-lemma member_set[simp]: "member a l = (a \<in> (set l))" by (induct l) auto
+lemma member_set[simp]: "member a l = (a \<in> set l)" by (induct l) auto
 
 lemma pos:  "(n,(m,Pos i v) # xs) \<in> calculation(nfs) \<Longrightarrow> \<not> is_axiom (list_sequent ((m,Pos i v) # xs)) \<Longrightarrow> (Suc n,xs@[(0,Pos i v)]) \<in> calculation(nfs)"
   and neg:  "(n,(m,Neg i v) # xs) \<in> calculation(nfs) \<Longrightarrow> \<not> is_axiom (list_sequent ((m,Neg i v) # xs)) \<Longrightarrow> (Suc n,xs@[(0,Neg i v)]) \<in> calculation(nfs)"
@@ -188,7 +188,7 @@ definition
   inc :: "nat \<times> sequent \<Rightarrow> nat \<times> sequent" where
   "inc = (\<lambda>(n,fs). (Suc n, fs))"
 
-lemma inj_inc[simp]: "inj inc"
+lemma inj_inc: "inj inc"
   by (simp add: inc_def inj_on_def)
 
 lemma calculation: "calculation s = insert (0,s) (inc ` (\<Union> (calculation ` {k. \<not> is_axiom (list_sequent s) \<and> k \<in> set (inference s)})))"
@@ -236,7 +236,7 @@ lemma inj_inj_on: "inj f \<Longrightarrow> inj_on f A"
 lemma t: "finite {w. P w} \<Longrightarrow> finite {w. Q w \<and> P w}"
   using finite_subset by simp
 
-lemma finite_subs: "finite {w. \<not> is_axiom (list_sequent y) \<and> w : set (inference y)}"
+lemma finite_subs: "finite {w. \<not> is_axiom (list_sequent y) \<and> w \<in> set (inference y)}"
   by simp
 
 lemma (in fpc) fSuc:
@@ -259,7 +259,7 @@ lemma (in fpc) is_path_f': "infinite (calculation s) \<Longrightarrow> f n \<in>
 lemma (in fpc) is_path_f: "infinite (calculation s) \<Longrightarrow> \<forall>n. f n \<in> calculation s \<and> fst (f n) = n \<and> (snd (f (Suc n))) \<in> set (inference (snd (f n))) \<and> infinite (calculation (snd (f n)))"
   using is_path_f' fSuc by simp
 
-lemma cut[simp]: "Suc n \<in> set A = (n \<in> set (cut A))"
+lemma cut: "Suc n \<in> set A = (n \<in> set (cut A))"
   proof (induct A)
     case Nil then show ?case by simp
   next
@@ -345,7 +345,7 @@ lemma sound_Uni:
         using assms valid_def by blast
       then have 2: "(\<forall>n. (if n = u then z else e n) \<in> M) \<longrightarrow> semantics_alternative (M, I) (e(u := z)) s \<or> semantics (M, I) (case_nat z e) p"
        using 1 eval_substitution_bind is_model_environment_def semantics_alternative_append by simp
-      have 3: "u \<notin> set (SimPro.cut (fv p)) \<and> u \<notin> set (fv_list s)"
+      have 3: "u \<notin> set (cut (fv p)) \<and> u \<notin> set (fv_list s)"
         using assms fv_list_cons by simp
       have 4: "\<forall>n. e n \<in> M"
         using \<open>is_model_environment (M, I) e\<close> is_model_environment_def by simp
@@ -366,11 +366,9 @@ definition init :: "sequent \<Rightarrow> bool" where
   "init s = (\<forall>x \<in> (set s). fst x = 0)"
 
 definition is_Exi :: "form \<Rightarrow> bool" where
-  "is_Exi f = (case f of
-    Exi _ \<Rightarrow> True |
-    _     \<Rightarrow> False)"
+  "is_Exi f = (case f of Exi _ \<Rightarrow> True | _ \<Rightarrow> False)"
 
-lemma is_Exi[simp]: "\<not> is_Exi (Pos i v) \<and> \<not> is_Exi (Neg i v) \<and> \<not> is_Exi (Con p q) \<and> \<not> is_Exi (Dis p q) \<and> \<not> is_Exi (Uni p)"
+lemma is_Exi: "\<not> is_Exi (Pos i v) \<and> \<not> is_Exi (Neg i v) \<and> \<not> is_Exi (Con p q) \<and> \<not> is_Exi (Dis p q) \<and> \<not> is_Exi (Uni p)"
   using is_Exi_def by simp
 
 lemma index0:
@@ -730,13 +728,13 @@ definition model :: "sequent \<Rightarrow> model" where
 lemma is_env_model_ntou: "is_model_environment (model s) ntou"
   using is_model_environment_def model_def by simp
 
-lemma (in fpc) [simp]: "infinite (calculation s) \<Longrightarrow> init s \<Longrightarrow> (contains f n (m,A)) \<Longrightarrow> \<not> is_Exi A \<Longrightarrow> m = 0"
+lemma (in fpc) not_is_Exi: "infinite (calculation s) \<Longrightarrow> init s \<Longrightarrow> (contains f n (m,A)) \<Longrightarrow> \<not> is_Exi A \<Longrightarrow> m = 0"
   using contains_def index0 is_path_f' prod.collapse by metis
 
-lemma size_substitution[simp]: "\<forall>m. size (substitution m f) = size f"
-  by (induct f) simp_all
+lemma size_substitution[simp]: "size (substitution m f) = size f"
+  by (induct f arbitrary: m) simp_all
 
-lemma size_substitution_bind[simp]: "size (substitution_bind f m) = size f"
+lemma size_substitution_bind[simp]: "size (substitution_bind f n) = size f"
   using substitution_bind_def by simp
  
 lemma (in fpc) model': "infinite (calculation s) \<Longrightarrow> init s \<Longrightarrow> \<forall>p. size p = h \<longrightarrow> (\<forall>m n. contains f n (m,p) \<longrightarrow> \<not> (semantics (model s) ntou p))"
@@ -749,7 +747,7 @@ lemma (in fpc) model': "infinite (calculation s) \<Longrightarrow> init s \<Long
       apply(metis (mono_tags, lifting) contains_def index0 is_Exi is_path_f less_add_Suc1 less_add_Suc2 contains_propagates_Con prod.collapse)
      apply(intro impI allI)
      apply(subgoal_tac "m=0")
-      prefer 2 apply(simp)
+      prefer 2 apply(simp add: is_Exi not_is_Exi)
      apply(simp)
      apply(frule contains_propagates_Uni)
       apply(assumption)
@@ -768,7 +766,7 @@ lemma (in fpc) model': "infinite (calculation s) \<Longrightarrow> init s \<Long
     
     apply(clarsimp simp: model_def f[symmetric])
     apply(subgoal_tac "m = 0 \<and> ma = 0")
-     prefer 2 apply(simp)
+     prefer 2 apply(simp add: is_Exi not_is_Exi)
     apply(rename_tac nat list m na nb ma)
     apply(subgoal_tac "\<exists>y. considers f (nb+na+y) (0, Pos nat list)")
      prefer 2 apply(simp add: contains_considers contains_propagates_Pos)
