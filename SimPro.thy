@@ -711,64 +711,94 @@ lemma size_substitution[simp]: "size (substitution m f) = size f"
 
 lemma size_substitution_bind[simp]: "size (substitution_bind f n) = size f"
   using substitution_bind_def by simp
- 
-lemma (in fpc) model': "infinite (calculation s) \<Longrightarrow> init s \<Longrightarrow> \<forall>p. size p = h \<longrightarrow> (\<forall>m n. contains f n (m,p) \<longrightarrow> \<not> (semantics (model s) ntou p))"
-  apply(rule nat_less_induct)
-  apply(rule allI)
-  apply(case_tac p)
-       apply(clarsimp simp: model_def f[symmetric])
-       apply(blast)
-      apply(clarsimp)
-      apply(metis (mono_tags, lifting) contains_def index0 is_Exi is_path_f less_add_Suc1 less_add_Suc2 contains_propagates_Con prod.collapse)
-     apply(intro impI allI)
-     apply(subgoal_tac "m=0")
-      prefer 2 apply(simp add: is_Exi not_is_Exi)
-     apply(simp)
-     apply(frule contains_propagates_Uni)
-      apply(assumption)
-     apply(erule exE) -- "all case"
-     apply(rename_tac form m na y)
-     apply(drule_tac x="size form" in spec)
-     apply(erule impE)
-      apply(simp)
-     apply(drule_tac x="substitution_bind form (fresh (fv_list (list_sequent (snd (f (na + y))))))" in spec)
-     apply(simp add: eval_substitution_bind)
-     apply(erule impE)
-      apply(blast)
-     apply(rule_tac x="ntou (fresh (fv_list (list_sequent (snd (f (na + y))))))" in bexI)
-      apply(simp)
-     using is_env_model_ntou is_model_environment_def apply(blast)
-    
-    apply(clarsimp simp: model_def f[symmetric])
-    apply(subgoal_tac "m = 0 \<and> ma = 0")
-     prefer 2 apply(simp add: is_Exi not_is_Exi)
-    apply(rename_tac nat list m na nb ma)
-    apply(subgoal_tac "\<exists>y. considers f (nb+na+y) (0, Pos nat list)")
-     prefer 2 apply(simp add: contains_considers contains_propagates_Pos)
-    apply(erule exE)
-    apply(subgoal_tac "contains f (na+nb+y) (0, Neg nat list)")
-     apply(subgoal_tac "nb+na=na+nb")
-      apply(subgoal_tac "is_axiom (list_sequent (snd (f (na+nb+y))))")
-       apply(blast dest: is_path_f is_axiom_finite_calculation)
-      apply(simp add: contains_def considers_def)
-      apply(case_tac "snd (f (na + nb + y))")
-       apply(simp)
-      apply(force simp: list_sequent_def)
-     apply(simp)
-    apply(simp add: contains_propagates_Neg)
-   apply(metis (no_types, lifting) contains_def add.right_neutral add_Suc_right form.size(11) index0 is_Exi is_path_f less_add_Suc1 less_add_Suc2 contains_propagates_Dis prod.collapse semantics.simps(4))
- 
-  apply(clarsimp)
-  apply(rename_tac form m na ma)
-  apply(subgoal_tac "\<forall>m'. \<not> semantics (model s) ntou (substitution_bind form m')")
-   apply(simp add: eval_substitution_bind id_def)
-  apply(intro allI)
-  apply(drule_tac x="size form" in spec)
-  apply(erule impE)
-   apply(simp)
-  apply(drule_tac x="substitution_bind form m'" in spec)
-  apply(fastforce simp: id_def dest: Exi_upward)
-  done
+
+lemma (in fpc) model':
+  assumes "infinite (calculation s)"
+  and "init s"
+  shows "\<forall>p. size p = h \<longrightarrow> (\<forall>m n. contains f n (m,p) \<longrightarrow> \<not> (semantics (model s) ntou p))"
+  proof (rule nat_less_induct, rule allI)
+    fix p n
+    show "\<forall>m<n. \<forall>p. size p = m \<longrightarrow> (\<forall>m n. contains f n (m, p) \<longrightarrow> \<not> semantics (model s) uton p) \<Longrightarrow>
+           size p = n \<longrightarrow> (\<forall>m n. contains f n (m, p) \<longrightarrow> \<not> semantics (model s) uton p)"
+    proof -
+      assume *: "\<forall>m<n. \<forall>p. size p = m \<longrightarrow> (\<forall>m n. contains f n (m, p) \<longrightarrow> \<not> semantics (model s) uton p)"
+      show ?thesis proof (cases p)
+        case Pos then show ?thesis by (clarsimp simp: model_def f[symmetric]) blast
+          next
+        case (Neg i v) then show ?thesis proof (clarsimp simp: model_def f[symmetric])
+          fix na m nb ma
+          show "p = Neg i v \<Longrightarrow> n = 0 \<Longrightarrow> contains f na (m, Neg i v) \<Longrightarrow> contains f nb (ma, Pos i v) \<Longrightarrow> False"
+          proof -
+            assume 1: "contains f na (m, Neg i v)" and 2: "contains f nb (ma, Pos i v)"
+            then have 3: "m = 0 \<and> ma = 0"
+              using assms by (simp add: is_Exi not_is_Exi)
+            then have "\<exists>y. considers f (nb+na+y) (0, Pos i v)"
+              using assms 2 by (simp add: contains_considers contains_propagates_Pos)
+            then obtain y where 4: "considers f (nb+na+y) (0, Pos i v)"
+              by blast
+            then have 5: "contains f (na+nb+y) (0, Neg i v)"
+              using assms 1 3 by (simp add: contains_propagates_Neg)
+            then have 6: "nb+na=na+nb"
+              by simp
+            then have "is_axiom (list_sequent (snd (f (na+nb+y))))"
+              proof (cases "snd (f (na + nb + y))")
+                case Nil then show ?thesis
+                  using 5 by (simp add: contains_def)
+              next
+                case Cons then show ?thesis
+                  using 4 5 6 by (force simp: contains_def list_sequent_def considers_def)
+              qed
+            then show ?thesis using assms by (blast dest: is_path_f is_axiom_finite_calculation)
+          qed
+        qed
+      next
+        case Con then show ?thesis using assms * contains_def index0 is_Exi is_path_f
+        by clarsimp (metis (mono_tags, lifting) less_add_Suc1 less_add_Suc2 contains_propagates_Con prod.collapse)
+      next
+        case Dis then show ?thesis using assms * contains_def index0 is_Exi is_path_f
+        by (metis (no_types, lifting) add.right_neutral add_Suc_right form.size(11) less_add_Suc1 less_add_Suc2 contains_propagates_Dis prod.collapse semantics.simps(4))
+      next
+        case (Uni q) then show ?thesis proof (intro impI allI)
+          fix na m
+          show "size p = n \<Longrightarrow> contains f na (m, p) \<Longrightarrow> \<not> semantics (model s) uton p"
+          proof -
+            assume 1: "size p = n" and 2: "contains f na (m, p)"
+            then have "m = 0" using assms local.Uni by (simp add: is_Exi not_is_Exi)
+            then have "\<exists>y. contains f (Suc (na + y)) (0, substitution_bind q (fresh (fv_list (list_sequent (snd (f (na + y)))))))"
+              using assms local.Uni 2 contains_propagates_Uni by simp
+            then obtain y where 3: "contains f (Suc (na + y)) (0, substitution_bind q (fresh (fv_list (list_sequent (snd (f (na + y)))))))"
+              by blast
+            have 4: "Suc (size q) = n" using local.Uni 1 by simp
+            then show ?thesis using local.Uni proof (simp)
+              show "\<exists>z\<in>fst (model s). \<not> semantics (model s) (case_nat z uton) q"
+              proof (rule_tac x="ntou (fresh (fv_list (list_sequent (snd (f (na + y))))))" in bexI)
+                show "\<not> semantics (model s) (case_nat (uton (fresh (fv_list (list_sequent (snd (f (na + y))))))) uton) q"
+                  using * 3 4 eval_substitution_bind size_substitution_bind
+                  by (metis lessI)
+              next
+                show "uton (fresh (fv_list (list_sequent (snd (f (na + y)))))) \<in> fst (model s)"
+                  using is_env_model_ntou is_model_environment_def by blast
+              qed
+            qed
+          qed
+        qed
+      next
+        case (Exi q) then show ?thesis proof (clarsimp)
+          fix m na ma z
+          show "p = Exi q \<Longrightarrow> n = Suc (size q) \<Longrightarrow> z \<in> fst (model s) \<Longrightarrow> contains f na (m, Exi q)
+                \<Longrightarrow> semantics (model s) (case_nat z uton) q \<Longrightarrow> False"
+          proof -
+            assume "n = Suc (size q)" and "contains f na (m, Exi q)"
+            and 1: "semantics (model s) (case_nat z uton) q"
+            then have "\<forall>m'. \<not> semantics (model s) ntou (substitution_bind q m')"
+              using assms *
+              by (meson Exi_upward eval_cong id_apply lessI size_substitution_bind)
+            then show ?thesis using 1 eval_substitution_bind by simp
+          qed
+        qed
+      qed
+    qed
+  qed
    
 lemma (in fpc) model: "infinite (calculation s) \<Longrightarrow> init s \<Longrightarrow> (\<forall>A m n. contains f n (m,A) \<longrightarrow> \<not> (semantics (model s) ntou A))"
   using model' by simp
