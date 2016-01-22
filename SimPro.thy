@@ -1024,12 +1024,12 @@ section "Code"
 
 ML \<open>
 
-datatype form = Pre of bool * string * int list
-                | Con of form * form | Dis of form * form | Uni of form |  Exi of form
+datatype form = Pre of bool * string * int list |
+                Con of form * form | Dis of form * form | Uni of form |  Exi of form
 
 fun make_sequent l = map (fn p => (0,p)) l
 
-fun list_sequent s = map snd s
+fun list_sequent s = map (fn (_,p) => p) s
 
 fun member _ [] = false
   | member a (h :: t) = if a = h then true else member a t
@@ -1061,8 +1061,8 @@ fun substitution f (Pre (b,i,v)) = Pre (b,i,map f v)
 
 fun substitution_bind p y = substitution (fn 0 => y | n => n - 1) p
 
-fun inference s = case s of [] => [[]] | (n,h) :: t => case h of
-      Pre (b,i,v) => if member (Pre (not b,i,v)) (list_sequent t) then [] else [t @ [(0,Pre (b,i,v))]]
+fun inference s = case s of [] => [[]] | (n,h) :: t => case h of Pre (b,i,v) =>
+        if member (Pre (not b,i,v)) (list_sequent t) then [] else [t @ [(0,Pre (b,i,v))]]
     | Con (p,q) => [t @ [(0,p)],t @ [(0,q)]]
     | Dis (p,q) => [t @ [(0,p),(0,q)]]
     | Uni p => [t @ [(0,substitution_bind p (fresh ((flatten o map fv) (list_sequent s))))]]
@@ -1083,19 +1083,21 @@ section "Appendix"
 
 (*
 
-export_code make_sequent inference test in SML module_name SimPro file "SimPro.sml"
+export_code make_sequent flatten inference test in SML module_name SimPro file "SimPro.sml"
 
 SML_file "SimPro.sml"
 
-SML_export "val SimPro_inference = SimPro.inference"
-
 SML_export "val SimPro_make_sequent = SimPro.make_sequent"
+
+SML_export "val SimPro_flatten = SimPro.flatten"
+
+SML_export "val SimPro_inference = SimPro.inference"
 
 SML_export "val SimPro_test = SimPro.test"
 
 ML \<open>
 
-fun SimPro_prover a = if a = () then true else SimPro_prover ((flatten o map SimPro_inference) a);
+fun SimPro_prover a = if a = () then true else SimPro_prover ((SimPro_flatten o map SimPro_inference) a);
 
 fun SimPro_check p = SimPro_prover [SimPro_make_sequent [p]]
 
