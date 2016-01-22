@@ -375,89 +375,162 @@ lemma max_list: "\<forall>v \<in> set l. v \<le> max_list l"
 lemma fresh: "fresh l \<notin> (set l)"
   using length_pos_if_in_set max_list fresh_def by fastforce
 
-lemma soundness': "init s \<Longrightarrow> m \<in> (fst ` (calculation s)) \<Longrightarrow> \<forall>y u. (y,u) \<in> (calculation s) \<longrightarrow> y \<le> m \<Longrightarrow> \<forall>n t. h = m - n \<and> (n,t) \<in> calculation s \<longrightarrow> valid (list_sequent t)"
-  apply(induct h)
-    -- "base case"
-   apply(intro allI impI)
-
-   apply(case_tac "is_axiom (list_sequent t)")
-     -- "base case, is axiom"
-    apply(clarsimp simp: list_sequent_def valid_def semantics_alternative_def2)
-    apply(case_tac t)
-     apply(simp)
-    apply(simp)
-    apply(metis (no_types, lifting) semantics.simps(1))
-   
-   -- "base case, not is axiom: if not a satax, then inference holds... but this can't be"
-   apply(subgoal_tac "n=m")
-    prefer 2 apply(fastforce)
-   apply(meson calculation_upwards le_SucI le_antisym n_not_Suc_n)
-   
-  -- "step case, by case analysis"
-  apply(intro allI impI)
-  apply(elim exE conjE)
-
-  apply(case_tac "is_axiom (list_sequent t)")
-    -- "step case, is axiom"
-   apply(clarsimp simp: list_sequent_def valid_def semantics_alternative_def2)
-   apply(case_tac t)
-    apply(simp)
-   apply(simp)
-   apply(metis (no_types, lifting) semantics.simps(1))
- 
-  -- "we hit Uni/ Exi cases first"
-  apply(case_tac "\<exists>a f list. t = (a,Uni f) # list")
-   apply(elim exE)
-   apply(frule calculation.step)
-    using fv_list_def
-    apply(simp add: inference_def)
-   apply(metis (no_types, lifting) Suc_diff_Suc Suc_leD diff_diff_cancel diff_le_self fresh le_simps(3) list.simps(8) list.simps(9) list_sequent_def map_append snd_eqD sound_Uni)
- 
-  apply(case_tac "\<exists>a f list. t = (a,Exi f) # list")
-   apply(elim exE)
-   apply(frule calculation.step)
-    apply(simp add: inference_def)
-   apply(metis (no_types, lifting) Suc_diff_Suc Suc_leD diff_diff_cancel diff_le_self le_simps(3) list.simps(8) list.simps(9) list_sequent_def map_append snd_eqD sound_Exi)
-
-   -- "now for other cases"
-  apply(case_tac t)
-   -- "case empty list"
-   apply(metis (no_types, lifting) Suc_diff_Suc Suc_leD Un_iff append_Nil2 calculation_upwards diff_diff_cancel diff_le_self insert_iff le_simps(3) list.set(2) list.simps(4) set_append split_list_first inference_def)
-   
-  apply(simp add: valid_def semantics_alternative_def2)
-  apply(intro allI impI)
-  apply(rename_tac gs g)
-  apply(case_tac a)
-  apply(case_tac b)
-       apply(fastforce simp: list_sequent_def dest!: pre)
-      apply(clarsimp)
-      apply(frule con1)
-       apply(assumption)
-      apply(frule con2)
-       apply(assumption)
-      apply(rename_tac form1 form2 bb)
-      apply(frule_tac x="Suc n" in spec)
-      apply(frule_tac x="list @ [(0, form1)]" in spec)
-      apply(frule_tac x="Suc n" in spec)
-      apply(frule_tac x="list @ [(0, form2)]" in spec)
-      apply(clarsimp simp: list_sequent_def)
-      apply(erule impE)
-       apply(simp)
-      apply(erule impE)
-       apply(simp)
-      apply(metis (no_types, lifting) semantics.simps(2))
-    apply(clarsimp dest!: dis)
-    apply(rename_tac form1 form2 bb)
-    apply(frule_tac x="Suc n" in spec)
-    apply(drule_tac x="list @ [(0, form1),(0,form2)]" in spec)
-    apply(clarsimp simp: list_sequent_def)
-    apply(erule impE)
-     apply(simp)
-    apply(metis (no_types, lifting) semantics.simps(3))
-   apply(blast)
-    -- "all case"
-  apply(blast)
-  done
+lemma soundness':
+  assumes "init s"
+  and "m \<in> (fst ` (calculation s))"
+  and "\<forall>y u. (y,u) \<in> (calculation s) \<longrightarrow> y \<le> m"
+  shows "\<forall>n t. h = m - n \<and> (n,t) \<in> calculation s \<longrightarrow> valid (list_sequent t)"
+  proof (induct h)
+    case 0 then show ?case proof (intro allI impI)
+      fix n t
+      show "0 = m - n \<and> (n, t) \<in> calculation s \<Longrightarrow> valid (list_sequent t)"
+      proof -
+        assume *: "0 = m - n \<and> (n, t) \<in> calculation s"
+        then show ?thesis proof (cases "is_axiom (list_sequent t)")
+          case True then show ?thesis proof (cases t)
+            case Nil then show ?thesis using True list_sequent_def by simp
+          next
+            case Cons then show ?thesis
+              using True list_sequent_def valid_def semantics_alternative_def2
+              by simp (metis (no_types, lifting) semantics.simps(1))
+          qed
+        next
+          case False
+          then have "n = m" using assms * by fastforce
+          then show ?thesis using assms * False
+            by (meson calculation_upwards le_SucI le_antisym n_not_Suc_n)
+        qed
+      qed
+    qed
+  next
+    case IH: (Suc x) then show ?case proof (intro allI impI)
+      fix n t
+      show "Suc x = m - n \<and> (n, t) \<in> calculation s \<Longrightarrow> valid (list_sequent t)"
+      proof -
+        assume "Suc x = m - n \<and> (n, t) \<in> calculation s"
+        then have *: "Suc x = m - n" and **: "(n, t) \<in> calculation s"
+          by (simp, simp)
+        then show ?thesis proof (cases "is_axiom (list_sequent t)")
+          case True then show ?thesis proof (cases t)
+            case Nil then show ?thesis using True list_sequent_def by simp
+          next
+            case Cons then show ?thesis using True list_sequent_def valid_def semantics_alternative_def2
+              by simp (metis (no_types, lifting) semantics.simps(1))
+          qed
+        next
+          case notAxiom: False then show ?thesis proof (cases "\<exists>a f list. t = (a,Uni f) # list")
+            case True
+            then obtain a and f and list where 1: "t = (a,Uni f) # list" by blast
+            then show ?thesis using IH assms * ** inference_def fv_list_def fresh list_sequent_def
+              by simp (frule calculation.step, simp,
+                 metis (no_types, lifting) Suc_leD diff_Suc_Suc diff_diff_cancel diff_le_self
+                  le_SucI list.simps(8) list.simps(9) map_append snd_conv sound_Uni)
+          next
+            case notUni: False then show ?thesis proof (cases "\<exists>a f list. t = (a,Exi f) # list")
+              case True
+              then obtain a and f and list where 1: "t = (a,Exi f) # list" by blast
+              then show ?thesis using IH assms * ** inference_def fresh list_sequent_def
+                by simp (frule calculation.step, simp,
+                   metis (no_types, lifting) Suc_leD diff_Suc_Suc diff_diff_cancel diff_le_self
+                    le_SucI list.simps(8) list.simps(9) map_append snd_conv sound_Exi)
+            next
+              case notExi: False
+              then show ?thesis proof (cases t)
+                case Nil
+                then show ?thesis using assms notAxiom IH * ** calculation_upwards split_list_first inference_def
+                  by (metis (no_types, lifting) Suc_diff_Suc Suc_leD Un_iff append_Nil2 diff_diff_cancel
+                       diff_le_self insert_iff le_simps(3) list.set(2) list.simps(4) set_append)
+              next
+                case (Cons a list)
+                then show ?thesis using IH proof (simp add: valid_def semantics_alternative_def2, intro allI impI)
+                  fix as gs g
+                  show "\<forall>n t. x = m - n \<and> (n, t) \<in> calculation s \<longrightarrow>
+                       (\<forall>a b e. is_model_environment (a, b) e \<longrightarrow> (\<exists>p. p \<in> set (list_sequent t) \<and> semantics (a, b) e p))
+                       \<Longrightarrow> is_model_environment (as, gs) g \<Longrightarrow> \<exists>p. p \<in> set (list_sequent (a # list)) \<and> semantics (as, gs) g p"
+                   proof -
+                    assume ***: "is_model_environment (as, gs) g"
+                    and IH': "\<forall>n t. x = m - n \<and> (n, t) \<in> calculation s \<longrightarrow> (\<forall>a b e. is_model_environment (a, b) e \<longrightarrow>
+                             (\<exists>p. p \<in> set (list_sequent t) \<and> semantics (a, b) e p))"
+                    then show ?thesis proof (cases a)
+                      case (Pair _ p) then show ?thesis proof (cases p)
+                        case (Pre b i v) then  show ?thesis
+                            using IH' assms * ** Cons notAxiom *** Pair
+                            by (fastforce simp: list_sequent_def dest!: pre)
+                      next
+                        case (Con q r)
+                          then have 1: "(Suc n, list @ [(0, q)]) \<in> calculation s"
+                            using ** Pair con1 local.Cons notAxiom by blast
+                          then have 2: "x = m - Suc n \<and> (Suc n, list @ [(0, q)]) \<in> calculation s"
+                            using * by linarith
+                          have 3: "(Suc n, list @ [(0, r)]) \<in> calculation s"
+                            using ** Pair Con con2 local.Cons notAxiom by blast
+                          then have 4: "x = m - Suc n \<and> (Suc n, list @ [(0, r)]) \<in> calculation s"
+                            using * by linarith
+                          then have 5: "(Suc n, list @ [(0, q)]) \<in> calculation s \<longrightarrow>
+                                (\<forall>a b e. is_model_environment (a, b) e \<longrightarrow>
+                                (\<exists>p. p \<in> set (list_sequent (list @ [(0, q)])) \<and> semantics (a, b) e p))"
+                            using IH' by blast
+                          then have "x = m - Suc n \<and> (Suc n, list @ [(0, r)]) \<in> calculation s \<longrightarrow>
+                            (\<forall>a b e. is_model_environment (a, b) e \<longrightarrow>
+                            (\<exists>p. p \<in> set (list_sequent (list @ [(0, r)])) \<and> semantics (a, b) e p))"
+                            using 2 IH' by blast
+                          then show ?thesis using 5 proof (elim impE)
+                            show "(Suc n, list @ [(0, q)]) \<in> calculation s"
+                              using 1 by simp
+                         next
+                            show "\<forall>a b e. is_model_environment (a, b) e \<longrightarrow>
+                                  (\<exists>p. p \<in> set (list_sequent (list @ [(0, q)])) \<and> semantics (a, b) e p) \<Longrightarrow>
+                                  x = m - Suc n \<and> (Suc n, list @ [(0, r)]) \<in> calculation s"
+                              using 2 3 by blast
+                         next
+                            show "\<forall>a b e. is_model_environment (a, b) e \<longrightarrow>
+                                  (\<exists>p. p \<in> set (list_sequent (list @ [(0, r)])) \<and> semantics (a, b) e p) \<Longrightarrow>
+                                  (Suc n, list @ [(0, q)]) \<in> calculation s"
+                              using 1 by blast
+                         next show "\<forall>a b e. is_model_environment (a, b) e \<longrightarrow>
+                                     (\<exists>p. p \<in> set (list_sequent (list @ [(0, r)])) \<and> semantics (a, b) e p) \<Longrightarrow>
+                                    \<forall>a b e. is_model_environment (a, b) e \<longrightarrow>
+                                     (\<exists>p. p \<in> set (list_sequent (list @ [(0, q)])) \<and> semantics (a, b) e p) \<Longrightarrow>
+                                    \<exists>p. p \<in> set (list_sequent (a # list)) \<and> semantics (as, gs) g p"
+                              using Con *** Pair list_sequent_def
+                              by simp (metis (no_types, lifting) semantics.simps(2))
+                         qed
+                      next
+                        case (Dis q r)
+                        then have "x = m - Suc n \<and> (Suc n, list @ [(0, q), (0, r)]) \<in> calculation s \<longrightarrow>
+                                  (\<forall>a b e. is_model_environment (a, b) e \<longrightarrow>
+                                  (\<exists>p. p \<in> set (list_sequent (list @ [(0, q), (0, r)])) \<and> semantics (a, b) e p))"
+                                  using * IH' by blast
+                        then show ?thesis proof (elim impE)
+                          have 1: "(Suc n, list @ [(0, q), (0, r)]) \<in> calculation s"
+                            using ** Dis Pair dis local.Cons notAxiom by blast
+                          have "x = m - Suc n" using "*" by linarith
+                          then show "x = m - Suc n \<and> (Suc n, list @ [(0, q), (0, r)]) \<in> calculation s"
+                            using 1 by simp
+                        next
+                          show "\<forall>a b e. is_model_environment (a, b) e \<longrightarrow>
+                               (\<exists>p. p \<in> set (list_sequent (list @ [(0, q), (0, r)])) \<and> semantics (a, b) e p) \<Longrightarrow>
+                                \<exists>p. p \<in> set (list_sequent (a # list)) \<and> semantics (as, gs) g p"
+                            using Dis *** Pair list_sequent_def
+                            by simp (metis (no_types, lifting) semantics.simps(3))
+                        qed
+                      next
+                        case Uni then show ?thesis
+                          using notUni Pair Cons by blast
+                      next
+                        case Exi then show ?thesis
+                          using notExi Pair Cons by blast
+                      qed
+                    qed
+                  qed
+                qed
+              qed
+            qed
+          qed
+        qed
+      qed
+    qed
+  qed
 
 lemma list_make_sequent_inverse[simp]: "list_sequent (make_sequent s) = s"
   using list_sequent_def make_sequent_def by (induct s) simp_all
@@ -947,8 +1020,7 @@ ML \<open>
 
 fun max x y = if x > y then x else y
 
-datatype form = Pos of string * int list | Con of form * form | Uni of form
-              | Neg of string * int list | Dis of form * form | Exi of form
+datatype form = Pre of bool * string * int list | Con of form * form | Dis of form * form | Uni of form |  Exi of form
 
 fun make_sequent l = map (fn p => (0,p)) l
 
@@ -963,8 +1035,7 @@ fun flatten [] = []
 fun cut [] = []
   | cut (h :: t) = case h of 0 => cut t | n => n - 1 :: cut t
 
-fun fv (Pos (_,v)) = v
-  | fv (Neg (_,v)) = v
+fun fv (Pre (_,_,v)) = v
   | fv (Con (p,q)) = fv p @ fv q
   | fv (Dis (p,q)) = fv p @ fv q
   | fv (Uni p) = cut (fv p)
@@ -975,8 +1046,7 @@ fun max_list [] = 0
 
 fun fresh l = if l = [] then 0 else (max_list l) + 1
 
-fun substitution f (Pos (i,v)) = Pos (i,map f v)
-  | substitution f (Neg (i,v)) = Neg (i,map f v)
+fun substitution f (Pre (b,i,v)) = Pre (b,i,map f v)
   | substitution f (Con (p,q)) = Con (substitution f p,substitution f q)
   | substitution f (Dis (p,q)) = Dis (substitution f p,substitution f q)
   | substitution f (Uni p) = Uni (substitution (fn 0 => 0 | n => (f (n - 1)) + 1) p)
@@ -985,8 +1055,7 @@ fun substitution f (Pos (i,v)) = Pos (i,map f v)
 fun substitution_bind p y = substitution (fn 0 => y | n => n - 1) p
 
 fun inference s = case s of [] => [[]] | (n,h) :: t => case h of
-      Pos (i,v) => if member (Neg (i,v)) (list_sequent t) then [] else [t @ [(0,Pos (i,v))]]
-    | Neg (i,v) => if member (Pos (i,v)) (list_sequent t) then [] else [t @ [(0,Neg (i,v))]]
+      Pre (b,i,v) => if member (Pre (not b,i,v)) (list_sequent t) then [] else [t @ [(0,Pre (b,i,v))]]
     | Con (p,q) => [t @ [(0,p)],t @ [(0,q)]]
     | Dis (p,q) => [t @ [(0,p),(0,q)]]
     | Uni p => [t @ [(0,substitution_bind p (fresh ((flatten o map fv) (list_sequent s))))]]
@@ -996,8 +1065,8 @@ fun prover a = if a = [] then true else prover ((flatten o map inference) a)
 
 fun check p = prover [make_sequent [p]]
 
-val test = Dis (Uni (Con (Neg ("A",[0]),Neg ("B",[0]))),
-                Dis (Exi (Pos ("B",[0])),Exi (Pos ("A",[0]))))
+val test = Dis (Uni (Con (Pre (false,"A",[0]),Pre (false,"B",[0]))),
+                Dis (Exi (Pre (true,"B",[0])),Exi (Pre (true,"A",[0]))))
 
 val _ = check test orelse 0 div 0 = 42
 
