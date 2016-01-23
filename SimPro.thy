@@ -61,23 +61,23 @@ primrec max_list :: "nat list \<Rightarrow> nat" where
 definition fresh :: "nat list \<Rightarrow> nat" where
   "fresh l = (if l = [] then 0 else Suc (max_list l))"
 
-primrec substitution :: "(nat \<Rightarrow> nat) \<Rightarrow> form \<Rightarrow> form" where
-  "substitution f (Pre b i v) = Pre b i (map f v)"
-| "substitution f (Con p q) = Con (substitution f p) (substitution f q)"
-| "substitution f (Dis p q) = Dis (substitution f p) (substitution f q)"
-| "substitution f (Uni p) = Uni (substitution (\<lambda>x. case x of 0 \<Rightarrow> 0 | Suc n \<Rightarrow> Suc (f n)) p)"
-| "substitution f (Exi p) = Exi (substitution (\<lambda>x. case x of 0 \<Rightarrow> 0 | Suc n \<Rightarrow> Suc (f n)) p)"
+primrec subst :: "(nat \<Rightarrow> nat) \<Rightarrow> form \<Rightarrow> form" where
+  "subst f (Pre b i v) = Pre b i (map f v)"
+| "subst f (Con p q) = Con (subst f p) (subst f q)"
+| "subst f (Dis p q) = Dis (subst f p) (subst f q)"
+| "subst f (Uni p) = Uni (subst (\<lambda>x. case x of 0 \<Rightarrow> 0 | Suc n \<Rightarrow> Suc (f n)) p)"
+| "subst f (Exi p) = Exi (subst (\<lambda>x. case x of 0 \<Rightarrow> 0 | Suc n \<Rightarrow> Suc (f n)) p)"
 
-definition substitution_bind :: "form \<Rightarrow> nat \<Rightarrow> form" where
-  "substitution_bind p y = substitution (\<lambda>x. case x of 0 \<Rightarrow> y | Suc n \<Rightarrow> n) p"
+definition subst_bind :: "form \<Rightarrow> nat \<Rightarrow> form" where
+  "subst_bind p y = subst (\<lambda>x. case x of 0 \<Rightarrow> y | Suc n \<Rightarrow> n) p"
 
 definition inference :: "sequent \<Rightarrow> sequent list" where
   "inference s = (case s of [] \<Rightarrow> [[]] | (n,h) # t \<Rightarrow> (case h of
       Pre b i v \<Rightarrow> if member (Pre (\<not> b) i v) (list_sequent t) then [] else [t @ [(0,Pre b i v)]]
     | Con p q \<Rightarrow> [t @ [(0,p)],t @ [(0,q)]]
     | Dis p q \<Rightarrow> [t @ [(0,p),(0,q)]]
-    | Uni p \<Rightarrow> [t @ [(0,substitution_bind p (fresh ((flatten \<circ> map fv) (list_sequent s))))]]
-    | Exi p \<Rightarrow> [t @ [(0,substitution_bind p n),(Suc n,h)]] ))"
+    | Uni p \<Rightarrow> [t @ [(0,subst_bind p (fresh ((flatten \<circ> map fv) (list_sequent s))))]]
+    | Exi p \<Rightarrow> [t @ [(0,subst_bind p n),(Suc n,h)]] ))"
 
 primrec repeat :: "('a \<Rightarrow> 'a) \<Rightarrow> 'a \<Rightarrow> nat \<Rightarrow> 'a" where
   "repeat _ a 0 = a"
@@ -126,8 +126,8 @@ lemma pre:  "(n,(m,Pre b i v) # xs) \<in> calculation(nfs) \<Longrightarrow> \<n
   and con1: "(n,(m,Con p q) # xs) \<in> calculation(nfs) \<Longrightarrow> \<not> is_axiom (list_sequent ((m,Con p q) # xs)) \<Longrightarrow> (Suc n,xs@[(0,p)]) \<in> calculation(nfs)"
   and con2: "(n,(m,Con p q) # xs) \<in> calculation(nfs) \<Longrightarrow> \<not> is_axiom (list_sequent ((m,Con p q) # xs)) \<Longrightarrow> (Suc n,xs@[(0,q)]) \<in> calculation(nfs)"
   and dis:  "(n,(m,Dis p q) # xs) \<in> calculation(nfs) \<Longrightarrow> \<not> is_axiom (list_sequent ((m,Dis p q) # xs)) \<Longrightarrow> (Suc n,xs@[(0,p),(0,q)]) \<in> calculation(nfs)"
-  and uni:  "(n,(m,Uni p) # xs) \<in> calculation(nfs) \<Longrightarrow> \<not> is_axiom (list_sequent ((m,Uni p) # xs)) \<Longrightarrow> (Suc n,xs@[(0,substitution_bind p (fresh ((flatten \<circ> map fv) (list_sequent ((m,Uni p) # xs)))))]) \<in> calculation(nfs)"
-  and exi:  "(n,(m,Exi p) # xs) \<in> calculation(nfs) \<Longrightarrow> \<not> is_axiom (list_sequent ((m,Exi p) # xs)) \<Longrightarrow> (Suc n,xs@[(0,substitution_bind p m),(Suc m,Exi p)]) \<in> calculation(nfs)"
+  and uni:  "(n,(m,Uni p) # xs) \<in> calculation(nfs) \<Longrightarrow> \<not> is_axiom (list_sequent ((m,Uni p) # xs)) \<Longrightarrow> (Suc n,xs@[(0,subst_bind p (fresh ((flatten \<circ> map fv) (list_sequent ((m,Uni p) # xs)))))]) \<in> calculation(nfs)"
+  and exi:  "(n,(m,Exi p) # xs) \<in> calculation(nfs) \<Longrightarrow> \<not> is_axiom (list_sequent ((m,Exi p) # xs)) \<Longrightarrow> (Suc n,xs@[(0,subst_bind p m),(Suc m,Exi p)]) \<in> calculation(nfs)"
   by (auto simp: inference_def list_sequent_def)
 
 lemmas not_is_axiom_subs = pre con1 con2 dis uni exi
@@ -297,15 +297,15 @@ section "Soundness"
 lemma ball: "\<forall>x \<in> m. P x = Q x \<Longrightarrow> (\<forall>x \<in> m. P x) = (\<forall>x \<in> m. Q x) \<and> (\<exists>x \<in> m. P x) = (\<exists>x \<in> m. Q x)"
   by simp
 
-lemma eval_substitution: "semantics m e (substitution f p) = semantics m (e \<circ> f) p"
+lemma eval_subst: "semantics m e (subst f p) = semantics m (e \<circ> f) p"
   using eval_cong by (induct p arbitrary: e f) (simp_all add: Nitpick.case_nat_unfold comp_def ball)
 
-lemma eval_substitution_bind: "semantics m e (substitution_bind p n) = semantics m (case_nat (e n) e) p"
-  using eval_cong eval_substitution unfolding substitution_bind_def by (simp add: Nitpick.case_nat_unfold)
+lemma eval_subst_bind: "semantics m e (subst_bind p n) = semantics m (case_nat (e n) e) p"
+  using eval_cong eval_subst unfolding subst_bind_def by (simp add: Nitpick.case_nat_unfold)
 
 lemma sound_Uni:
   assumes "u \<notin> set (fv_list (Uni p # s))"
-  and "valid (s@[substitution_bind p u])"
+  and "valid (s@[subst_bind p u])"
   shows "valid (Uni p # s)"
   proof (clarsimp simp: valid_def)
     fix M I e z
@@ -316,10 +316,10 @@ lemma sound_Uni:
         using assms
         by (clarsimp simp: Nitpick.case_nat_unfold fv_list_cons intro!: eval_cong[rule_format])
            (metis One_nat_def Suc_pred' cut)
-      have "is_model_environment (M,I) (e(u := z)) \<longrightarrow> semantics_alternative (M,I) (e(u := z)) (s @ [substitution_bind p u])"
+      have "is_model_environment (M,I) (e(u := z)) \<longrightarrow> semantics_alternative (M,I) (e(u := z)) (s @ [subst_bind p u])"
         using assms valid_def by blast
       then have 2: "(\<forall>n. (if n = u then z else e n) \<in> M) \<longrightarrow> semantics_alternative (M,I) (e(u := z)) s \<or> semantics (M,I) (case_nat z e) p"
-       using 1 eval_substitution_bind is_model_environment_def semantics_alternative_append by simp
+       using 1 eval_subst_bind is_model_environment_def semantics_alternative_append by simp
       have 3: "u \<notin> set (cut (fv p)) \<and> u \<notin> set (fv_list s)"
         using assms fv_list_cons by simp
       have "\<forall>n. e n \<in> M"
@@ -330,8 +330,8 @@ lemma sound_Uni:
     qed
   qed
   
-lemma sound_Exi: "valid (s@[substitution_bind p u,Exi p]) \<Longrightarrow> valid (Exi p # s)"
-  by (simp add: valid_def semantics_alternative_append eval_substitution_bind)
+lemma sound_Exi: "valid (s@[subst_bind p u,Exi p]) \<Longrightarrow> valid (Exi p # s)"
+  by (simp add: valid_def semantics_alternative_append eval_subst_bind)
      (metis is_model_environment_def prod.sel(1))
 
 lemma max_exists: "finite (X::nat set) \<Longrightarrow> X \<noteq> {} \<longrightarrow> (\<exists>x. x \<in> X \<and> (\<forall>y. y \<in> X \<longrightarrow> y \<le> x))"
@@ -656,7 +656,7 @@ lemma contains_propagates_Uni:
   assumes "f = failing_path (calculation s)"
   and "infinite (calculation s)"
   and "contains f n (0,Uni p)"
-  shows "(\<exists>y. contains f (Suc(n+y)) (0,substitution_bind p (fresh (fv_list (list_sequent (snd (f (n+y))))))))"
+  shows "(\<exists>y. contains f (Suc(n+y)) (0,subst_bind p (fresh (fv_list (list_sequent (snd (f (n+y))))))))"
   proof -
     have "(\<exists>l. considers f (n+l) (0,Uni p))" using assms contains_considers by blast
     then obtain l where 1: "considers f (n+l) (0,Uni p)" by blast
@@ -674,7 +674,7 @@ lemma contains_propagates_Exi:
   assumes "f = failing_path (calculation s)"
   and "infinite (calculation s)"
   and "contains f n (m,Exi p)"
-  shows "(\<exists>y. (contains f (n+y) (0,substitution_bind p m)) \<and> (contains f (n+y) (Suc m,Exi p)))"
+  shows "(\<exists>y. (contains f (n+y) (0,subst_bind p m)) \<and> (contains f (n+y) (Suc m,Exi p)))"
   proof -
     have "(\<exists>l. considers f (n+l) (m,Exi p))" using assms contains_considers by blast
     then obtain l where 1: "considers f (n+l) (m,Exi p)" by blast
@@ -747,7 +747,7 @@ lemma Exi_upward:
   and "infinite (calculation s)"
   and "init s"
   and "contains f n (m,Exi g)"
-  shows "(\<forall>m'. \<exists>n'. contains f n' (0,substitution_bind g m'))"
+  shows "(\<forall>m'. \<exists>n'. contains f n' (0,subst_bind g m'))"
   proof -
     fix m'
     have "\<exists>n'. contains f n' (m',Exi g)" using assms Exi0 Exi_upward' by metis
@@ -774,11 +774,11 @@ lemma not_is_Exi:
   shows "\<not> is_Exi A \<Longrightarrow> m = 0"
   using assms contains_def index0 is_path_f' prod.collapse by metis
 
-lemma size_substitution[simp]: "size (substitution m f) = size f"
+lemma size_subst[simp]: "size (subst m f) = size f"
   by (induct f arbitrary: m) simp_all
 
-lemma size_substitution_bind[simp]: "size (substitution_bind f n) = size f"
-  using substitution_bind_def by simp
+lemma size_subst_bind[simp]: "size (subst_bind f n) = size f"
+  using subst_bind_def by simp
 
 lemma model':
   assumes "f = failing_path (calculation s)"
@@ -835,16 +835,16 @@ lemma model':
           proof -
             assume 1: "size p = n" and 2: "contains f na (m,p)"
             then have "m = 0" using assms Uni is_Exi not_is_Exi by simp
-            then have "\<exists>y. contains f (Suc (na + y)) (0,substitution_bind q (fresh (fv_list (list_sequent (snd (f (na + y)))))))"
+            then have "\<exists>y. contains f (Suc (na + y)) (0,subst_bind q (fresh (fv_list (list_sequent (snd (f (na + y)))))))"
               using assms Uni 2 contains_propagates_Uni by simp
-            then obtain y where 3: "contains f (Suc (na + y)) (0,substitution_bind q (fresh (fv_list (list_sequent (snd (f (na + y)))))))"
+            then obtain y where 3: "contains f (Suc (na + y)) (0,subst_bind q (fresh (fv_list (list_sequent (snd (f (na + y)))))))"
               by blast
             have 4: "Suc (size q) = n" using Uni 1 by simp
             then show ?thesis using Uni proof (simp)
               show "\<exists>z\<in>fst (model s). \<not> semantics (model s) (case_nat z uton) q"
               proof (rule_tac x="ntou (fresh (fv_list (list_sequent (snd (f (na + y))))))" in bexI)
                 show "\<not> semantics (model s) (case_nat (uton (fresh (fv_list (list_sequent (snd (f (na + y))))))) uton) q"
-                  using * 3 4 eval_substitution_bind size_substitution_bind lessI by metis
+                  using * 3 4 eval_subst_bind size_subst_bind lessI by metis
               next
                 show "uton (fresh (fv_list (list_sequent (snd (f (na + y)))))) \<in> fst (model s)"
                   using is_env_model_ntou is_model_environment_def by blast
@@ -860,9 +860,9 @@ lemma model':
           proof -
             assume "n = Suc (size q)" and "contains f na (m,Exi q)"
             and 1: "semantics (model s) (case_nat z uton) q"
-            then have "\<forall>m'. \<not> semantics (model s) ntou (substitution_bind q m')"
-              using assms * by (meson Exi_upward eval_cong id_apply lessI size_substitution_bind)
-            then show ?thesis using 1 eval_substitution_bind by simp
+            then have "\<forall>m'. \<not> semantics (model s) ntou (subst_bind q m')"
+              using assms * by (meson Exi_upward eval_cong id_apply lessI size_subst_bind)
+            then show ?thesis using 1 eval_subst_bind by simp
           qed
         qed
       qed
@@ -985,8 +985,8 @@ lemmas ss =
   list_sequent_def
   snd_conv
   split_beta
-  substitution.simps
-  substitution_bind_def
+  subst.simps
+  subst_bind_def
 
 lemma prover_Nil: "prover []"
   by (metis repeat.simps(1) prover_def)
@@ -1025,7 +1025,7 @@ section "Code"
 ML \<open>
 
 datatype form = Pre of bool * string * int list |
-                Con of form * form | Dis of form * form | Uni of form |  Exi of form
+                Con of form * form | Dis of form * form | Uni of form | Exi of form
 
 fun make_sequent l = map (fn p => (0,p)) l
 
@@ -1053,20 +1053,20 @@ fun max_list [] = 0
 
 fun fresh l = if l = [] then 0 else (max_list l) + 1
 
-fun substitution f (Pre (b,i,v)) = Pre (b,i,map f v)
-  | substitution f (Con (p,q)) = Con (substitution f p,substitution f q)
-  | substitution f (Dis (p,q)) = Dis (substitution f p,substitution f q)
-  | substitution f (Uni p) = Uni (substitution (fn 0 => 0 | n => (f (n - 1)) + 1) p)
-  | substitution f (Exi p) = Exi (substitution (fn 0 => 0 | n => (f (n - 1)) + 1) p)
+fun subst f (Pre (b,i,v)) = Pre (b,i,map f v)
+  | subst f (Con (p,q)) = Con (subst f p,subst f q)
+  | subst f (Dis (p,q)) = Dis (subst f p,subst f q)
+  | subst f (Uni p) = Uni (subst (fn 0 => 0 | n => f (n - 1) + 1) p)
+  | subst f (Exi p) = Exi (subst (fn 0 => 0 | n => f (n - 1) + 1) p)
 
-fun substitution_bind p y = substitution (fn 0 => y | n => n - 1) p
+fun subst_bind p y = subst (fn 0 => y | n => n - 1) p
 
 fun inference s = case s of [] => [[]] | (n,h) :: t => case h of Pre (b,i,v) =>
-        if member (Pre (not b,i,v)) (list_sequent t) then [] else [t @ [(0,Pre (b,i,v))]]
+    if member (Pre (not b,i,v)) (list_sequent t) then [] else [t @ [(0,Pre (b,i,v))]]
     | Con (p,q) => [t @ [(0,p)],t @ [(0,q)]]
     | Dis (p,q) => [t @ [(0,p),(0,q)]]
-    | Uni p => [t @ [(0,substitution_bind p (fresh ((flatten o map fv) (list_sequent s))))]]
-    | Exi p => [t @ [(0,substitution_bind p n),(n + 1,h)]]
+    | Uni p => [t @ [(0,subst_bind p (fresh ((flatten o map fv) (list_sequent s))))]]
+    | Exi p => [t @ [(0,subst_bind p n),(n + 1,h)]]
 
 fun prover a = if a = [] then () else prover ((flatten o map inference) a)
 
