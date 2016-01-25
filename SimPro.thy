@@ -2,7 +2,7 @@ section "A Simple Prover"
 
 theory SimPro imports Main begin
 
-type_synonym proxy = nat
+type_synonym proxy = "unit list"
 
 datatype form = Pre bool string "nat list" | Con form form | Dis form form | Uni form | Exi form
 
@@ -109,7 +109,7 @@ lemma "\<forall>m. \<forall>e. is_model_environment m e \<longrightarrow> fst m 
   using is_model_environment_def by auto
 
 lemma "\<exists>m. \<forall>e. is_model_environment m e \<and> infinite (fst m)"
-  using is_model_environment_def by auto
+  using is_model_environment_def infinite_UNIV_listI by auto
 
 section "Basics"
 
@@ -754,9 +754,9 @@ lemma Exi_upward:
     then show ?thesis using assms contains_propagates_Exi Exi0 Exi_upward' by metis
   qed
 
-definition ntou :: "nat \<Rightarrow> proxy" where "ntou = id"
+definition ntou :: "nat \<Rightarrow> proxy" where "ntou n = replicate n ()"
 
-definition uton :: "proxy \<Rightarrow> nat" where "uton = id"
+definition uton :: "proxy \<Rightarrow> nat" where "uton u = length u"
 
 lemma aaa: "ntou (uton u) = u" using ntou_def uton_def by (induct u) auto
 
