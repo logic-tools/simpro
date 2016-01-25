@@ -758,11 +758,11 @@ definition ntou :: "nat \<Rightarrow> proxy" where "ntou n = replicate n ()"
 
 definition uton :: "proxy \<Rightarrow> nat" where "uton u = length u"
 
-lemma aaa: "ntou (uton u) = u" using ntou_def uton_def by (induct u) auto
+lemma aaa[simp]: "ntou (uton u) = u" using ntou_def uton_def by (induct u) auto
 
-lemma bbb: "uton (ntou n) = n" using ntou_def uton_def by (induct n) auto
+lemma bbb[simp]: "uton (ntou n) = n" using ntou_def uton_def by (induct n) auto
 
-lemma ccc: "uton \<circ> ntou = id" using bbb by auto
+lemma ccc[simp]: "uton \<circ> ntou = id" by auto
 
 section "Falsifying Model From Failing Path"
 
@@ -799,9 +799,9 @@ lemma model':
       assume *: "\<forall>m<n. \<forall>p. size p = m \<longrightarrow> (\<forall>m n. contains f n (m,p) \<longrightarrow> \<not> semantics (model s) ntou p)"
       show ?thesis proof (cases p)
         case (Pre b i v) then show ?thesis proof (cases b)
-          case True then show ?thesis using Pre assms model_def ccc by auto
+          case True then show ?thesis using Pre assms model_def by auto
         next
-          case False then show ?thesis using Pre ccc proof (clarsimp simp: model_def)
+          case False then show ?thesis using Pre proof (clarsimp simp: model_def)
           fix na m nb ma
           show "n = 0 \<Longrightarrow> contains f na (m,Pre False i v) \<Longrightarrow> contains (failing_path (calculation s)) nb (ma,Pre True i v) \<Longrightarrow> False"
           proof -
@@ -868,7 +868,8 @@ lemma model':
             and 1: "semantics (model s) (case_nat z ntou) q"
             then have "\<forall>m'. \<not> semantics (model s) ntou (subst_bind q m')"
               using assms * by (meson Exi_upward eval_cong id_apply lessI size_subst_bind)
-            then show ?thesis using 1 eval_subst_bind aaa by metis
+            also have "\<forall>u. ntou (uton u) = u" by simp
+            ultimately show ?thesis using 1 eval_subst_bind by metis
           qed
         qed
       qed
