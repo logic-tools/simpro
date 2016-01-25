@@ -754,9 +754,15 @@ lemma Exi_upward:
     then show ?thesis using assms contains_propagates_Exi Exi0 Exi_upward' by metis
   qed
 
-abbreviation ntou :: "nat \<Rightarrow> proxy" where "ntou \<equiv> id"
+definition ntou :: "nat \<Rightarrow> proxy" where "ntou = id"
 
-abbreviation uton :: "proxy \<Rightarrow> nat" where "uton \<equiv> id"
+definition uton :: "proxy \<Rightarrow> nat" where "uton = id"
+
+lemma aaa: "ntou (uton u) = u" using ntou_def uton_def by (induct u) auto
+
+lemma bbb: "uton (ntou n) = n" using ntou_def uton_def by (induct n) auto
+
+lemma ccc: "uton \<circ> ntou = id" using bbb by auto
 
 section "Falsifying Model From Failing Path"
 
@@ -787,15 +793,15 @@ lemma model':
   shows "\<forall>p. size p = h \<longrightarrow> (\<forall>m n. contains f n (m,p) \<longrightarrow> \<not> (semantics (model s) ntou p))"
   proof (rule nat_less_induct,rule allI)
     fix p n
-    show "\<forall>m<n. \<forall>p. size p = m \<longrightarrow> (\<forall>m n. contains f n (m,p) \<longrightarrow> \<not> semantics (model s) uton p) \<Longrightarrow>
-           size p = n \<longrightarrow> (\<forall>m n. contains f n (m,p) \<longrightarrow> \<not> semantics (model s) uton p)"
+    show "\<forall>m<n. \<forall>p. size p = m \<longrightarrow> (\<forall>m n. contains f n (m,p) \<longrightarrow> \<not> semantics (model s) ntou p) \<Longrightarrow>
+           size p = n \<longrightarrow> (\<forall>m n. contains f n (m,p) \<longrightarrow> \<not> semantics (model s) ntou p)"
     proof -
-      assume *: "\<forall>m<n. \<forall>p. size p = m \<longrightarrow> (\<forall>m n. contains f n (m,p) \<longrightarrow> \<not> semantics (model s) uton p)"
+      assume *: "\<forall>m<n. \<forall>p. size p = m \<longrightarrow> (\<forall>m n. contains f n (m,p) \<longrightarrow> \<not> semantics (model s) ntou p)"
       show ?thesis proof (cases p)
         case (Pre b i v) then show ?thesis proof (cases b)
-          case True then show ?thesis using Pre assms model_def by auto
+          case True then show ?thesis using Pre assms model_def ccc by auto
         next
-          case False then show ?thesis using Pre proof (clarsimp simp: model_def)
+          case False then show ?thesis using Pre ccc proof (clarsimp simp: model_def)
           fix na m nb ma
           show "n = 0 \<Longrightarrow> contains f na (m,Pre False i v) \<Longrightarrow> contains (failing_path (calculation s)) nb (ma,Pre True i v) \<Longrightarrow> False"
           proof -
@@ -831,7 +837,7 @@ lemma model':
       next
         case (Uni q) then show ?thesis proof (intro impI allI)
           fix na m
-          show "size p = n \<Longrightarrow> contains f na (m,p) \<Longrightarrow> \<not> semantics (model s) uton p"
+          show "size p = n \<Longrightarrow> contains f na (m,p) \<Longrightarrow> \<not> semantics (model s) ntou p"
           proof -
             assume 1: "size p = n" and 2: "contains f na (m,p)"
             then have "m = 0" using assms Uni is_Exi not_is_Exi by simp
@@ -841,12 +847,12 @@ lemma model':
               by blast
             have 4: "Suc (size q) = n" using Uni 1 by simp
             then show ?thesis using Uni proof (simp)
-              show "\<exists>z\<in>fst (model s). \<not> semantics (model s) (case_nat z uton) q"
+              show "\<exists>z\<in>fst (model s). \<not> semantics (model s) (case_nat z ntou) q"
               proof (rule_tac x="ntou (fresh (fv_list (list_sequent (snd (f (na + y))))))" in bexI)
-                show "\<not> semantics (model s) (case_nat (uton (fresh (fv_list (list_sequent (snd (f (na + y))))))) uton) q"
+                show "\<not> semantics (model s) (case_nat (ntou (fresh (fv_list (list_sequent (snd (f (na + y))))))) ntou) q"
                   using * 3 4 eval_subst_bind size_subst_bind lessI by metis
               next
-                show "uton (fresh (fv_list (list_sequent (snd (f (na + y)))))) \<in> fst (model s)"
+                show "ntou (fresh (fv_list (list_sequent (snd (f (na + y)))))) \<in> fst (model s)"
                   using is_env_model_ntou is_model_environment_def by blast
               qed
             qed
@@ -856,13 +862,13 @@ lemma model':
         case (Exi q) then show ?thesis proof (clarsimp)
           fix m na ma z
           show "p = Exi q \<Longrightarrow> n = Suc (size q) \<Longrightarrow> z \<in> fst (model s) \<Longrightarrow> contains f na (m,Exi q)
-                \<Longrightarrow> semantics (model s) (case_nat z uton) q \<Longrightarrow> False"
+                \<Longrightarrow> semantics (model s) (case_nat z ntou) q \<Longrightarrow> False"
           proof -
             assume "n = Suc (size q)" and "contains f na (m,Exi q)"
-            and 1: "semantics (model s) (case_nat z uton) q"
+            and 1: "semantics (model s) (case_nat z ntou) q"
             then have "\<forall>m'. \<not> semantics (model s) ntou (subst_bind q m')"
               using assms * by (meson Exi_upward eval_cong id_apply lessI size_subst_bind)
-            then show ?thesis using 1 eval_subst_bind by simp
+            then show ?thesis using 1 eval_subst_bind aaa by metis
           qed
         qed
       qed
