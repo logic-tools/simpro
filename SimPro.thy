@@ -2,9 +2,9 @@ section "A Simple Prover"
 
 theory SimPro imports Main begin
 
-type_synonym proxy = "unit list"
+datatype nnf = Pre bool string "nat list" | Con nnf nnf | Dis nnf nnf | Uni nnf | Exi nnf
 
-datatype form = Pre bool string "nat list" | Con form form | Dis form form | Uni form | Exi form
+type_synonym proxy = "unit list"
 
 type_synonym model = "proxy set \<times> (string \<Rightarrow> proxy list \<Rightarrow> bool)"
 
@@ -13,26 +13,26 @@ type_synonym environment = "nat \<Rightarrow> proxy"
 definition is_model_environment :: "model \<Rightarrow> environment \<Rightarrow> bool" where
   "is_model_environment m e = (\<forall>n. e n \<in> fst m)"
 
-primrec semantics :: "model \<Rightarrow> environment \<Rightarrow> form \<Rightarrow> bool" where
+primrec semantics :: "model \<Rightarrow> environment \<Rightarrow> nnf \<Rightarrow> bool" where
   "semantics m e (Pre b i v) = (b = snd m i (map e v))"
 | "semantics m e (Con p q) = (semantics m e p \<and> semantics m e q)"
 | "semantics m e (Dis p q) = (semantics m e p \<or> semantics m e q)"
 | "semantics m e (Uni p) = (\<forall>z \<in> fst m. semantics m (\<lambda>x. case x of 0 \<Rightarrow> z | Suc n \<Rightarrow> e n) p)"
 | "semantics m e (Exi p) = (\<exists>z \<in> fst m. semantics m (\<lambda>x. case x of 0 \<Rightarrow> z | Suc n \<Rightarrow> e n) p)"
 
-primrec semantics_alternative :: "model \<Rightarrow> environment \<Rightarrow> form list \<Rightarrow> bool" where
+primrec semantics_alternative :: "model \<Rightarrow> environment \<Rightarrow> nnf list \<Rightarrow> bool" where
   "semantics_alternative _ _ [] = False"
 | "semantics_alternative m e (h # t) = (semantics m e h \<or> semantics_alternative m e t)"
 
-definition valid :: "form list \<Rightarrow> bool" where
+definition valid :: "nnf list \<Rightarrow> bool" where
   "valid l = (\<forall>m e. is_model_environment m e \<longrightarrow> semantics_alternative m e l)"
 
-type_synonym sequent = "(nat \<times> form) list"
+type_synonym sequent = "(nat \<times> nnf) list"
 
-definition make_sequent :: "form list \<Rightarrow> sequent" where
+definition make_sequent :: "nnf list \<Rightarrow> sequent" where
   "make_sequent l = map (\<lambda>p. (0,p)) l"
 
-definition list_sequent :: "sequent \<Rightarrow> form list" where
+definition list_sequent :: "sequent \<Rightarrow> nnf list" where
   "list_sequent s = map snd s"
 
 primrec member :: "'a => 'a list => bool" where
@@ -47,37 +47,37 @@ primrec cut :: "nat list \<Rightarrow> nat list" where
   "cut [] = []"
 | "cut (h # t) = (case h of 0 \<Rightarrow> cut t | Suc n \<Rightarrow> n # cut t)"
 
-primrec fv :: "form \<Rightarrow> nat list" where
+primrec fv :: "nnf \<Rightarrow> nat list" where
   "fv (Pre _ _ v) = v"
 | "fv (Con p q) = fv p @ fv q"
 | "fv (Dis p q) = fv p @ fv q"
 | "fv (Uni p) = cut (fv p)"
 | "fv (Exi p) = cut (fv p)"
 
-primrec max_list :: "nat list \<Rightarrow> nat" where
-  "max_list [] = 0"
-| "max_list (h # t) = max h (max_list t)"
+primrec maxlist :: "nat list \<Rightarrow> nat" where
+  "maxlist [] = 0"
+| "maxlist (h # t) = max h (maxlist t)"
 
 definition fresh :: "nat list \<Rightarrow> nat" where
-  "fresh l = (if l = [] then 0 else Suc (max_list l))"
+  "fresh l = (if l = [] then 0 else Suc (maxlist l))"
 
-primrec subst :: "(nat \<Rightarrow> nat) \<Rightarrow> form \<Rightarrow> form" where
+primrec subst :: "(nat \<Rightarrow> nat) \<Rightarrow> nnf \<Rightarrow> nnf" where
   "subst f (Pre b i v) = Pre b i (map f v)"
 | "subst f (Con p q) = Con (subst f p) (subst f q)"
 | "subst f (Dis p q) = Dis (subst f p) (subst f q)"
 | "subst f (Uni p) = Uni (subst (\<lambda>x. case x of 0 \<Rightarrow> 0 | Suc n \<Rightarrow> Suc (f n)) p)"
 | "subst f (Exi p) = Exi (subst (\<lambda>x. case x of 0 \<Rightarrow> 0 | Suc n \<Rightarrow> Suc (f n)) p)"
 
-definition subst_bind :: "form \<Rightarrow> nat \<Rightarrow> form" where
-  "subst_bind p y = subst (\<lambda>x. case x of 0 \<Rightarrow> y | Suc n \<Rightarrow> n) p"
+definition bind :: "nnf \<Rightarrow> nat \<Rightarrow> nnf" where
+  "bind p y = subst (\<lambda>x. case x of 0 \<Rightarrow> y | Suc n \<Rightarrow> n) p"
 
 definition inference :: "sequent \<Rightarrow> sequent list" where
   "inference s = (case s of [] \<Rightarrow> [[]] | (n,h) # t \<Rightarrow> (case h of
       Pre b i v \<Rightarrow> if member (Pre (\<not> b) i v) (list_sequent t) then [] else [t @ [(0,Pre b i v)]]
     | Con p q \<Rightarrow> [t @ [(0,p)],t @ [(0,q)]]
     | Dis p q \<Rightarrow> [t @ [(0,p),(0,q)]]
-    | Uni p \<Rightarrow> [t @ [(0,subst_bind p (fresh ((flatten \<circ> map fv) (list_sequent s))))]]
-    | Exi p \<Rightarrow> [t @ [(0,subst_bind p n),(Suc n,h)]] ))"
+    | Uni p \<Rightarrow> [t @ [(0,bind p (fresh ((flatten \<circ> map fv) (list_sequent s))))]]
+    | Exi p \<Rightarrow> [t @ [(0,bind p n),(Suc n,h)]] ))"
 
 primrec repeat :: "('a \<Rightarrow> 'a) \<Rightarrow> 'a \<Rightarrow> nat \<Rightarrow> 'a" where
   "repeat _ a 0 = a"
@@ -86,7 +86,7 @@ primrec repeat :: "('a \<Rightarrow> 'a) \<Rightarrow> 'a \<Rightarrow> nat \<Ri
 definition prover :: "sequent list \<Rightarrow> bool" where
   "prover a = (\<exists>n. repeat (flatten \<circ> map inference) a n = [])"
 
-definition check :: "form \<Rightarrow> bool" where
+definition check :: "nnf \<Rightarrow> bool" where
   "check p = prover [make_sequent [p]]"
 
 abbreviation(input) check_thesis :: bool where
@@ -113,10 +113,10 @@ lemma "\<exists>m. \<forall>e. is_model_environment m e \<and> infinite (fst m)"
 
 section "Basics"
 
-definition fv_list :: "form list \<Rightarrow> nat list" where
+definition fv_list :: "nnf list \<Rightarrow> nat list" where
   "fv_list = flatten \<circ> map fv"
 
-primrec is_axiom :: "form list \<Rightarrow> bool" where
+primrec is_axiom :: "nnf list \<Rightarrow> bool" where
   "is_axiom [] = False"
 | "is_axiom (p # t) = ((\<exists>b i v. p = Pre b i v \<and> Pre (\<not> b) i v \<in> set t))"
 
@@ -126,8 +126,8 @@ lemma pre:  "(n,(m,Pre b i v) # xs) \<in> calculation(nfs) \<Longrightarrow> \<n
   and con1: "(n,(m,Con p q) # xs) \<in> calculation(nfs) \<Longrightarrow> \<not> is_axiom (list_sequent ((m,Con p q) # xs)) \<Longrightarrow> (Suc n,xs@[(0,p)]) \<in> calculation(nfs)"
   and con2: "(n,(m,Con p q) # xs) \<in> calculation(nfs) \<Longrightarrow> \<not> is_axiom (list_sequent ((m,Con p q) # xs)) \<Longrightarrow> (Suc n,xs@[(0,q)]) \<in> calculation(nfs)"
   and dis:  "(n,(m,Dis p q) # xs) \<in> calculation(nfs) \<Longrightarrow> \<not> is_axiom (list_sequent ((m,Dis p q) # xs)) \<Longrightarrow> (Suc n,xs@[(0,p),(0,q)]) \<in> calculation(nfs)"
-  and uni:  "(n,(m,Uni p) # xs) \<in> calculation(nfs) \<Longrightarrow> \<not> is_axiom (list_sequent ((m,Uni p) # xs)) \<Longrightarrow> (Suc n,xs@[(0,subst_bind p (fresh ((flatten \<circ> map fv) (list_sequent ((m,Uni p) # xs)))))]) \<in> calculation(nfs)"
-  and exi:  "(n,(m,Exi p) # xs) \<in> calculation(nfs) \<Longrightarrow> \<not> is_axiom (list_sequent ((m,Exi p) # xs)) \<Longrightarrow> (Suc n,xs@[(0,subst_bind p m),(Suc m,Exi p)]) \<in> calculation(nfs)"
+  and uni:  "(n,(m,Uni p) # xs) \<in> calculation(nfs) \<Longrightarrow> \<not> is_axiom (list_sequent ((m,Uni p) # xs)) \<Longrightarrow> (Suc n,xs@[(0,bind p (fresh ((flatten \<circ> map fv) (list_sequent ((m,Uni p) # xs)))))]) \<in> calculation(nfs)"
+  and exi:  "(n,(m,Exi p) # xs) \<in> calculation(nfs) \<Longrightarrow> \<not> is_axiom (list_sequent ((m,Exi p) # xs)) \<Longrightarrow> (Suc n,xs@[(0,bind p m),(Suc m,Exi p)]) \<in> calculation(nfs)"
   by (auto simp: inference_def list_sequent_def)
 
 lemmas not_is_axiom_subs = pre con1 con2 dis uni exi
@@ -300,12 +300,12 @@ lemma ball: "\<forall>x \<in> m. P x = Q x \<Longrightarrow> (\<forall>x \<in> m
 lemma eval_subst: "semantics m e (subst f p) = semantics m (e \<circ> f) p"
   using eval_cong by (induct p arbitrary: e f) (simp_all add: Nitpick.case_nat_unfold comp_def ball)
 
-lemma eval_subst_bind: "semantics m e (subst_bind p n) = semantics m (case_nat (e n) e) p"
-  using eval_cong eval_subst unfolding subst_bind_def by (simp add: Nitpick.case_nat_unfold)
+lemma eval_bind: "semantics m e (bind p n) = semantics m (case_nat (e n) e) p"
+  using eval_cong eval_subst unfolding bind_def by (simp add: Nitpick.case_nat_unfold)
 
 lemma sound_Uni:
   assumes "u \<notin> set (fv_list (Uni p # s))"
-  and "valid (s@[subst_bind p u])"
+  and "valid (s@[bind p u])"
   shows "valid (Uni p # s)"
   proof (clarsimp simp: valid_def)
     fix M I e z
@@ -316,10 +316,10 @@ lemma sound_Uni:
         using assms
         by (clarsimp simp: Nitpick.case_nat_unfold fv_list_cons intro!: eval_cong[rule_format])
            (metis One_nat_def Suc_pred' cut)
-      have "is_model_environment (M,I) (e(u := z)) \<longrightarrow> semantics_alternative (M,I) (e(u := z)) (s @ [subst_bind p u])"
+      have "is_model_environment (M,I) (e(u := z)) \<longrightarrow> semantics_alternative (M,I) (e(u := z)) (s @ [bind p u])"
         using assms valid_def by blast
       then have 2: "(\<forall>n. (if n = u then z else e n) \<in> M) \<longrightarrow> semantics_alternative (M,I) (e(u := z)) s \<or> semantics (M,I) (case_nat z e) p"
-       using 1 eval_subst_bind is_model_environment_def semantics_alternative_append by simp
+       using 1 eval_bind is_model_environment_def semantics_alternative_append by simp
       have 3: "u \<notin> set (cut (fv p)) \<and> u \<notin> set (fv_list s)"
         using assms fv_list_cons by simp
       have "\<forall>n. e n \<in> M"
@@ -330,8 +330,8 @@ lemma sound_Uni:
     qed
   qed
   
-lemma sound_Exi: "valid (s@[subst_bind p u,Exi p]) \<Longrightarrow> valid (Exi p # s)"
-  by (simp add: valid_def semantics_alternative_append eval_subst_bind)
+lemma sound_Exi: "valid (s@[bind p u,Exi p]) \<Longrightarrow> valid (Exi p # s)"
+  by (simp add: valid_def semantics_alternative_append eval_bind)
      (metis is_model_environment_def prod.sel(1))
 
 lemma max_exists: "finite (X::nat set) \<Longrightarrow> X \<noteq> {} \<longrightarrow> (\<exists>x. x \<in> X \<and> (\<forall>y. y \<in> X \<longrightarrow> y \<le> x))"
@@ -340,7 +340,7 @@ lemma max_exists: "finite (X::nat set) \<Longrightarrow> X \<noteq> {} \<longrig
 definition init :: "sequent \<Rightarrow> bool" where
   "init s = (\<forall>x \<in> (set s). fst x = 0)"
 
-definition is_Exi :: "form \<Rightarrow> bool" where
+definition is_Exi :: "nnf \<Rightarrow> bool" where
   "is_Exi f = (case f of Exi _ \<Rightarrow> True | _ \<Rightarrow> False)"
 
 lemma is_Exi: "\<not> is_Exi (Pre b i v) \<and> \<not> is_Exi (Con p q) \<and> \<not> is_Exi (Dis p q) \<and> \<not> is_Exi (Uni p)"
@@ -371,11 +371,11 @@ lemma index0:
     qed
   qed
 
-lemma max_list: "\<forall>v \<in> set l. v \<le> max_list l"
+lemma maxlist: "\<forall>v \<in> set l. v \<le> maxlist l"
   by (induct l) (auto simp: max_def)
 
 lemma fresh: "fresh l \<notin> (set l)"
-  using length_pos_if_in_set max_list fresh_def by fastforce
+  using length_pos_if_in_set maxlist fresh_def by fastforce
 
 lemma soundness':
   assumes "init s"
@@ -549,10 +549,10 @@ qed
 
 section "Contains / Considers"
 
-definition contains :: "(nat \<Rightarrow> (nat \<times> sequent)) \<Rightarrow> nat \<Rightarrow> nat \<times> form \<Rightarrow> bool" where
+definition contains :: "(nat \<Rightarrow> (nat \<times> sequent)) \<Rightarrow> nat \<Rightarrow> nat \<times> nnf \<Rightarrow> bool" where
   "contains f n nf = (nf \<in> set (snd (f n)))"
 
-definition considers :: "(nat \<Rightarrow> (nat \<times> sequent)) \<Rightarrow> nat \<Rightarrow> nat \<times> form \<Rightarrow> bool" where
+definition considers :: "(nat \<Rightarrow> (nat \<times> sequent)) \<Rightarrow> nat \<Rightarrow> nat \<times> nnf \<Rightarrow> bool" where
   "considers f n nf = (case snd (f n) of [] \<Rightarrow> False | (x # xs) \<Rightarrow> x = nf)"
 
 lemma progress:
@@ -656,7 +656,7 @@ lemma contains_propagates_Uni:
   assumes "f = failing_path (calculation s)"
   and "infinite (calculation s)"
   and "contains f n (0,Uni p)"
-  shows "(\<exists>y. contains f (Suc(n+y)) (0,subst_bind p (fresh (fv_list (list_sequent (snd (f (n+y))))))))"
+  shows "(\<exists>y. contains f (Suc(n+y)) (0,bind p (fresh (fv_list (list_sequent (snd (f (n+y))))))))"
   proof -
     have "(\<exists>l. considers f (n+l) (0,Uni p))" using assms contains_considers by blast
     then obtain l where 1: "considers f (n+l) (0,Uni p)" by blast
@@ -674,7 +674,7 @@ lemma contains_propagates_Exi:
   assumes "f = failing_path (calculation s)"
   and "infinite (calculation s)"
   and "contains f n (m,Exi p)"
-  shows "(\<exists>y. (contains f (n+y) (0,subst_bind p m)) \<and> (contains f (n+y) (Suc m,Exi p)))"
+  shows "(\<exists>y. (contains f (n+y) (0,bind p m)) \<and> (contains f (n+y) (Suc m,Exi p)))"
   proof -
     have "(\<exists>l. considers f (n+l) (m,Exi p))" using assms contains_considers by blast
     then obtain l where 1: "considers f (n+l) (m,Exi p)" by blast
@@ -747,7 +747,7 @@ lemma Exi_upward:
   and "infinite (calculation s)"
   and "init s"
   and "contains f n (m,Exi g)"
-  shows "(\<forall>m'. \<exists>n'. contains f n' (0,subst_bind g m'))"
+  shows "(\<forall>m'. \<exists>n'. contains f n' (0,bind g m'))"
   proof -
     fix m'
     have "\<exists>n'. contains f n' (m',Exi g)" using assms Exi0 Exi_upward' by metis
@@ -783,8 +783,8 @@ lemma not_is_Exi:
 lemma size_subst[simp]: "size (subst m f) = size f"
   by (induct f arbitrary: m) simp_all
 
-lemma size_subst_bind[simp]: "size (subst_bind f n) = size f"
-  using subst_bind_def by simp
+lemma size_bind[simp]: "size (bind f n) = size f"
+  using bind_def by simp
 
 lemma model':
   assumes "f = failing_path (calculation s)"
@@ -830,10 +830,10 @@ lemma model':
       qed
       next
         case Con then show ?thesis using assms * is_Exi not_is_Exi contains_propagates_Con
-          by (metis Nat.add_0_right add_Suc_right form.size(7) less_add_Suc1 less_add_Suc2 semantics.simps(2))
+          by (metis Nat.add_0_right add_Suc_right nnf.size(7) less_add_Suc1 less_add_Suc2 semantics.simps(2))
       next
         case Dis then show ?thesis using assms * contains_propagates_Dis is_Exi not_is_Exi
-          by (metis Nat.add_0_right add_Suc_right form.size(8) less_add_Suc1 less_add_Suc2 semantics.simps(3))
+          by (metis Nat.add_0_right add_Suc_right nnf.size(8) less_add_Suc1 less_add_Suc2 semantics.simps(3))
       next
         case (Uni q) then show ?thesis proof (intro impI allI)
           fix na m
@@ -841,16 +841,16 @@ lemma model':
           proof -
             assume 1: "size p = n" and 2: "contains f na (m,p)"
             then have "m = 0" using assms Uni is_Exi not_is_Exi by simp
-            then have "\<exists>y. contains f (Suc (na + y)) (0,subst_bind q (fresh (fv_list (list_sequent (snd (f (na + y)))))))"
+            then have "\<exists>y. contains f (Suc (na + y)) (0,bind q (fresh (fv_list (list_sequent (snd (f (na + y)))))))"
               using assms Uni 2 contains_propagates_Uni by simp
-            then obtain y where 3: "contains f (Suc (na + y)) (0,subst_bind q (fresh (fv_list (list_sequent (snd (f (na + y)))))))"
+            then obtain y where 3: "contains f (Suc (na + y)) (0,bind q (fresh (fv_list (list_sequent (snd (f (na + y)))))))"
               by blast
             have 4: "Suc (size q) = n" using Uni 1 by simp
             then show ?thesis using Uni proof (simp)
               show "\<exists>z\<in>fst (model s). \<not> semantics (model s) (case_nat z ntou) q"
               proof (rule_tac x="ntou (fresh (fv_list (list_sequent (snd (f (na + y))))))" in bexI)
                 show "\<not> semantics (model s) (case_nat (ntou (fresh (fv_list (list_sequent (snd (f (na + y))))))) ntou) q"
-                  using * 3 4 eval_subst_bind size_subst_bind lessI by metis
+                  using * 3 4 eval_bind size_bind lessI by metis
               next
                 show "ntou (fresh (fv_list (list_sequent (snd (f (na + y)))))) \<in> fst (model s)"
                   using is_env_model_ntou is_model_environment_def by blast
@@ -866,10 +866,10 @@ lemma model':
           proof -
             assume "n = Suc (size q)" and "contains f na (m,Exi q)"
             and 1: "semantics (model s) (case_nat z ntou) q"
-            then have "\<forall>m'. \<not> semantics (model s) ntou (subst_bind q m')"
-              using assms * by (meson Exi_upward eval_cong id_apply lessI size_subst_bind)
+            then have "\<forall>m'. \<not> semantics (model s) ntou (bind q m')"
+              using assms * by (meson Exi_upward eval_cong id_apply lessI size_bind)
             also have "\<forall>u. ntou (uton u) = u" by simp
-            ultimately show ?thesis using 1 eval_subst_bind by metis
+            ultimately show ?thesis using 1 eval_bind by metis
           qed
         qed
       qed
@@ -975,7 +975,7 @@ lemma "(\<exists>x. A x \<or> B x) \<longrightarrow> ((\<exists>x. B x) \<or> (\
 lemma "((\<exists>x. A x \<or> B x) \<longrightarrow> ((\<exists>x. B x) \<or> (\<exists>x. A x))) = 
   ((\<forall>x. \<not> A x \<and> \<not> B x) \<or> ((\<exists>x. B x) \<or> (\<exists>x. A x)))" by blast
 
-definition test :: "form" where
+definition test :: "nnf" where
   "test = Dis (Uni (Con (Pre False ''A'' [0]) (Pre False ''B'' [0])))
               (Dis (Exi (Pre True ''B'' [0])) (Exi (Pre True ''A'' [0])))"
 
@@ -983,8 +983,8 @@ lemmas ss =
   append_Cons
   append_Nil
   comp_def
-  flatten.simps 
-  form.simps
+  flatten.simps
+  nnf.simps
   fresh_def
   fv_list_def
   inference_def
@@ -993,7 +993,7 @@ lemmas ss =
   snd_conv
   split_beta
   subst.simps
-  subst_bind_def
+  bind_def
 
 lemma prover_Nil: "prover []"
   by (metis repeat.simps(1) prover_def)
@@ -1031,8 +1031,8 @@ section "Code"
 
 ML \<open>
 
-datatype form = Pre of bool * string * int list |
-                Con of form * form | Dis of form * form | Uni of form | Exi of form
+datatype nnf = Pre of bool * string * int list |
+               Con of nnf * nnf | Dis of nnf * nnf | Uni of nnf | Exi of nnf
 
 fun make_sequent l = map (fn p => (0,p)) l
 
@@ -1055,10 +1055,10 @@ fun fv (Pre (_,_,v)) = v
 
 fun max x y = if x > y then x else y
 
-fun max_list [] = 0
-  | max_list (h :: t) = max h (max_list t)
+fun maxlist [] = 0
+  | maxlist (h :: t) = max h (maxlist t)
 
-fun fresh l = if l = [] then 0 else (max_list l) + 1
+fun fresh l = if l = [] then 0 else (maxlist l) + 1
 
 fun subst f (Pre (b,i,v)) = Pre (b,i,map f v)
   | subst f (Con (p,q)) = Con (subst f p,subst f q)
@@ -1066,14 +1066,14 @@ fun subst f (Pre (b,i,v)) = Pre (b,i,map f v)
   | subst f (Uni p) = Uni (subst (fn 0 => 0 | n => f (n - 1) + 1) p)
   | subst f (Exi p) = Exi (subst (fn 0 => 0 | n => f (n - 1) + 1) p)
 
-fun subst_bind p y = subst (fn 0 => y | n => n - 1) p
+fun bind p y = subst (fn 0 => y | n => n - 1) p
 
 fun inference s = case s of [] => [[]] | (n,h) :: t => case h of Pre (b,i,v) =>
-    if member (Pre (not b,i,v)) (list_sequent t) then [] else [t @ [(0,Pre (b,i,v))]]
+  if member (Pre (not b,i,v)) (list_sequent t) then [] else [t @ [(0,Pre (b,i,v))]]
     | Con (p,q) => [t @ [(0,p)],t @ [(0,q)]]
     | Dis (p,q) => [t @ [(0,p),(0,q)]]
-    | Uni p => [t @ [(0,subst_bind p (fresh ((flatten o map fv) (list_sequent s))))]]
-    | Exi p => [t @ [(0,subst_bind p n),(n + 1,h)]]
+    | Uni p => [t @ [(0,bind p (fresh ((flatten o map fv) (list_sequent s))))]]
+    | Exi p => [t @ [(0,bind p n),(n + 1,h)]]
 
 fun prover a = if a = [] then () else prover ((flatten o map inference) a)
 
