@@ -997,8 +997,9 @@ lemma prover_Cons: "prover (h # t) = prover (inference h @ (flatten \<circ> map 
   using repeat_repeat list.simps(8) list.simps(9) flatten.simps
     by (metis (no_types) repeat.simps(2) comp_def prover_def)
 
-proposition "prover [make_sequent [test]]"
-  unfolding make_sequent_def test_def by (simp only: qqq ss si sd prover_Nil prover_Cons)
+proposition "check test"
+  unfolding check_def make_sequent_def test_def
+    by (simp only: qqq ss si sd prover_Nil prover_Cons)
 
 section "Correctness"
 
