@@ -968,6 +968,9 @@ lemma finite_calculation'':
 lemma finite_calculation: "finite (calculation s) = (\<exists>m. loop [s] m = [])"
   using finite_calculation' finite_calculation'' by blast
 
+corollary finite_calculation_prover: "finite (calculation s) = prover [s]"
+  using finite_calculation loop_def prover_def by simp
+
 section "Test"
 
 lemma "(\<exists>x. A x \<or> B x) \<longrightarrow> ((\<exists>x. B x) \<or> (\<exists>x. A x))" by iprover
@@ -979,21 +982,13 @@ definition test :: "nnf" where
   "test = Dis (Uni (Con (Pre False ''A'' [0]) (Pre False ''B'' [0])))
               (Dis (Exi (Pre True ''B'' [0])) (Exi (Pre True ''A'' [0])))"
 
-lemmas ss =
-  append_Cons
-  append_Nil
-  comp_def
-  flatten.simps
-  nnf.simps
-  fresh_def
-  fv_list_def
-  inference_def
-  list.simps
-  list_sequent_def
-  snd_conv
-  split_beta
-  subst.simps
-  bind_def
+lemma qqq: "CHR ''A'' \<noteq> CHR ''B''" by simp
+
+lemmas ss = nnf.simps member.simps flatten.simps cut.simps fv.simps maxlist.simps subst.simps
+
+lemmas si = nat.simps prod.simps list.simps append.simps if_True if_False simp_thms
+
+lemmas sd = list_sequent_def fresh_def bind_def inference_def comp_def snd_def
 
 lemma prover_Nil: "prover []"
   by (metis repeat.simps(1) prover_def)
@@ -1002,11 +997,8 @@ lemma prover_Cons: "prover (h # t) = prover (inference h @ (flatten \<circ> map 
   using repeat_repeat list.simps(8) list.simps(9) flatten.simps
     by (metis (no_types) repeat.simps(2) comp_def prover_def)
 
-corollary finite_calculation_prover: "finite (calculation s) = prover [s]"
-  using finite_calculation loop_def prover_def by simp
-
-lemma search: "finite (calculation [(0,test)])"
-  unfolding test_def finite_calculation_prover using prover_Nil prover_Cons by (simp only: ss) simp
+proposition "prover [make_sequent [test]]"
+  unfolding make_sequent_def test_def by (simp only: qqq ss si sd prover_Nil prover_Cons)
 
 section "Correctness"
 
