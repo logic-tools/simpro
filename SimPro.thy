@@ -2,7 +2,20 @@ section \<open>A Simple Prover\<close>
 
 theory SimPro imports Main begin
 
+abbreviation(input) "TEST P Q \<equiv> (\<exists>x. P x \<or> Q x) \<longrightarrow> (\<exists>x. Q x) \<or> (\<exists>x. P x)"
+
+proposition "TEST P Q"
+by iprover
+
+proposition "TEST P Q = (\<forall>x. \<not> P x \<and> \<not> Q x) \<or> (\<exists>x. Q x) \<or> (\<exists>x. P x)"
+by fast
+
 datatype nnf = Pre bool string "nat list" | Con nnf nnf | Dis nnf nnf | Uni nnf | Exi nnf
+
+definition test :: "nnf" where
+  "test \<equiv> Dis
+    (Uni (Con (Pre False ''P'' [0]) (Pre False ''Q'' [0])))
+    (Dis (Exi (Pre True ''Q'' [0])) (Exi (Pre True ''P'' [0])))"
 
 type_synonym proxy = "unit list"
 
@@ -88,19 +101,9 @@ lemma prover: "prover []" "prover (h # t) = prover (inference h @ (flatten \<cir
 unfolding prover_def comp_def
 by (metis repeat.simps(1),metis (no_types,lifting) repeat.simps(2) repeat list.map flatten.simps)
 
-abbreviation(input) "TEST P Q \<equiv> (\<exists>x. P x \<or> Q x) \<longrightarrow> (\<exists>x. Q x) \<or> (\<exists>x. P x)"
-
-proposition "TEST P Q" "TEST P Q = (\<forall>x. \<not> P x \<and> \<not> Q x) \<or> (\<exists>x. Q x) \<or> (\<exists>x. P x)"
-by (iprover,fast)
-
-definition test :: "nnf" where
-  "test \<equiv> Dis
-    (Uni (Con (Pre False ''P'' [0]) (Pre False ''Q'' [0])))
-    (Dis (Exi (Pre True ''Q'' [0])) (Exi (Pre True ''P'' [0])))"
-
 lemmas simps = fresh_def bind_def inference_def comp_def snd_def
   nnf.simps member.simps flatten.simps cut.simps fv.simps maxlist.simps subst.simps
-  nat.simps append.simps list.simps prod.simps if_P if_cancel simp_thms
+  nat.simps append.simps list.simps prod.simps if_True if_False if_cancel simp_thms
 
 proposition "check test"
 unfolding check_def test_def
