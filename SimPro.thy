@@ -20,14 +20,6 @@ primrec semantics :: "model \<Rightarrow> environment \<Rightarrow> nnf \<Righta
   "semantics m e (Uni p) = (\<forall>z \<in> fst m. semantics m (\<lambda>x. case x of 0 \<Rightarrow> z | Suc n \<Rightarrow> e n) p)" |
   "semantics m e (Exi p) = (\<exists>z \<in> fst m. semantics m (\<lambda>x. case x of 0 \<Rightarrow> z | Suc n \<Rightarrow> e n) p)"
 
-type_synonym sequent = "(nat \<times> nnf) list"
-
-definition make_sequent :: "nnf list \<Rightarrow> sequent" where
-  "make_sequent l \<equiv> map (\<lambda>p. (0,p)) l"
-
-definition list_sequent :: "sequent \<Rightarrow> nnf list" where
-  "list_sequent s \<equiv> map snd s"
-
 primrec member :: "'a \<Rightarrow> 'a list \<Rightarrow> bool" where
   "member _ [] = False" |
   "member a (h # t) = (if a = h then True else member a t)"
@@ -64,12 +56,14 @@ primrec subst :: "(nat \<Rightarrow> nat) \<Rightarrow> nnf \<Rightarrow> nnf" w
 definition bind :: "nnf \<Rightarrow> nat \<Rightarrow> nnf" where
   "bind p y \<equiv> subst (\<lambda>x. case x of 0 \<Rightarrow> y | Suc n \<Rightarrow> n) p"
 
+type_synonym sequent = "(nat \<times> nnf) list"
+
 definition inference :: "sequent \<Rightarrow> sequent list" where
   "inference s \<equiv> case s of [] \<Rightarrow> [[]] | (n,h) # t \<Rightarrow> (case h of
-    Pre b i v \<Rightarrow> if member (Pre (\<not> b) i v) (list_sequent t) then [] else [t @ [(0,Pre b i v)]] |
+    Pre b i v \<Rightarrow> if member (Pre (\<not> b) i v) (map snd t) then [] else [t @ [(0,Pre b i v)]] |
     Con p q \<Rightarrow> [t @ [(0,p)],t @ [(0,q)]] |
     Dis p q \<Rightarrow> [t @ [(0,p),(0,q)]] |
-    Uni p \<Rightarrow> [t @ [(0,bind p (fresh ((flatten \<circ> map fv) (list_sequent s))))]] |
+    Uni p \<Rightarrow> [t @ [(0,bind p (fresh ((flatten \<circ> map fv) (map snd s))))]] |
     Exi p \<Rightarrow> [t @ [(0,bind p n),(Suc n,h)]])"
 
 primrec repeat :: "('a \<Rightarrow> 'a) \<Rightarrow> 'a \<Rightarrow> nat \<Rightarrow> 'a" where
@@ -80,7 +74,7 @@ definition prover :: "sequent list \<Rightarrow> bool" where
   "prover a \<equiv> \<exists>n. repeat (flatten \<circ> map inference) a n = []"
 
 definition check :: "nnf \<Rightarrow> bool" where
-  "check p \<equiv> prover [make_sequent [p]]"
+  "check p \<equiv> prover [[(0,p)]]"
 
 abbreviation(input) "CHECK \<equiv> check = (\<lambda>p. \<forall>m e. is_model_environment m e \<longrightarrow> semantics m e p)"
 
@@ -104,12 +98,12 @@ definition test :: "nnf" where
     (Uni (Con (Pre False ''P'' [0]) (Pre False ''Q'' [0])))
     (Dis (Exi (Pre True ''Q'' [0])) (Exi (Pre True ''P'' [0])))"
 
-lemmas simps = list_sequent_def fresh_def bind_def inference_def comp_def snd_def
+lemmas simps = fresh_def bind_def inference_def comp_def snd_def
   nnf.simps member.simps flatten.simps cut.simps fv.simps maxlist.simps subst.simps
   nat.simps append.simps list.simps prod.simps if_P if_cancel simp_thms
 
 proposition "check test"
-unfolding check_def make_sequent_def test_def
+unfolding check_def test_def
 by (simp only: prover simps)
 
 section "Inductive definition"
@@ -125,7 +119,7 @@ primrec semantics_alternative :: "model \<Rightarrow> environment \<Rightarrow> 
 definition valid :: "nnf list \<Rightarrow> bool" where
   "valid l = (\<forall>m e. is_model_environment m e \<longrightarrow> semantics_alternative m e l)"
 
-abbreviation(input) "VALID \<equiv> valid = finite \<circ> calculation \<circ> make_sequent"
+abbreviation(input) "VALID \<equiv> valid = finite \<circ> calculation \<circ> (map (Pair 0))"
 
 lemma "\<forall>m. \<forall>e. is_model_environment m e \<longrightarrow> fst m \<noteq> {}"
   using is_model_environment_def by auto
@@ -134,6 +128,12 @@ lemma "\<exists>m. \<forall>e. is_model_environment m e \<and> infinite (fst m)"
   using is_model_environment_def infinite_UNIV_listI by auto
 
 section "Basics"
+
+definition make_sequent :: "nnf list \<Rightarrow> sequent" where
+  "make_sequent l = map (\<lambda>p. (0,p)) l"
+
+definition list_sequent :: "sequent \<Rightarrow> nnf list" where
+  "list_sequent s = map snd s"
 
 definition fv_list :: "nnf list \<Rightarrow> nat list" where
   "fv_list \<equiv> flatten \<circ> map fv"
@@ -678,7 +678,7 @@ lemma contains_propagates_Uni:
   assumes "f = failing_path (calculation s)"
   and "infinite (calculation s)"
   and "contains f n (0,Uni p)"
-  shows "(\<exists>y. contains f (Suc(n+y)) (0,bind p (fresh (fv_list (list_sequent (snd (f (n+y))))))))"
+  shows "(\<exists>y. contains f (Suc(n+y)) (0,bind p (fresh (fv_list (map snd (snd (f (n+y))))))))"
   proof -
     have "(\<exists>l. considers f (n+l) (0,Uni p))" using assms contains_considers by blast
     then obtain l where 1: "considers f (n+l) (0,Uni p)" by blast
@@ -863,18 +863,18 @@ lemma model':
           proof -
             assume 1: "size p = n" and 2: "contains f na (m,p)"
             then have "m = 0" using assms Uni is_Exi not_is_Exi by simp
-            then have "\<exists>y. contains f (Suc (na + y)) (0,bind q (fresh (fv_list (list_sequent (snd (f (na + y)))))))"
+            then have "\<exists>y. contains f (Suc (na + y)) (0,bind q (fresh (fv_list (map snd (snd (f (na + y)))))))"
               using assms Uni 2 contains_propagates_Uni by simp
-            then obtain y where 3: "contains f (Suc (na + y)) (0,bind q (fresh (fv_list (list_sequent (snd (f (na + y)))))))"
+            then obtain y where 3: "contains f (Suc (na + y)) (0,bind q (fresh (fv_list (map snd (snd (f (na + y)))))))"
               by blast
             have 4: "Suc (size q) = n" using Uni 1 by simp
             then show ?thesis using Uni proof (simp)
               show "\<exists>z\<in>fst (model s). \<not> semantics (model s) (case_nat z ntou) q"
-              proof (rule_tac x="ntou (fresh (fv_list (list_sequent (snd (f (na + y))))))" in bexI)
-                show "\<not> semantics (model s) (case_nat (ntou (fresh (fv_list (list_sequent (snd (f (na + y))))))) ntou) q"
+              proof (rule_tac x="ntou (fresh (fv_list (map snd (snd (f (na + y))))))" in bexI)
+                show "\<not> semantics (model s) (case_nat (ntou (fresh (fv_list (map snd (snd (f (na + y))))))) ntou) q"
                   using * 3 4 eval_bind size_bind lessI by metis
               next
-                show "ntou (fresh (fv_list (list_sequent (snd (f (na + y)))))) \<in> fst (model s)"
+                show "ntou (fresh (fv_list (map snd (snd (f (na + y)))))) \<in> fst (model s)"
                   using is_env_model_ntou is_model_environment_def by blast
               qed
             qed
@@ -999,8 +999,9 @@ lemmas magic = soundness completeness finite_calculation_prover
 
 theorem correctness: CHECK VALID
 proof -
-  have CHECK using magic check_def valid_def semantics_alternative.simps by metis
-  also have VALID using magic by force
+  have xxx: "\<forall>p. [[(0,p)]] = [map (Pair 0) [p]]" by simp  
+  have CHECK using magic check_def valid_def semantics_alternative.simps by (metis xxx make_sequent_def)
+  also have VALID using magic make_sequent_def by force
   then show CHECK VALID using calculation by simp_all
 qed
 
@@ -1020,10 +1021,6 @@ ML
 
 datatype nnf = Pre of bool * string * int list |
                Con of nnf * nnf | Dis of nnf * nnf | Uni of nnf | Exi of nnf
-
-fun make_sequent l = map (fn p => (0,p)) l
-
-fun list_sequent s = map (fn (_,p) => p) s
 
 fun member _ [] = false
   | member a (h :: t) = if a = h then true else member a t
@@ -1056,15 +1053,15 @@ fun subst f (Pre (b,i,v)) = Pre (b,i,map f v)
 fun bind p y = subst (fn 0 => y | n => n - 1) p
 
 fun inference s = case s of [] => [[]] | (n,h) :: t => case h of Pre (b,i,v) =>
-  if member (Pre (not b,i,v)) (list_sequent t) then [] else [t @ [(0,Pre (b,i,v))]]
+  if member (Pre (not b,i,v)) (map snd t) then [] else [t @ [(0,Pre (b,i,v))]]
     | Con (p,q) => [t @ [(0,p)],t @ [(0,q)]]
     | Dis (p,q) => [t @ [(0,p),(0,q)]]
-    | Uni p => [t @ [(0,bind p (fresh ((flatten o map fv) (list_sequent s))))]]
+    | Uni p => [t @ [(0,bind p (fresh ((flatten o map fv) (map snd s))))]]
     | Exi p => [t @ [(0,bind p n),(n + 1,h)]]
 
 fun prover a = if a = [] then () else prover ((flatten o map inference) a)
 
-fun check p = prover [make_sequent [p]]
+fun check p = prover [[(0,p)]]
 
 val test = Dis (Uni (Con (Pre (false,"P",[0]),Pre (false,"Q",[0]))),
                 Dis (Exi (Pre (true,"Q",[0])),Exi (Pre (true,"P",[0]))))
@@ -1072,6 +1069,8 @@ val test = Dis (Uni (Con (Pre (false,"P",[0]),Pre (false,"Q",[0]))),
 val () = check test
 
 *}
+
+end
 
 (*
 
@@ -1098,5 +1097,3 @@ val () = SimPro_check SimPro_test
 \<close>
 
 *)
-
-end
