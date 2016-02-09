@@ -1,7 +1,6 @@
-theory SimPro imports Main
-begin
-
 section \<open>A Simple Prover\<close>
+
+theory SimPro imports Main begin
 
 datatype nnf = Pre bool string "nat list" | Con nnf nnf | Dis nnf nnf | Uni nnf | Exi nnf
 
@@ -11,84 +10,71 @@ type_synonym model = "proxy set \<times> (string \<Rightarrow> proxy list \<Righ
 
 type_synonym environment = "nat \<Rightarrow> proxy"
 
-definition is_model_environment :: "model \<Rightarrow> environment \<Rightarrow> bool"
-where
+definition is_model_environment :: "model \<Rightarrow> environment \<Rightarrow> bool" where
   "is_model_environment m e \<equiv> \<forall>n. e n \<in> fst m"
 
-primrec semantics :: "model \<Rightarrow> environment \<Rightarrow> nnf \<Rightarrow> bool"
-where
-  "semantics m e (Pre b i v) = (b = snd m i (map e v))"
-| "semantics m e (Con p q) = (semantics m e p \<and> semantics m e q)"
-| "semantics m e (Dis p q) = (semantics m e p \<or> semantics m e q)"
-| "semantics m e (Uni p) = (\<forall>z \<in> fst m. semantics m (\<lambda>x. case x of 0 \<Rightarrow> z | Suc n \<Rightarrow> e n) p)"
-| "semantics m e (Exi p) = (\<exists>z \<in> fst m. semantics m (\<lambda>x. case x of 0 \<Rightarrow> z | Suc n \<Rightarrow> e n) p)"
+primrec semantics :: "model \<Rightarrow> environment \<Rightarrow> nnf \<Rightarrow> bool" where
+  "semantics m e (Pre b i v) = (b = snd m i (map e v))" |
+  "semantics m e (Con p q) = (semantics m e p \<and> semantics m e q)" |
+  "semantics m e (Dis p q) = (semantics m e p \<or> semantics m e q)" |
+  "semantics m e (Uni p) = (\<forall>z \<in> fst m. semantics m (\<lambda>x. case x of 0 \<Rightarrow> z | Suc n \<Rightarrow> e n) p)" |
+  "semantics m e (Exi p) = (\<exists>z \<in> fst m. semantics m (\<lambda>x. case x of 0 \<Rightarrow> z | Suc n \<Rightarrow> e n) p)"
 
 type_synonym sequent = "(nat \<times> nnf) list"
 
-definition make_sequent :: "nnf list \<Rightarrow> sequent"
-where
+definition make_sequent :: "nnf list \<Rightarrow> sequent" where
   "make_sequent l \<equiv> map (\<lambda>p. (0,p)) l"
 
-definition list_sequent :: "sequent \<Rightarrow> nnf list"
-where
+definition list_sequent :: "sequent \<Rightarrow> nnf list" where
   "list_sequent s \<equiv> map snd s"
 
-primrec member :: "'a => 'a list => bool"
-where
-  "member _ [] = False"
-| "member a (h # t) = (if a = h then True else member a t)"
+primrec member :: "'a \<Rightarrow> 'a list \<Rightarrow> bool" where
+  "member _ [] = False" |
+  "member a (h # t) = (if a = h then True else member a t)"
 
-primrec flatten :: "'a list list \<Rightarrow> 'a list"
-where
-  "flatten [] = []"
-| "flatten (h # t) = h @ flatten t"
+primrec flatten :: "'a list list \<Rightarrow> 'a list" where
+  "flatten [] = []" |
+  "flatten (h # t) = h @ flatten t"
 
-primrec cut :: "nat list \<Rightarrow> nat list"
-where
-  "cut [] = []"
-| "cut (h # t) = (case h of 0 \<Rightarrow> cut t | Suc n \<Rightarrow> n # cut t)"
+primrec cut :: "nat list \<Rightarrow> nat list" where
+  "cut [] = []" |
+  "cut (h # t) = (case h of 0 \<Rightarrow> cut t | Suc n \<Rightarrow> n # cut t)"
 
-primrec fv :: "nnf \<Rightarrow> nat list"
-where
-  "fv (Pre _ _ v) = v"
-| "fv (Con p q) = fv p @ fv q"
-| "fv (Dis p q) = fv p @ fv q"
-| "fv (Uni p) = cut (fv p)"
-| "fv (Exi p) = cut (fv p)"
+primrec fv :: "nnf \<Rightarrow> nat list" where
+  "fv (Pre _ _ v) = v" |
+  "fv (Con p q) = fv p @ fv q" |
+  "fv (Dis p q) = fv p @ fv q" |
+  "fv (Uni p) = cut (fv p)" |
+  "fv (Exi p) = cut (fv p)"
 
-primrec maxlist :: "nat list \<Rightarrow> nat"
-where
-  "maxlist [] = 0"
-| "maxlist (h # t) = max h (maxlist t)"
+primrec maxlist :: "nat list \<Rightarrow> nat" where
+  "maxlist [] = 0" |
+  "maxlist (h # t) = max h (maxlist t)"
 
-definition fresh :: "nat list \<Rightarrow> nat"
-where
+definition fresh :: "nat list \<Rightarrow> nat" where
   "fresh l \<equiv> if l = [] then 0 else Suc (maxlist l)"
 
-primrec subst :: "(nat \<Rightarrow> nat) \<Rightarrow> nnf \<Rightarrow> nnf"
-where
-  "subst f (Pre b i v) = Pre b i (map f v)"
-| "subst f (Con p q) = Con (subst f p) (subst f q)"
-| "subst f (Dis p q) = Dis (subst f p) (subst f q)"
-| "subst f (Uni p) = Uni (subst (\<lambda>x. case x of 0 \<Rightarrow> 0 | Suc n \<Rightarrow> Suc (f n)) p)"
-| "subst f (Exi p) = Exi (subst (\<lambda>x. case x of 0 \<Rightarrow> 0 | Suc n \<Rightarrow> Suc (f n)) p)"
+primrec subst :: "(nat \<Rightarrow> nat) \<Rightarrow> nnf \<Rightarrow> nnf" where
+  "subst f (Pre b i v) = Pre b i (map f v)" |
+  "subst f (Con p q) = Con (subst f p) (subst f q)" |
+  "subst f (Dis p q) = Dis (subst f p) (subst f q)" |
+  "subst f (Uni p) = Uni (subst (\<lambda>x. case x of 0 \<Rightarrow> 0 | Suc n \<Rightarrow> Suc (f n)) p)" |
+  "subst f (Exi p) = Exi (subst (\<lambda>x. case x of 0 \<Rightarrow> 0 | Suc n \<Rightarrow> Suc (f n)) p)"
 
-definition bind :: "nnf \<Rightarrow> nat \<Rightarrow> nnf"
-where
+definition bind :: "nnf \<Rightarrow> nat \<Rightarrow> nnf" where
   "bind p y \<equiv> subst (\<lambda>x. case x of 0 \<Rightarrow> y | Suc n \<Rightarrow> n) p"
 
-definition inference :: "sequent \<Rightarrow> sequent list"
-where
+definition inference :: "sequent \<Rightarrow> sequent list" where
   "inference s \<equiv> case s of [] \<Rightarrow> [[]] | (n,h) # t \<Rightarrow> (case h of
-    Pre b i v \<Rightarrow> if member (Pre (\<not> b) i v) (list_sequent t) then [] else [t @ [(0,Pre b i v)]]
-  | Con p q \<Rightarrow> [t @ [(0,p)],t @ [(0,q)]]
-  | Dis p q \<Rightarrow> [t @ [(0,p),(0,q)]]
-  | Uni p \<Rightarrow> [t @ [(0,bind p (fresh ((flatten \<circ> map fv) (list_sequent s))))]]
-  | Exi p \<Rightarrow> [t @ [(0,bind p n),(Suc n,h)]])"
+    Pre b i v \<Rightarrow> if member (Pre (\<not> b) i v) (list_sequent t) then [] else [t @ [(0,Pre b i v)]] |
+    Con p q \<Rightarrow> [t @ [(0,p)],t @ [(0,q)]] |
+    Dis p q \<Rightarrow> [t @ [(0,p),(0,q)]] |
+    Uni p \<Rightarrow> [t @ [(0,bind p (fresh ((flatten \<circ> map fv) (list_sequent s))))]] |
+    Exi p \<Rightarrow> [t @ [(0,bind p n),(Suc n,h)]])"
 
 primrec repeat :: "('a \<Rightarrow> 'a) \<Rightarrow> 'a \<Rightarrow> nat \<Rightarrow> 'a" where
-  "repeat _ a 0 = a"
-| "repeat f a (Suc n) = f (repeat f a n)"
+  "repeat _ a 0 = a" |
+  "repeat f a (Suc n) = f (repeat f a n)"
 
 definition prover :: "sequent list \<Rightarrow> bool" where
   "prover a \<equiv> \<exists>n. repeat (flatten \<circ> map inference) a n = []"
@@ -99,32 +85,32 @@ definition check :: "nnf \<Rightarrow> bool" where
 abbreviation(input) "CHECK \<equiv> check = (\<lambda>p. \<forall>m e. is_model_environment m e \<longrightarrow> semantics m e p)"
 
 lemma repeat: "repeat f (f a) n = f (repeat f a n)"
-  by (induct n) auto
+by (induct n) auto
 
 proposition "(\<exists>n. r (repeat f a n)) = (if r a then True else (\<exists>n. r (repeat f (f a) n)))"
-  by (metis repeat.simps repeat not0_implies_Suc)
+by (metis repeat.simps repeat not0_implies_Suc)
 
 lemma prover: "prover []" "prover (h # t) = prover (inference h @ (flatten \<circ> map inference) t)"
-  unfolding prover_def comp_def
-  by (metis repeat.simps(1),metis (no_types,lifting) repeat.simps(2) repeat list.map flatten.simps)
+unfolding prover_def comp_def
+by (metis repeat.simps(1),metis (no_types,lifting) repeat.simps(2) repeat list.map flatten.simps)
 
 abbreviation(input) "TEST P Q \<equiv> (\<exists>x. P x \<or> Q x) \<longrightarrow> (\<exists>x. Q x) \<or> (\<exists>x. P x)"
 
 proposition "TEST P Q" "TEST P Q = (\<forall>x. \<not> P x \<and> \<not> Q x) \<or> (\<exists>x. Q x) \<or> (\<exists>x. P x)"
-  by (iprover,fast)
+by (iprover,fast)
 
-definition test :: "nnf"
-where
+definition test :: "nnf" where
   "test \<equiv> Dis
     (Uni (Con (Pre False ''P'' [0]) (Pre False ''Q'' [0])))
     (Dis (Exi (Pre True ''Q'' [0])) (Exi (Pre True ''P'' [0])))"
 
 lemmas simps = list_sequent_def fresh_def bind_def inference_def comp_def snd_def
   nnf.simps member.simps flatten.simps cut.simps fv.simps maxlist.simps subst.simps
-  nat.simps append.simps list.simps prod.simps if_True if_False if_cancel simp_thms
+  nat.simps append.simps list.simps prod.simps if_P if_cancel simp_thms
 
 proposition "check test"
-  unfolding check_def make_sequent_def test_def by (simp only: prover simps)
+unfolding check_def make_sequent_def test_def
+by (simp only: prover simps)
 
 section "Inductive definition"
 
@@ -1026,9 +1012,11 @@ proof -
     unfolding correctness using magic check_def correctness(1) by (auto,metis) 
 qed
 
-section "Code"
+section "Appendix"
 
-ML \<open>
+ML
+
+{*
 
 datatype nnf = Pre of bool * string * int list |
                Con of nnf * nnf | Dis of nnf * nnf | Uni of nnf | Exi of nnf
@@ -1083,9 +1071,7 @@ val test = Dis (Uni (Con (Pre (false,"P",[0]),Pre (false,"Q",[0]))),
 
 val () = check test
 
-\<close>
-
-section "Appendix"
+*}
 
 (*
 
