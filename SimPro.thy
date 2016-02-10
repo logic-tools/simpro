@@ -2,7 +2,9 @@ section \<open>A Simple Prover\<close>
 
 theory SimPro imports Main begin
 
-abbreviation(input) "TEST P Q \<equiv> (\<exists>x. P x \<or> Q x) \<longrightarrow> (\<exists>x. Q x) \<or> (\<exists>x. P x)"
+datatype nnf = Pre bool "char list" "nat list" | Con nnf nnf | Dis nnf nnf | Uni nnf | Exi nnf
+
+abbreviation (input) "TEST P Q \<equiv> (\<exists>x. P x \<or> Q x) \<longrightarrow> (\<exists>x. Q x) \<or> (\<exists>x. P x)"
 
 proposition "TEST P Q"
 by iprover
@@ -10,16 +12,14 @@ by iprover
 proposition "TEST P Q = (\<forall>x. \<not> P x \<and> \<not> Q x) \<or> (\<exists>x. Q x) \<or> (\<exists>x. P x)"
 by fast
 
-datatype nnf = Pre bool string "nat list" | Con nnf nnf | Dis nnf nnf | Uni nnf | Exi nnf
-
-definition test :: "nnf" where
+definition \<comment> \<open>TEST P Q\<close>
   "test \<equiv> Dis
-    (Uni (Con (Pre False ''P'' [0]) (Pre False ''Q'' [0])))
+    (Uni (Con (Pre False ''P'' [0]) (Pre False ''Q'' [0]))) 
     (Dis (Exi (Pre True ''Q'' [0])) (Exi (Pre True ''P'' [0])))"
 
 type_synonym proxy = "unit list"
 
-type_synonym model = "proxy set \<times> (string \<Rightarrow> proxy list \<Rightarrow> bool)"
+type_synonym model = "proxy set \<times> (char list \<Rightarrow> proxy list \<Rightarrow> bool)"
 
 type_synonym environment = "nat \<Rightarrow> proxy"
 
@@ -89,10 +89,31 @@ definition prover :: "sequent list \<Rightarrow> bool" where
 definition check :: "nnf \<Rightarrow> bool" where
   "check p \<equiv> prover [[(0,p)]]"
 
-abbreviation(input) "CHECK \<equiv> check = (\<lambda>p. \<forall>m e. is_model_environment m e \<longrightarrow> semantics m e p)"
+abbreviation (input) "CHECK \<equiv> check = (\<lambda>p. \<forall>m e. is_model_environment m e \<longrightarrow> semantics m e p)"
+
+inductive_set calculation :: "sequent \<Rightarrow> (nat \<times> sequent) set" for s where
+  init[intro]: "(0,s) \<in> calculation s" |
+  step[intro]: "(n,k) \<in> calculation s \<Longrightarrow> l \<in> set (inference k) \<Longrightarrow> (Suc n,l) \<in> calculation s"
+
+primrec semantics_alternative :: "model \<Rightarrow> environment \<Rightarrow> nnf list \<Rightarrow> bool" where
+  "semantics_alternative _ _ [] = False" |
+  "semantics_alternative m e (h # t) = (semantics m e h \<or> semantics_alternative m e t)"
+
+definition valid :: "nnf list \<Rightarrow> bool" where
+  "valid l \<equiv> \<forall>m e. is_model_environment m e \<longrightarrow> semantics_alternative m e l"
+
+abbreviation (input) "VALID \<equiv> valid = finite \<circ> calculation \<circ> map (Pair 0)"
+
+proposition "\<forall>m e. is_model_environment m e \<longrightarrow> fst m \<noteq> {}"
+using is_model_environment_def
+by fast
+
+proposition "\<exists>m. \<forall>e. is_model_environment m e \<and> infinite (fst m)"
+using is_model_environment_def infinite_UNIV_listI
+by auto
 
 lemma repeat: "repeat f (f a) n = f (repeat f a n)"
-by (induct n) auto
+by (induct n) simp_all
 
 proposition "(\<exists>n. r (repeat f a n)) = (if r a then True else (\<exists>n. r (repeat f (f a) n)))"
 by (metis repeat.simps repeat not0_implies_Suc)
@@ -101,34 +122,13 @@ lemma prover: "prover []" "prover (h # t) = prover (inference h @ (flatten \<cir
 unfolding prover_def comp_def
 by (metis repeat.simps(1),metis (no_types,lifting) repeat.simps(2) repeat list.map flatten.simps)
 
-lemmas simps = fresh_def bind_def inference_def comp_def snd_def
+lemmas simps = prover fresh_def bind_def inference_def comp_def snd_def
   nnf.simps member.simps flatten.simps cut.simps fv.simps maxlist.simps subst.simps
   nat.simps append.simps list.simps prod.simps if_True if_False if_cancel simp_thms
 
 proposition "check test"
 unfolding check_def test_def
-by (simp only: prover simps)
-
-section "Inductive definition"
-
-inductive_set calculation :: "sequent \<Rightarrow> (nat \<times> sequent) set" for s :: sequent where
-  init[intro]: "(0,s) \<in> calculation s"
-| step[intro]: "(n,k) \<in> calculation s \<Longrightarrow> l \<in> set (inference k) \<Longrightarrow> (Suc n,l) \<in> calculation s"
-
-primrec semantics_alternative :: "model \<Rightarrow> environment \<Rightarrow> nnf list \<Rightarrow> bool" where
-  "semantics_alternative _ _ [] = False"
-| "semantics_alternative m e (h # t) = (semantics m e h \<or> semantics_alternative m e t)"
-
-definition valid :: "nnf list \<Rightarrow> bool" where
-  "valid l = (\<forall>m e. is_model_environment m e \<longrightarrow> semantics_alternative m e l)"
-
-abbreviation(input) "VALID \<equiv> valid = finite \<circ> calculation \<circ> (map (Pair 0))"
-
-lemma "\<forall>m. \<forall>e. is_model_environment m e \<longrightarrow> fst m \<noteq> {}"
-  using is_model_environment_def by auto
-
-lemma "\<exists>m. \<forall>e. is_model_environment m e \<and> infinite (fst m)"
-  using is_model_environment_def infinite_UNIV_listI by auto
+by (simp only: simps)
 
 section "Basics"
 
@@ -1022,8 +1022,11 @@ ML
 
 {*
 
-datatype nnf = Pre of bool * string * int list |
-               Con of nnf * nnf | Dis of nnf * nnf | Uni of nnf | Exi of nnf
+datatype nnf = Pre of bool * string * int list | Con of nnf * nnf | Uni of nnf
+                                               | Dis of nnf * nnf | Exi of nnf
+
+val test = Dis (Uni (Con (Pre (false,"P",[0]),Pre (false,"Q",[0]))),
+                Dis (Exi (Pre (true,"Q",[0])),Exi (Pre (true,"P",[0]))))
 
 fun member _ [] = false
   | member a (h :: t) = if a = h then true else member a t
@@ -1066,9 +1069,6 @@ fun prover a = if a = [] then () else prover ((flatten o map inference) a)
 
 fun check p = prover [[(0,p)]]
 
-val test = Dis (Uni (Con (Pre (false,"P",[0]),Pre (false,"Q",[0]))),
-                Dis (Exi (Pre (true,"Q",[0])),Exi (Pre (true,"P",[0]))))
-
 val () = check test
 
 *}
@@ -1089,7 +1089,7 @@ SML_export "val SimPro_inference = SimPro.inference"
 
 SML_export "val SimPro_test = SimPro.test"
 
-ML \<open>
+ML {*
 
 fun SimPro_prover a = if a = () then true else SimPro_prover ((SimPro_flatten o map SimPro_inference) a);
 
@@ -1097,6 +1097,6 @@ fun SimPro_check p = SimPro_prover [SimPro_make_sequent [p]]
 
 val () = SimPro_check SimPro_test
 
-\<close>
+*}
 
 *)
