@@ -54,12 +54,16 @@ primrec subst :: "(nat \<Rightarrow> nat) \<Rightarrow> nnf \<Rightarrow> nnf" w
 definition bind :: "nnf \<Rightarrow> nat \<Rightarrow> nnf" where
   "bind p y \<equiv> subst (\<lambda>x. case x of 0 \<Rightarrow> y | Suc n \<Rightarrow> n) p"
 
-primrec maxlist :: "nat list \<Rightarrow> nat" where
-  "maxlist [] = 0" |
-  "maxlist (h # t) = max h (maxlist t)"
+primrec maximum2 :: "nat \<Rightarrow> nat \<Rightarrow> nat" where
+  "maximum2 0 n = n" |
+  "maximum2 (Suc n) n' = Suc (case n' of 0 \<Rightarrow> n | Suc n'' \<Rightarrow> maximum2 n n'')"
+
+primrec maximum :: "nat list \<Rightarrow> nat" where
+  "maximum [] = 0" |
+  "maximum (h # t) = maximum2 h (maximum t)"
 
 definition fresh :: "nat list \<Rightarrow> nat" where
-  "fresh l \<equiv> if l = [] then 0 else Suc (maxlist l)"
+  "fresh l \<equiv> if l = [] then 0 else Suc (maximum l)"
 
 primrec flatten :: "'a list list \<Rightarrow> 'a list" where
   "flatten [] = []" |
@@ -125,11 +129,11 @@ lemma prover: "prover []" "prover (h # t) = prover (solve h @ all solve t)"
 unfolding prover_def
 by (metis repeat.simps(1),metis (no_types,lifting) repeat.simps(2) repeat list.map flatten.simps all_def)
 
-lemma fff: "fresh l = (if l = [] then 0 else Suc (maxlist l))" using fresh_def by simp
+lemma fff: "fresh l = (if l = [] then 0 else Suc (maximum l))" using fresh_def by simp
 
 lemmas simps = prover nnf.case nat.case prod.case list.case
   fff bind_def solve_def all_def snd_def list.map
-  adjust.simps fv.simps maxlist.simps subst.simps flatten.simps member.simps append.simps
+  adjust.simps fv.simps maximum2.simps maximum.simps subst.simps flatten.simps member.simps append.simps
   if_True if_False if_cancel not_True_eq_False not_False_eq_True simp_thms(6)
 
 print_theorems
@@ -139,6 +143,9 @@ unfolding check_def test_def
 by (simp only: simps)
 
 section "Basics"
+
+lemma mmm[simp]: "(maximum2 n n') = (max n n')"
+by (induct n arbitrary: n') (simp_all add: Nitpick.case_nat_unfold max_Suc1)
 
 lemma all: "all f = (flatten \<circ> map f)" using all_def comp_apply by fastforce
 
@@ -406,11 +413,11 @@ lemma index0:
     qed
   qed
 
-lemma maxlist: "\<forall>v \<in> set l. v \<le> maxlist l"
+lemma maximum: "\<forall>v \<in> set l. v \<le> maximum l"
   by (induct l) (auto simp: max_def)
 
 lemma fresh: "fresh l \<notin> (set l)"
-  using length_pos_if_in_set maxlist fresh_def by fastforce
+  using length_pos_if_in_set maximum fresh_def by fastforce
 
 lemma soundness':
   assumes "init s"
@@ -1047,12 +1054,12 @@ fun fv (Pre (_,_,v)) = v
   | fv (Uni p) = adjust (fv p)
   | fv (Exi p) = adjust (fv p)
 
-fun max x y = if x > y then x else y
+fun maximum2 x y = if x > y then x else y
 
-fun maxlist [] = 0
-  | maxlist (h :: t) = max h (maxlist t)
+fun maximum [] = 0
+  | maximum (h :: t) = maximum2 h (maximum t)
 
-fun fresh l = if l = [] then 0 else (maxlist l) + 1
+fun fresh l = if l = [] then 0 else (maximum l) + 1
 
 fun subst f (Pre (b,i,v)) = Pre (b,i,map f v)
   | subst f (Con (p,q)) = Con (subst f p,subst f q)
