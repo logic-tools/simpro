@@ -125,16 +125,55 @@ by (induct n) simp_all
 proposition "(\<exists>n. r (repeat f a n)) = (if r a then True else (\<exists>n. r (repeat f (f a) n)))"
 by (metis repeat.simps repeat not0_implies_Suc)
 
+lemma case_nff:
+"(case Pre b i v of Pre b' i' v' \<Rightarrow> f b' i' v' | Con p' q' \<Rightarrow> f' p' q' | Dis p'' q'' \<Rightarrow> f'' p'' q'' | Uni p''' \<Rightarrow> f''' p''' | Exi p'''' \<Rightarrow> f'''' p'''') = (f b i v)"
+"(case Con p q of Pre b' i' v' \<Rightarrow> f b' i' v' | Con p' q' \<Rightarrow> f' p' q' | Dis p'' q'' \<Rightarrow> f'' p'' q'' | Uni p''' \<Rightarrow> f''' p''' | Exi p'''' \<Rightarrow> f'''' p'''') = (f' p q)"
+"(case Dis p q of Pre b' i' v' \<Rightarrow> f b' i' v' | Con p' q' \<Rightarrow> f' p' q' | Dis p'' q'' \<Rightarrow> f'' p'' q'' | Uni p''' \<Rightarrow> f''' p''' | Exi p'''' \<Rightarrow> f'''' p'''') = (f'' p q)"
+"(case Uni p of Pre b' i' v' \<Rightarrow> f b' i' v' | Con p' q' \<Rightarrow> f' p' q' | Dis p'' q'' \<Rightarrow> f'' p'' q'' | Uni p''' \<Rightarrow> f''' p''' | Exi p'''' \<Rightarrow> f'''' p'''') = (f''' p)"
+"(case Exi p of Pre b' i' v' \<Rightarrow> f b' i' v' | Con p' q' \<Rightarrow> f' p' q' | Dis p'' q'' \<Rightarrow> f'' p'' q'' | Uni p''' \<Rightarrow> f''' p''' | Exi p'''' \<Rightarrow> f'''' p'''') = (f'''' p)"
+by (rule nnf.case(1),rule nnf.case(2),rule nnf.case(3),rule nnf.case(4),rule nnf.case(5))
+
+lemma case_nat:
+"(case 0 of 0 \<Rightarrow> x | Suc n' \<Rightarrow> f n') = x"
+"(case Suc n of 0 \<Rightarrow> x | Suc n' \<Rightarrow> f n') = (f n)"
+by (rule nat.case(1),rule nat.case(2))
+
+lemma case_prod:
+"(case (x,y) of (x',y') \<Rightarrow> f x' y') = (f x y)"
+by (rule prod.case)
+
+lemma case_list:
+"(case [] of [] \<Rightarrow> x | h' # t' \<Rightarrow> f h' t') = x"
+"(case h # t of [] \<Rightarrow> x | h' # t' \<Rightarrow> f h' t') = (f h t)"
+by (rule list.case(1),rule list.case(2))
+
+lemma append: "[] @ l = l" "(h # t) @ l = h # t @ l"
+by (rule append.simps(1),rule append.simps(2))
+
+lemma map: "map f [] = []" "map f (h # t) = f h # map f t"
+by (rule list.map(1),rule list.map(2))
+
+lemma snd: "snd z = (case z of (x,y) \<Rightarrow> y)"
+by (rule snd_def)
+
+lemma boolean:
+"(if True then x else y) = x"
+"(if False then x else y) = y"
+"(if c then x else x) = x"
+"(\<not> True) = False"
+"(\<not> False) = True"
+by (rule if_True,rule if_False,rule if_cancel,rule not_True_eq_False,rule not_False_eq_True)
+
+lemma equality: "(x = x) = True"
+by iprover
+
 lemma prover: "prover []" "prover (h # t) = prover (solve h @ all solve t)"
 unfolding prover_def
-by (metis repeat.simps(1),metis (no_types,lifting) repeat.simps(2) repeat list.map flatten.simps all_def)
+by (metis repeat.simps(1),metis (no_types,lifting) repeat.simps(2) repeat map flatten.simps all_def)
 
-lemma fff: "fresh l = (if l = [] then 0 else Suc (maximum l))" using fresh_def by simp
-
-lemmas simps = prover nnf.case nat.case prod.case list.case
-  fff bind_def solve_def all_def snd_def list.map
-  adjust.simps fv.simps maximum2.simps maximum.simps subst.simps flatten.simps member.simps append.simps
-  if_True if_False if_cancel not_True_eq_False not_False_eq_True simp_thms(6)
+lemmas simps = prover case_nff case_nat case_prod case_list fresh_def bind_def all_def solve_def
+  adjust.simps fv.simps maximum2.simps maximum.simps subst.simps flatten.simps member.simps
+  append map snd boolean equality
 
 print_theorems
 
