@@ -62,8 +62,12 @@ primrec maximum :: "nat list \<Rightarrow> nat" where
   "maximum [] = 0" |
   "maximum (h # t) = maximum2 h (maximum t)"
 
+primrec null :: "'a list \<Rightarrow> bool" where
+  "null [] = True" |
+  "null (_ # _) = False"
+
 definition fresh :: "nat list \<Rightarrow> nat" where
-  "fresh l \<equiv> if l = [] then 0 else Suc (maximum l)"
+  "fresh l \<equiv> if null l then 0 else Suc (maximum l)"
 
 primrec flatten :: "'a list list \<Rightarrow> 'a list" where
   "flatten [] = []" |
@@ -125,7 +129,7 @@ by (induct n) simp_all
 proposition "(\<exists>n. r (repeat f a n)) = (if r a then True else (\<exists>n. r (repeat f (f a) n)))"
 by (metis repeat.simps repeat not0_implies_Suc)
 
-lemma case_nff:
+lemma case_nnf:
 "(case Pre b i v of Pre b' i' v' \<Rightarrow> f b' i' v' | Con p' q' \<Rightarrow> f' p' q' | Dis p'' q'' \<Rightarrow> f'' p'' q'' | Uni p''' \<Rightarrow> f''' p''' | Exi p'''' \<Rightarrow> f'''' p'''') = (f b i v)"
 "(case Con p q of Pre b' i' v' \<Rightarrow> f b' i' v' | Con p' q' \<Rightarrow> f' p' q' | Dis p'' q'' \<Rightarrow> f'' p'' q'' | Uni p''' \<Rightarrow> f''' p''' | Exi p'''' \<Rightarrow> f'''' p'''') = (f' p q)"
 "(case Dis p q of Pre b' i' v' \<Rightarrow> f b' i' v' | Con p' q' \<Rightarrow> f' p' q' | Dis p'' q'' \<Rightarrow> f'' p'' q'' | Uni p''' \<Rightarrow> f''' p''' | Exi p'''' \<Rightarrow> f'''' p'''') = (f'' p q)"
@@ -153,29 +157,35 @@ by (rule append.simps(1),rule append.simps(2))
 lemma map: "map f [] = []" "map f (h # t) = f h # map f t"
 by (rule list.map(1),rule list.map(2))
 
-lemma snd: "snd z = (case z of (x,y) \<Rightarrow> y)"
+lemma fst: "fst z = (case z of (x,_) \<Rightarrow> x)"
+by (rule fst_def)
+
+lemma snd: "snd z = (case z of (_,y) \<Rightarrow> y)"
 by (rule snd_def)
 
-lemma boolean:
+lemma if_rules:
 "(if True then x else y) = x"
 "(if False then x else y) = y"
-"(if c then x else x) = x"
+by (rule if_True,rule if_False)
+
+lemma boolean:
 "(\<not> True) = False"
 "(\<not> False) = True"
-by (rule if_True,rule if_False,rule if_cancel,rule not_True_eq_False,rule not_False_eq_True)
-
-lemma equality: "(x = x) = True"
-by iprover
+"(True \<and> P) = P"
+"(False \<and> P) = False"
+"(x = x) = True"
+"(h # t = h' # t') = (h = h' \<and> t = t')"
+"(CHR ''P'' = CHR ''Q'') = False"
+"(CHR ''Q'' = CHR ''P'') = False"
+by simp_all
 
 lemma prover: "prover []" "prover (h # t) = prover (solve h @ all solve t)"
 unfolding prover_def
 by (metis repeat.simps(1),metis (no_types,lifting) repeat.simps(2) repeat map flatten.simps all_def)
 
-lemmas simps = prover case_nff case_nat case_prod case_list fresh_def bind_def all_def solve_def
-  adjust.simps fv.simps maximum2.simps maximum.simps subst.simps flatten.simps member.simps
-  append map snd boolean equality
-
-print_theorems
+lemmas simps = prover case_nnf case_nat case_prod case_list bind_def fresh_def all_def solve_def
+  adjust.simps fv.simps maximum2.simps maximum.simps null.simps subst.simps flatten.simps member.simps
+  append map fst snd if_rules boolean nnf.inject nnf.distinct
 
 proposition "check test"
 unfolding check_def test_def
@@ -456,7 +466,7 @@ lemma maximum: "\<forall>v \<in> set l. v \<le> maximum l"
   by (induct l) (auto simp: max_def)
 
 lemma fresh: "fresh l \<notin> (set l)"
-  using length_pos_if_in_set maximum fresh_def by fastforce
+  using maximum fresh_def by (auto,metis null.simps(2) empty_iff list.exhaust list.set(1),force)
 
 lemma soundness':
   assumes "init s"
