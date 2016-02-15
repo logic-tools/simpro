@@ -54,20 +54,20 @@ primrec subst :: "(nat \<Rightarrow> nat) \<Rightarrow> nnf \<Rightarrow> nnf" w
 definition bind :: "nnf \<Rightarrow> nat \<Rightarrow> nnf" where
   "bind p y \<equiv> subst (\<lambda>x. case x of 0 \<Rightarrow> y | Suc n \<Rightarrow> n) p"
 
-primrec maximum2 :: "nat \<Rightarrow> nat \<Rightarrow> nat" where
-  "maximum2 0 n = n" |
-  "maximum2 (Suc n) n' = Suc (case n' of 0 \<Rightarrow> n | Suc n'' \<Rightarrow> maximum2 n n'')"
+primrec maxn :: "nat \<Rightarrow> nat \<Rightarrow> nat" where
+  "maxn 0 n = n" |
+  "maxn (Suc n) n' = Suc (case n' of 0 \<Rightarrow> n | Suc n'' \<Rightarrow> maxn n n'')"
 
-primrec maximum :: "nat list \<Rightarrow> nat" where
-  "maximum [] = 0" |
-  "maximum (h # t) = maximum2 h (maximum t)"
+primrec maxl :: "nat list \<Rightarrow> nat" where
+  "maxl [] = 0" |
+  "maxl (h # t) = maxn h (maxl t)"
 
 primrec null :: "'a list \<Rightarrow> bool" where
   "null [] = True" |
   "null (_ # _) = False"
 
 definition fresh :: "nat list \<Rightarrow> nat" where
-  "fresh l \<equiv> if null l then 0 else Suc (maximum l)"
+  "fresh l \<equiv> if null l then 0 else Suc (maxl l)"
 
 primrec flatten :: "'a list list \<Rightarrow> 'a list" where
   "flatten [] = []" |
@@ -123,18 +123,47 @@ proposition "\<exists>m. \<forall>e. is_model_environment m e \<and> infinite (f
 using is_model_environment_def infinite_UNIV_listI
 by auto
 
-lemma repeat: "repeat f (f a) n = f (repeat f a n)"
+lemma repeat_once: "repeat f (f a) n = f (repeat f a n)"
 by (induct n) simp_all
 
-proposition "(\<exists>n. r (repeat f a n)) = (if r a then True else (\<exists>n. r (repeat f (f a) n)))"
-by (metis repeat.simps repeat not0_implies_Suc)
+proposition "(\<exists>n. r (repeat f a n)) = (if r a then True else \<exists>n. r (repeat f (f a) n))"
+by (metis repeat.simps repeat_once not0_implies_Suc)
+
+lemma prover_simps: "prover [] = True" "prover (h # t) = prover (solve h @ all solve t)"
+unfolding prover_def
+by (metis repeat.simps(1),metis repeat.simps(2) repeat_once list.map flatten.simps all_def)
+
+lemma append_simps: "[] @ l = l" "(h # t) @ l = h # t @ l"
+by (rule append.simps(1),rule append.simps(2))
+
+lemma map_simps: "map f [] = []" "map f (h # t) = f h # map f t"
+by (rule list.map(1),rule list.map(2))
+
+lemma if_simps: "(if True then x else y) = x" "(if False then x else y) = y"
+by (rule if_True,rule if_False)
+
+lemma not_simps: "(\<not> True) = False" "(\<not> False) = True" "(\<not> \<not> b) = b"
+by (rule simp_thms,rule simp_thms,rule nnf_simps)
+
+lemma prod_simps: "fst z = (case z of (x,_) \<Rightarrow> x)" "snd z = (case z of (_,y) \<Rightarrow> y)"
+by (rule fst_def,rule snd_def)
 
 lemma case_nnf:
-"(case Pre b i v of Pre b' i' v' \<Rightarrow> f b' i' v' | Con p' q' \<Rightarrow> f' p' q' | Dis p'' q'' \<Rightarrow> f'' p'' q'' | Uni p''' \<Rightarrow> f''' p''' | Exi p'''' \<Rightarrow> f'''' p'''') = (f b i v)"
-"(case Con p q of Pre b' i' v' \<Rightarrow> f b' i' v' | Con p' q' \<Rightarrow> f' p' q' | Dis p'' q'' \<Rightarrow> f'' p'' q'' | Uni p''' \<Rightarrow> f''' p''' | Exi p'''' \<Rightarrow> f'''' p'''') = (f' p q)"
-"(case Dis p q of Pre b' i' v' \<Rightarrow> f b' i' v' | Con p' q' \<Rightarrow> f' p' q' | Dis p'' q'' \<Rightarrow> f'' p'' q'' | Uni p''' \<Rightarrow> f''' p''' | Exi p'''' \<Rightarrow> f'''' p'''') = (f'' p q)"
-"(case Uni p of Pre b' i' v' \<Rightarrow> f b' i' v' | Con p' q' \<Rightarrow> f' p' q' | Dis p'' q'' \<Rightarrow> f'' p'' q'' | Uni p''' \<Rightarrow> f''' p''' | Exi p'''' \<Rightarrow> f'''' p'''') = (f''' p)"
-"(case Exi p of Pre b' i' v' \<Rightarrow> f b' i' v' | Con p' q' \<Rightarrow> f' p' q' | Dis p'' q'' \<Rightarrow> f'' p'' q'' | Uni p''' \<Rightarrow> f''' p''' | Exi p'''' \<Rightarrow> f'''' p'''') = (f'''' p)"
+"(case Pre b i v of Pre b' i' v' \<Rightarrow> f b' i' v' |
+  Con p' q' \<Rightarrow> f' p' q' | Dis p'' q'' \<Rightarrow> f'' p'' q'' |
+  Uni p''' \<Rightarrow> f''' p''' | Exi p'''' \<Rightarrow> f'''' p'''') = (f b i v)"
+"(case Con p q of Pre b' i' v' \<Rightarrow> f b' i' v' |
+  Con p' q' \<Rightarrow> f' p' q' | Dis p'' q'' \<Rightarrow> f'' p'' q'' |
+  Uni p''' \<Rightarrow> f''' p''' | Exi p'''' \<Rightarrow> f'''' p'''') = (f' p q)"
+"(case Dis p q of Pre b' i' v' \<Rightarrow> f b' i' v' |
+  Con p' q' \<Rightarrow> f' p' q' | Dis p'' q'' \<Rightarrow> f'' p'' q'' |
+  Uni p''' \<Rightarrow> f''' p''' | Exi p'''' \<Rightarrow> f'''' p'''') = (f'' p q)"
+"(case Uni p of Pre b' i' v' \<Rightarrow> f b' i' v' |
+  Con p' q' \<Rightarrow> f' p' q' | Dis p'' q'' \<Rightarrow> f'' p'' q'' |
+  Uni p''' \<Rightarrow> f''' p''' | Exi p'''' \<Rightarrow> f'''' p'''') = (f''' p)"
+"(case Exi p of Pre b' i' v' \<Rightarrow> f b' i' v' |
+  Con p' q' \<Rightarrow> f' p' q' | Dis p'' q'' \<Rightarrow> f'' p'' q'' |
+  Uni p''' \<Rightarrow> f''' p''' | Exi p'''' \<Rightarrow> f'''' p'''') = (f'''' p)"
 by (rule nnf.case(1),rule nnf.case(2),rule nnf.case(3),rule nnf.case(4),rule nnf.case(5))
 
 lemma case_nat:
@@ -144,56 +173,33 @@ by (rule nat.case(1),rule nat.case(2))
 
 lemma case_prod:
 "(case (x,y) of (x',y') \<Rightarrow> f x' y') = (f x y)"
-by (rule prod.case)
+by (rule prod.case(1))
 
 lemma case_list:
 "(case [] of [] \<Rightarrow> x | h' # t' \<Rightarrow> f h' t') = x"
 "(case h # t of [] \<Rightarrow> x | h' # t' \<Rightarrow> f h' t') = (f h t)"
 by (rule list.case(1),rule list.case(2))
 
-lemma append: "[] @ l = l" "(h # t) @ l = h # t @ l"
-by (rule append.simps(1),rule append.simps(2))
+lemma reflexivity: "(x = x) = True"
+by (rule simp_thms)
 
-lemma map: "map f [] = []" "map f (h # t) = f h # map f t"
-by (rule list.map(1),rule list.map(2))
+lemma inject_simps: "(True \<and> P) = P" "(False \<and> P) = False"
+by (rule simp_thms,rule simp_thms)
 
-lemma fst: "fst z = (case z of (x,_) \<Rightarrow> x)"
-by (rule fst_def)
-
-lemma snd: "snd z = (case z of (_,y) \<Rightarrow> y)"
-by (rule snd_def)
-
-lemma if_rules:
-"(if True then x else y) = x"
-"(if False then x else y) = y"
-by (rule if_True,rule if_False)
-
-lemma boolean:
-"(\<not> True) = False"
-"(\<not> False) = True"
-"(True \<and> P) = P"
-"(False \<and> P) = False"
-"(x = x) = True"
-"(h # t = h' # t') = (h = h' \<and> t = t')"
-"(CHR ''P'' = CHR ''Q'') = False"
-"(CHR ''Q'' = CHR ''P'') = False"
-by simp_all
-
-lemma prover: "prover []" "prover (h # t) = prover (solve h @ all solve t)"
-unfolding prover_def
-by (metis repeat.simps(1),metis (no_types,lifting) repeat.simps(2) repeat map flatten.simps all_def)
-
-lemmas simps = prover case_nnf case_nat case_prod case_list bind_def fresh_def all_def solve_def
-  adjust.simps fv.simps maximum2.simps maximum.simps null.simps subst.simps flatten.simps member.simps
-  append map fst snd if_rules boolean nnf.inject nnf.distinct
+lemmas simps = prover_simps solve_def all_def fresh_def bind_def
+  append_simps map_simps if_simps not_simps prod_simps
+  member.simps flatten.simps null.simps maxl.simps maxn.simps subst.simps fv.simps adjust.simps
+  case_nnf case_nat case_prod case_list reflexivity
+  nnf.inject list.inject char.inject inject_simps
+  nnf.distinct list.distinct nibble.distinct
 
 proposition "check test"
 unfolding check_def test_def
-by (simp only: simps)
+by (simp only: simps(1-321))
 
 section "Basics"
 
-lemma mmm[simp]: "(maximum2 n n') = (max n n')"
+lemma mmm[simp]: "(maxn n n') = (max n n')"
 by (induct n arbitrary: n') (simp_all add: Nitpick.case_nat_unfold max_Suc1)
 
 lemma all: "all f = (flatten \<circ> map f)" using all_def comp_apply by fastforce
@@ -462,11 +468,11 @@ lemma index0:
     qed
   qed
 
-lemma maximum: "\<forall>v \<in> set l. v \<le> maximum l"
+lemma maxl: "\<forall>v \<in> set l. v \<le> maxl l"
   by (induct l) (auto simp: max_def)
 
 lemma fresh: "fresh l \<notin> (set l)"
-  using maximum fresh_def by (auto,metis null.simps(2) empty_iff list.exhaust list.set(1),force)
+  using maxl fresh_def by (auto,metis null.simps(2) empty_iff list.exhaust list.set(1),force)
 
 lemma soundness':
   assumes "init s"
@@ -1103,12 +1109,12 @@ fun fv (Pre (_,_,v)) = v
   | fv (Uni p) = adjust (fv p)
   | fv (Exi p) = adjust (fv p)
 
-fun maximum2 x y = if x > y then x else y
+fun maxn x y = if x > y then x else y
 
-fun maximum [] = 0
-  | maximum (h :: t) = maximum2 h (maximum t)
+fun maxl [] = 0
+  | maxl (h :: t) = maxn h (maxl t)
 
-fun fresh l = if l = [] then 0 else (maximum l) + 1
+fun fresh l = if l = [] then 0 else (maxl l) + 1
 
 fun subst f (Pre (b,i,v)) = Pre (b,i,map f v)
   | subst f (Con (p,q)) = Con (subst f p,subst f q)
