@@ -1,4 +1,4 @@
-section \<open>A Simple Prover\<close>
+section \<open>A Simple Prover in Isabelle\<close>
 
 theory SimPro imports Main begin
 
@@ -1074,9 +1074,11 @@ lemmas magic = soundness completeness finite_calculation_prover
 
 theorem correctness: CHECK VALID
 proof -
-  have xxx: "\<forall>p. [[(0,p)]] = [map (Pair 0) [p]]" by simp  
-  have CHECK using magic check_def valid_def semantics_alternative.simps by (metis xxx make_sequent_def)
-  also have VALID using magic make_sequent_def by force
+  have "\<forall>p. [[(0,p)]] = [map (Pair 0) [p]]" by simp
+  then have CHECK
+    using magic check_def valid_def make_sequent_def semantics_alternative.simps by metis
+  also have VALID
+    using magic make_sequent_def by force
   then show CHECK VALID using calculation by simp_all
 qed
 
