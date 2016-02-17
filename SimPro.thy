@@ -72,12 +72,8 @@ primrec null :: "'a list \<Rightarrow> bool" where
 definition fresh :: "nat list \<Rightarrow> nat" where
   "fresh l \<equiv> if null l then 0 else Suc (maxl l)"
 
-primrec flatten :: "'a list list \<Rightarrow> 'a list" where
-  "flatten [] = []" |
-  "flatten (h # t) = h @ flatten t"
-
 definition all :: "('a \<Rightarrow> 'b list) \<Rightarrow> 'a list \<Rightarrow> 'b list" where
-  "all f l \<equiv> flatten (map f l)"
+  "all f l \<equiv> concat (map f l)"
 
 primrec member :: "'a \<Rightarrow> 'a list \<Rightarrow> bool" where
   "member _ [] = False" |
@@ -87,7 +83,7 @@ type_synonym sequent = "(nat \<times> nnf) list"
 
 definition solve :: "sequent \<Rightarrow> sequent list" where
   "solve s \<equiv> case s of [] \<Rightarrow> [[]] | h # t \<Rightarrow> (case h of (n,r) \<Rightarrow> (case r of
-    Pre b i v \<Rightarrow> if member (Pre (\<not> b) i v) (map snd t) then [] else [t @ [(0,Pre b i v)]] |
+    Pre b i v \<Rightarrow> if member (Pre (\<not> b) i v) (map snd t) then [] else [t @ [(0,r)]] |
     Con p q \<Rightarrow> [t @ [(0,p)],t @ [(0,q)]] |
     Dis p q \<Rightarrow> [t @ [(0,p),(0,q)]] |
     Uni p \<Rightarrow> [t @ [(0,subst (bind (fresh (all fv (map snd s)))) p)]] |
@@ -134,10 +130,13 @@ by (metis repeat.simps repeat_once not0_implies_Suc)
 
 lemma prover_simps: "prover [] = True" "prover (h # t) = prover (solve h @ all solve t)"
 unfolding prover_def
-by (metis repeat.simps(1),metis repeat.simps(2) repeat_once list.map flatten.simps all_def)
+by (metis repeat.simps(1),metis repeat.simps(2) repeat_once list.map concat.simps all_def)
 
 lemma append_simps: "[] @ l = l" "(h # t) @ l = h # t @ l"
 by (rule append.simps(1),rule append.simps(2))
+
+lemma concat_simps: "concat [] = []" "concat (h # t) = h @ concat t"
+by (rule concat.simps(1),rule concat.simps(2))
 
 lemma map_simps: "map f [] = []" "map f (h # t) = f h # map f t"
 by (rule list.map(1),rule list.map(2))
@@ -154,33 +153,33 @@ by (rule fst_def,rule snd_def)
 lemma case_nnf:
 "(case Pre b i v of Pre b' i' v' \<Rightarrow> f b' i' v' |
   Con p' q' \<Rightarrow> f' p' q' | Dis p'' q'' \<Rightarrow> f'' p'' q'' |
-  Uni p''' \<Rightarrow> f''' p''' | Exi p'''' \<Rightarrow> f'''' p'''') = (f b i v)"
+  Uni p''' \<Rightarrow> f''' p''' | Exi p'''' \<Rightarrow> f'''' p'''') = f b i v"
 "(case Con p q of Pre b' i' v' \<Rightarrow> f b' i' v' |
   Con p' q' \<Rightarrow> f' p' q' | Dis p'' q'' \<Rightarrow> f'' p'' q'' |
-  Uni p''' \<Rightarrow> f''' p''' | Exi p'''' \<Rightarrow> f'''' p'''') = (f' p q)"
+  Uni p''' \<Rightarrow> f''' p''' | Exi p'''' \<Rightarrow> f'''' p'''') = f' p q"
 "(case Dis p q of Pre b' i' v' \<Rightarrow> f b' i' v' |
   Con p' q' \<Rightarrow> f' p' q' | Dis p'' q'' \<Rightarrow> f'' p'' q'' |
-  Uni p''' \<Rightarrow> f''' p''' | Exi p'''' \<Rightarrow> f'''' p'''') = (f'' p q)"
+  Uni p''' \<Rightarrow> f''' p''' | Exi p'''' \<Rightarrow> f'''' p'''') = f'' p q"
 "(case Uni p of Pre b' i' v' \<Rightarrow> f b' i' v' |
   Con p' q' \<Rightarrow> f' p' q' | Dis p'' q'' \<Rightarrow> f'' p'' q'' |
-  Uni p''' \<Rightarrow> f''' p''' | Exi p'''' \<Rightarrow> f'''' p'''') = (f''' p)"
+  Uni p''' \<Rightarrow> f''' p''' | Exi p'''' \<Rightarrow> f'''' p'''') = f''' p"
 "(case Exi p of Pre b' i' v' \<Rightarrow> f b' i' v' |
   Con p' q' \<Rightarrow> f' p' q' | Dis p'' q'' \<Rightarrow> f'' p'' q'' |
-  Uni p''' \<Rightarrow> f''' p''' | Exi p'''' \<Rightarrow> f'''' p'''') = (f'''' p)"
+  Uni p''' \<Rightarrow> f''' p''' | Exi p'''' \<Rightarrow> f'''' p'''') = f'''' p"
 by (rule nnf.case(1),rule nnf.case(2),rule nnf.case(3),rule nnf.case(4),rule nnf.case(5))
 
 lemma case_nat:
 "(case 0 of 0 \<Rightarrow> x | Suc n' \<Rightarrow> f n') = x"
-"(case Suc n of 0 \<Rightarrow> x | Suc n' \<Rightarrow> f n') = (f n)"
+"(case Suc n of 0 \<Rightarrow> x | Suc n' \<Rightarrow> f n') = f n"
 by (rule nat.case(1),rule nat.case(2))
 
 lemma case_prod:
-"(case (x,y) of (x',y') \<Rightarrow> f x' y') = (f x y)"
+"(case (x,y) of (x',y') \<Rightarrow> f x' y') = f x y"
 by (rule prod.case(1))
 
 lemma case_list:
 "(case [] of [] \<Rightarrow> x | h' # t' \<Rightarrow> f h' t') = x"
-"(case h # t of [] \<Rightarrow> x | h' # t' \<Rightarrow> f h' t') = (f h t)"
+"(case h # t of [] \<Rightarrow> x | h' # t' \<Rightarrow> f h' t') = f h t"
 by (rule list.case(1),rule list.case(2))
 
 lemma reflexivity: "(x = x) = True"
@@ -190,8 +189,8 @@ lemma inject_simps: "(True \<and> P) = P" "(False \<and> P) = False"
 by (rule simp_thms,rule simp_thms)
 
 lemmas simps = prover_simps solve_def all_def fresh_def bind_def skip_def
-  append_simps map_simps if_simps not_simps prod_simps
-  member.simps flatten.simps null.simps maxl.simps maxn.simps subst.simps fv.simps adjust.simps
+  append_simps concat_simps map_simps if_simps not_simps prod_simps
+  member.simps null.simps maxl.simps maxn.simps subst.simps fv.simps adjust.simps
   case_nnf case_nat case_prod case_list reflexivity
   nnf.inject nat.inject list.inject char.inject prod.inject inject_simps
   nnf.distinct nat.distinct list.distinct bool.distinct nibble.distinct
@@ -205,7 +204,7 @@ section "Basics"
 lemma mmm[simp]: "(maxn n n') = (max n n')"
 by (induct n arbitrary: n') (simp_all add: Nitpick.case_nat_unfold max_Suc1)
 
-lemma all: "all f = (flatten \<circ> map f)" using all_def comp_apply by fastforce
+lemma all: "all f = (concat \<circ> map f)" using all_def comp_apply by fastforce
 
 definition make_sequent :: "nnf list \<Rightarrow> sequent" where
   "make_sequent l = map (\<lambda>p. (0,p)) l"
@@ -226,7 +225,7 @@ lemma pre:  "(n,(m,Pre b i v) # xs) \<in> calculation(nfs) \<Longrightarrow> \<n
   and con1: "(n,(m,Con p q) # xs) \<in> calculation(nfs) \<Longrightarrow> \<not> is_axiom (list_sequent ((m,Con p q) # xs)) \<Longrightarrow> (Suc n,xs@[(0,p)]) \<in> calculation(nfs)"
   and con2: "(n,(m,Con p q) # xs) \<in> calculation(nfs) \<Longrightarrow> \<not> is_axiom (list_sequent ((m,Con p q) # xs)) \<Longrightarrow> (Suc n,xs@[(0,q)]) \<in> calculation(nfs)"
   and dis:  "(n,(m,Dis p q) # xs) \<in> calculation(nfs) \<Longrightarrow> \<not> is_axiom (list_sequent ((m,Dis p q) # xs)) \<Longrightarrow> (Suc n,xs@[(0,p),(0,q)]) \<in> calculation(nfs)"
-  and uni:  "(n,(m,Uni p) # xs) \<in> calculation(nfs) \<Longrightarrow> \<not> is_axiom (list_sequent ((m,Uni p) # xs)) \<Longrightarrow> (Suc n,xs@[(0,subst (bind (fresh ((flatten \<circ> map fv) (list_sequent ((m,Uni p) # xs))))) p)]) \<in> calculation(nfs)"
+  and uni:  "(n,(m,Uni p) # xs) \<in> calculation(nfs) \<Longrightarrow> \<not> is_axiom (list_sequent ((m,Uni p) # xs)) \<Longrightarrow> (Suc n,xs@[(0,subst (bind (fresh ((concat \<circ> map fv) (list_sequent ((m,Uni p) # xs))))) p)]) \<in> calculation(nfs)"
   and exi:  "(n,(m,Exi p) # xs) \<in> calculation(nfs) \<Longrightarrow> \<not> is_axiom (list_sequent ((m,Exi p) # xs)) \<Longrightarrow> (Suc n,xs@[(0,subst (bind m) p),(Suc m,Exi p)]) \<in> calculation(nfs)"
   by (auto simp: solve_def list_sequent_def all)
 
@@ -998,15 +997,15 @@ lemma completeness: "infinite (calculation (make_sequent s)) \<Longrightarrow> \
 section "Algorithm"
 
 definition loop :: "sequent list \<Rightarrow> nat \<Rightarrow> sequent list" where
-  "loop s n \<equiv> repeat (flatten \<circ> map solve) s n"
+  "loop s n \<equiv> repeat (concat \<circ> map solve) s n"
 
 lemma loop_upwards: "loop s n = [] \<Longrightarrow> loop s (n+m) = []"
   using loop_def by (induct m) auto
 
-lemma flatten_append: "flatten (xs@ys) = ((flatten xs) @ (flatten ys))"
+lemma concat_append: "concat (xs@ys) = ((concat xs) @ (concat ys))"
   by (induct xs) auto
 
-lemma set_flatten: "set (flatten xs) = \<Union> (set ` set xs)"
+lemma set_concat: "set (concat xs) = \<Union> (set ` set xs)"
   by (induct xs) auto
 
 lemma loop: "\<forall>x. ((n,x) \<in> calculation s) = (x \<in> set (loop [s] n))"
@@ -1021,12 +1020,12 @@ lemma loop: "\<forall>x. ((n,x) \<in> calculation s) = (x \<in> set (loop [s] n)
       then obtain t where 1: "(m,t) \<in> calculation s \<and> x \<in> set (solve t) \<and> \<not> is_axiom (list_sequent t)"
         by blast
       then show "(x \<in> set (loop [s] (Suc m)))"
-        using Suc loop_def by (clarsimp dest!: split_list_first simp: flatten_append)
+        using Suc loop_def by (clarsimp dest!: split_list_first)
     next
       fix x
       assume "(x \<in> set (loop [s] (Suc m)))"
       then show "(Suc m,x) \<in> calculation s"
-        using Suc by (fastforce simp: set_flatten loop_def)
+        using Suc by (fastforce simp: set_concat loop_def)
     qed
   qed
 
@@ -1132,10 +1131,10 @@ fun bind p y = subst (fn 0 => y | n => n - 1) p
 fun member _ [] = false
   | member a (h :: t) = if a = h then true else member a t
 
-fun flatten [] = []
-  | flatten (h :: t) = h @ flatten t
+fun concat [] = []
+  | concat (h :: t) = h @ concat t
 
-fun all f l = flatten (map f l)
+fun all f l = concat (map f l)
 
 fun solve s = case s of [] => [[]] | h :: t => case h of (n,r) => case r of
   Pre (b,i,v) => if member (Pre (not b,i,v)) (map snd t) then [] else [t @ [(0,Pre (b,i,v))]]
@@ -1154,13 +1153,13 @@ val () = check test
 
 (*
 
-export_code make_sequent flatten solve test in SML module_name SimPro file "SimPro.sml"
+export_code make_sequent concat solve test in SML module_name SimPro file "SimPro.sml"
 
 SML_file "SimPro.sml"
 
 SML_export "val SimPro_make_sequent = SimPro.make_sequent"
 
-SML_export "val SimPro_flatten = SimPro.flatten"
+SML_export "val SimPro_concat = SimPro.concat"
 
 SML_export "val SimPro_inference = SimPro.inference"
 
@@ -1168,7 +1167,7 @@ SML_export "val SimPro_test = SimPro.test"
 
 ML {*
 
-fun SimPro_prover a = if a = () then true else SimPro_prover ((SimPro_flatten o map SimPro_inference) a);
+fun SimPro_prover a = if a = () then true else SimPro_prover ((SimPro_concat o map SimPro_inference) a);
 
 fun SimPro_check p = SimPro_prover [SimPro_make_sequent [p]]
 
