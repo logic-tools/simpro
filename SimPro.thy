@@ -173,14 +173,14 @@ lemma case_nat:
 "(case Suc n of 0 \<Rightarrow> x | Suc n' \<Rightarrow> f n') = f n"
 by (rule nat.case(1),rule nat.case(2))
 
-lemma case_prod:
-"(case (x,y) of (x',y') \<Rightarrow> f x' y') = f x y"
-by (rule prod.case(1))
-
 lemma case_list:
 "(case [] of [] \<Rightarrow> x | h' # t' \<Rightarrow> f h' t') = x"
 "(case h # t of [] \<Rightarrow> x | h' # t' \<Rightarrow> f h' t') = f h t"
 by (rule list.case(1),rule list.case(2))
+
+lemma case_prod:
+"(case (x,y) of (x',y') \<Rightarrow> f x' y') = f x y"
+by (rule prod.case(1))
 
 lemma reflexivity: "(x = x) = True"
 by (rule simp_thms)
@@ -188,16 +188,16 @@ by (rule simp_thms)
 lemma inject_simps: "(True \<and> P) = P" "(False \<and> P) = False"
 by (rule simp_thms,rule simp_thms)
 
-lemmas simps = prover_simps solve_def all_def fresh_def bind_def bump_def
+lemmas simps = check_def prover_simps solve_def all_def fresh_def bind_def bump_def
   append_simps concat_simps map_simps if_simps not_simps prod_simps
   member.simps null.simps maxl.simps maxn.simps subst.simps fv.simps adjust.simps
-  case_nnf case_nat case_prod case_list reflexivity
+  case_nnf case_nat case_list case_prod reflexivity
   nnf.inject nat.inject list.inject char.inject prod.inject inject_simps
   nnf.distinct nat.distinct list.distinct bool.distinct nibble.distinct
 
 proposition "check test"
-unfolding check_def test_def
-by (simp only: simps(1-328))
+unfolding test_def
+by (simp only: simps(1-329))
 
 section "Basics"
 
