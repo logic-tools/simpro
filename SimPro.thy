@@ -44,15 +44,15 @@ primrec fv :: "nnf \<Rightarrow> nat list" where
   "fv (Uni p) = adjust (fv p)" |
   "fv (Exi p) = adjust (fv p)"
 
-definition skip :: "(nat \<Rightarrow> nat) \<Rightarrow> nat \<Rightarrow> nat" where
-  "skip f x \<equiv> (case x of 0 \<Rightarrow> 0 | Suc n \<Rightarrow> Suc (f n))"
+definition bump :: "(nat \<Rightarrow> nat) \<Rightarrow> nat \<Rightarrow> nat" where
+  "bump f x \<equiv> (case x of 0 \<Rightarrow> 0 | Suc n \<Rightarrow> Suc (f n))"
 
 primrec subst :: "(nat \<Rightarrow> nat) \<Rightarrow> nnf \<Rightarrow> nnf" where
   "subst f (Pre b i v) = Pre b i (map f v)" |
   "subst f (Con p q) = Con (subst f p) (subst f q)" |
   "subst f (Dis p q) = Dis (subst f p) (subst f q)" |
-  "subst f (Uni p) = Uni (subst (skip f) p)" |
-  "subst f (Exi p) = Exi (subst (skip f) p)"
+  "subst f (Uni p) = Uni (subst (bump f) p)" |
+  "subst f (Exi p) = Exi (subst (bump f) p)"
 
 definition bind :: "nat \<Rightarrow> nat \<Rightarrow> nat" where
   "bind y x \<equiv> (case x of 0 \<Rightarrow> y | Suc n \<Rightarrow> n)"
@@ -188,7 +188,7 @@ by (rule simp_thms)
 lemma inject_simps: "(True \<and> P) = P" "(False \<and> P) = False"
 by (rule simp_thms,rule simp_thms)
 
-lemmas simps = prover_simps solve_def all_def fresh_def bind_def skip_def
+lemmas simps = prover_simps solve_def all_def fresh_def bind_def bump_def
   append_simps concat_simps map_simps if_simps not_simps prod_simps
   member.simps null.simps maxl.simps maxn.simps subst.simps fv.simps adjust.simps
   case_nnf case_nat case_prod case_list reflexivity
@@ -397,7 +397,7 @@ lemma ball: "\<forall>x \<in> m. P x = Q x \<Longrightarrow> (\<forall>x \<in> m
   by simp
 
 lemma eval_subst: "semantics m e (subst f p) = semantics m (e \<circ> f) p"
-  using eval_cong skip_def by (induct p arbitrary: e f) (simp_all add: Nitpick.case_nat_unfold ball)
+  using eval_cong bump_def by (induct p arbitrary: e f) (simp_all add: Nitpick.case_nat_unfold ball)
 
 lemma eval_bind: "semantics m e (subst (bind n) p) = semantics m (case_nat (e n) e) p"
   using eval_cong eval_subst by (simp add: Nitpick.case_nat_unfold bind_def)
