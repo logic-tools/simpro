@@ -33,9 +33,13 @@ primrec semantics :: "model \<Rightarrow> environment \<Rightarrow> nnf \<Righta
   "semantics m e (Uni p) = (\<forall>z \<in> fst m. semantics m (\<lambda>x. case x of 0 \<Rightarrow> z | Suc n \<Rightarrow> e n) p)" |
   "semantics m e (Exi p) = (\<exists>z \<in> fst m. semantics m (\<lambda>x. case x of 0 \<Rightarrow> z | Suc n \<Rightarrow> e n) p)"
 
+primrec adj :: "nat list \<Rightarrow> nat \<Rightarrow> nat list" where
+  "adj l 0 = l" |
+  "adj l (Suc n) = n # l"
+
 primrec adjust :: "nat list \<Rightarrow> nat list" where
   "adjust [] = []" |
-  "adjust (h # t) = (case h of 0 \<Rightarrow> adjust t | Suc n \<Rightarrow> n # adjust t)"
+  "adjust (h # t) = adj (adjust t) h"
 
 primrec fv :: "nnf \<Rightarrow> nat list" where
   "fv (Pre _ _ v) = v" |
@@ -195,7 +199,7 @@ by (rule simp_thms,rule simp_thms)
 
 lemmas simps = check_def prover_simps all_def bump_def sb_def
   append_simps concat_simps map_simps if_simps not_simps prod_simps
-  solve.simps track.simps stop.simps fresh.simps maxl.simps maxn.simps bind.simps subst.simps fv.simps adjust.simps
+  solve.simps track.simps stop.simps fresh.simps maxl.simps maxn.simps bind.simps subst.simps fv.simps adjust.simps adj.simps
   case_nnf case_nat case_list case_prod reflexivity
   nnf.inject nat.inject list.inject char.inject prod.inject inject_simps
   nnf.distinct nat.distinct list.distinct bool.distinct nibble.distinct
