@@ -44,7 +44,7 @@ primrec fv :: "nnf \<Rightarrow> nat list" where
   "fv (Uni p) = adjust (fv p)" |
   "fv (Exi p) = adjust (fv p)"
 
-definition bump :: "(nat \<Rightarrow> nat) \<Rightarrow> nat \<Rightarrow> nat" where
+primdefinition bump :: "(nat \<Rightarrow> nat) \<Rightarrow> nat \<Rightarrow> nat" where
   "bump f x \<equiv> (case x of 0 \<Rightarrow> 0 | Suc n \<Rightarrow> Suc (f n))"
 
 primrec subst :: "(nat \<Rightarrow> nat) \<Rightarrow> nnf \<Rightarrow> nnf" where
