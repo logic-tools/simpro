@@ -72,18 +72,18 @@ primrec fresh :: "nat list \<Rightarrow> nat" where
 definition all :: "('a \<Rightarrow> 'b list) \<Rightarrow> 'a list \<Rightarrow> 'b list" where
   "all f l \<equiv> concat (map f l)"
 
-primrec member :: "'a \<Rightarrow> 'a list \<Rightarrow> bool" where
-  "member _ [] = False" |
-  "member a (h # t) = (if a = h then True else member a t)"
+primrec stop :: "'a list \<Rightarrow> 'b \<Rightarrow> 'b list \<Rightarrow> 'a list" where
+  "stop l _ [] = l" |
+  "stop l a (h # t) = (if a = h then [] else stop l a t)"
 
 type_synonym sequent = "(nat \<times> nnf) list"
 
 definition solve :: "sequent \<Rightarrow> sequent list" where
   "solve s \<equiv> case s of [] \<Rightarrow> [[]] | h # t \<Rightarrow> (case h of (n,r) \<Rightarrow> (case r of
-    Pre b i v \<Rightarrow> if member (Pre (\<not> b) i v) (map snd t) then [] else [t @ [(0,r)]] |
+    Pre b i v \<Rightarrow> stop [t @ [(0,r)]] (Pre (\<not> b) i v) (map snd t) |
     Con p q \<Rightarrow> [t @ [(0,p)],t @ [(0,q)]] |
     Dis p q \<Rightarrow> [t @ [(0,p),(0,q)]] |
-    Uni p \<Rightarrow> [t @ [(0,subst (bind (fresh (all fv (map snd s)))) p)]] |
+    Uni p \<Rightarrow> [t @ [(0,subst (bind (fresh (all fv (r # (map snd t))))) p)]] |
     Exi p \<Rightarrow> [t @ [(0,subst (bind n) p),(Suc n,r)]]))"
 
 primrec repeat :: "('a \<Rightarrow> 'a) \<Rightarrow> 'a \<Rightarrow> nat \<Rightarrow> 'a" where
@@ -187,7 +187,7 @@ by (rule simp_thms,rule simp_thms)
 
 lemmas simps = check_def prover_simps solve_def all_def bind_def bump_def
   append_simps concat_simps map_simps if_simps not_simps prod_simps
-  member.simps fresh.simps maxl.simps maxn.simps subst.simps fv.simps adjust.simps
+  stop.simps fresh.simps maxl.simps maxn.simps subst.simps fv.simps adjust.simps
   case_nnf case_nat case_list case_prod reflexivity
   nnf.inject nat.inject list.inject char.inject prod.inject inject_simps
   nnf.distinct nat.distinct list.distinct bool.distinct nibble.distinct
@@ -216,7 +216,15 @@ primrec is_axiom :: "nnf list \<Rightarrow> bool" where
   "is_axiom [] = False"
 | "is_axiom (p # t) = ((\<exists>b i v. p = Pre b i v \<and> Pre (\<not> b) i v \<in> set t))"
 
-lemma member_set[simp]: "member a l = (a \<in> set l)" by (induct l) auto
+primrec member :: "'a \<Rightarrow> 'a list \<Rightarrow> bool" where
+  "member _ [] = False" |
+  "member a (h # t) = (if a = h then True else member a t)"
+
+lemma member_set[simp]: "member a l = (a \<in> set l)"
+by (induct l) auto
+
+lemma stop:"stop [t @ [(0,r)]] (Pre (\<not> b) i v) l = (if member (Pre (\<not> b) i v) l then [] else [t @ [(0,r)]])"
+by (induct l) simp_all
 
 lemma pre:  "(n,(m,Pre b i v) # xs) \<in> calculation(nfs) \<Longrightarrow> \<not> is_axiom (list_sequent ((m,Pre b i v) # xs)) \<Longrightarrow> (Suc n,xs@[(0,Pre b i v)]) \<in> calculation(nfs)"
   and con1: "(n,(m,Con p q) # xs) \<in> calculation(nfs) \<Longrightarrow> \<not> is_axiom (list_sequent ((m,Con p q) # xs)) \<Longrightarrow> (Suc n,xs@[(0,p)]) \<in> calculation(nfs)"
@@ -224,7 +232,7 @@ lemma pre:  "(n,(m,Pre b i v) # xs) \<in> calculation(nfs) \<Longrightarrow> \<n
   and dis:  "(n,(m,Dis p q) # xs) \<in> calculation(nfs) \<Longrightarrow> \<not> is_axiom (list_sequent ((m,Dis p q) # xs)) \<Longrightarrow> (Suc n,xs@[(0,p),(0,q)]) \<in> calculation(nfs)"
   and uni:  "(n,(m,Uni p) # xs) \<in> calculation(nfs) \<Longrightarrow> \<not> is_axiom (list_sequent ((m,Uni p) # xs)) \<Longrightarrow> (Suc n,xs@[(0,subst (bind (fresh ((concat \<circ> map fv) (list_sequent ((m,Uni p) # xs))))) p)]) \<in> calculation(nfs)"
   and exi:  "(n,(m,Exi p) # xs) \<in> calculation(nfs) \<Longrightarrow> \<not> is_axiom (list_sequent ((m,Exi p) # xs)) \<Longrightarrow> (Suc n,xs@[(0,subst (bind m) p),(Suc m,Exi p)]) \<in> calculation(nfs)"
-  by (auto simp: solve_def list_sequent_def all)
+  by (auto simp: solve_def list_sequent_def all stop)
 
 lemmas not_is_axiom_subs = pre con1 con2 dis uni exi
 
@@ -240,7 +248,7 @@ lemma calculation_upwards:
     case (Cons a _) then show ?thesis
     proof (cases a)
       case (Pair _ p) then show ?thesis
-        using Cons assms by (cases p) (fastforce simp: list_sequent_def solve_def)+
+        using Cons assms by (cases p) (fastforce simp: list_sequent_def solve_def stop)+
     qed
   qed
 
@@ -259,7 +267,7 @@ lemma calculation_downwards: "(Suc n,k) \<in> calculation s \<Longrightarrow> \<
     next
       case (Cons a _) then show ?thesis proof (cases a)
         case (Pair _ p) then show ?thesis
-          using 1 2 3 4 Cons solve_def list_sequent_def by (cases p) auto
+          using 1 2 3 4 Cons solve_def list_sequent_def by (cases p) (auto simp: stop)
       qed
     qed
   qed
@@ -460,7 +468,7 @@ lemma index0:
         next
           case (Cons a _) then show ?thesis proof (cases a)
             case (Pair _ q) then show ?thesis using 1 2 3 IH Cons
-              by (cases q) (fastforce simp: solve_def list_sequent_def is_Exi_def)+
+              by (cases q) (fastforce simp: solve_def list_sequent_def stop is_Exi_def)+
           qed
         qed
       qed
@@ -661,7 +669,7 @@ lemma progress:
     then show ?thesis proof (cases a)
       case (Pair _ p)
       then show ?thesis using suc solve_def
-        by (induct p,safe,simp_all split: if_splits) blast
+        by (induct p,safe,simp_all add: stop split: if_splits) blast
   qed
 qed
 
@@ -703,7 +711,7 @@ lemma contains_propagates_Pre[rule_format]:
     then show ?case proof (cases ys)
       case Nil
       then show ?thesis using 1 2 contains_def solve_def
-        by (simp split: if_splits)
+        by (simp add: stop split: if_splits)
     next
       case (Cons a _) then show ?thesis proof (cases a)
         case (Pair _ p) then show ?thesis
@@ -804,7 +812,7 @@ lemma Exi_downward:
           case (Cons a _) then show ?thesis proof (cases a)
             case (Pair _ p) then show ?thesis proof (cases p)
               case Pre then show ?thesis using IH fxSuc fxPair Cons Pair solve_def
-                by (simp split: if_splits)
+                by (simp add: stop split: if_splits)
             next
               case Con then show ?thesis using IH fxSuc fxPair Cons Pair solve_def
                 by (simp split: if_splits) fastforce
