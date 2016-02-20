@@ -44,8 +44,9 @@ primrec fv :: "nnf \<Rightarrow> nat list" where
   "fv (Uni p) = adjust (fv p)" |
   "fv (Exi p) = adjust (fv p)"
 
-definition bump :: "(nat \<Rightarrow> nat) \<Rightarrow> nat \<Rightarrow> nat" where
-  "bump f x \<equiv> (case x of 0 \<Rightarrow> 0 | Suc n \<Rightarrow> Suc (f n))"
+primrec bump :: "(nat \<Rightarrow> nat) \<Rightarrow> nat \<Rightarrow> nat" where
+  "bump f 0 = 0" |
+  "bump f (Suc n) = Suc (f n)"
 
 primrec subst :: "(nat \<Rightarrow> nat) \<Rightarrow> nnf \<Rightarrow> nnf" where
   "subst f (Pre b i v) = Pre b i (map f v)" |
@@ -408,14 +409,20 @@ section "Soundness"
 lemma ball: "\<forall>x \<in> m. P x = Q x \<Longrightarrow> (\<forall>x \<in> m. P x) = (\<forall>x \<in> m. Q x) \<and> (\<exists>x \<in> m. P x) = (\<exists>x \<in> m. Q x)"
   by simp
 
+definition bump' :: "(nat \<Rightarrow> nat) \<Rightarrow> nat \<Rightarrow> nat" where
+  "bump' f x \<equiv> (case x of 0 \<Rightarrow> 0 | Suc n \<Rightarrow> Suc (f n))"
+
+lemma bump'[simp]: "bump f x = bump' f x"
+  by (metis Nitpick.case_nat_unfold bump.simps Suc_pred' bump'_def not_gr0)
+
 lemma eval_subst: "semantics m e (subst f p) = semantics m (e \<circ> f) p"
-  using eval_cong bump_def by (induct p arbitrary: e f) (simp_all add: Nitpick.case_nat_unfold ball)
+  using eval_cong bump'_def by (induct p arbitrary: e f) (simp_all add: Nitpick.case_nat_unfold ball)
 
 definition bind' :: "nat \<Rightarrow> nat \<Rightarrow> nat" where
   "bind' y x \<equiv> (case x of 0 \<Rightarrow> y | Suc n \<Rightarrow> n)"
 
 lemma bind'[simp]: "bind y x = bind' y x"
-by (metis Nitpick.case_nat_unfold bind.simps Suc_pred' bind'_def not_gr0)
+  by (metis Nitpick.case_nat_unfold bind.simps Suc_pred' bind'_def not_gr0)
 
 lemma eval_bind: "semantics m e (subst (bind n) p) = semantics m (case_nat (e n) e) p"
   using eval_cong eval_subst by (simp add: Nitpick.case_nat_unfold bind'_def)
