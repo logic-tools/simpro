@@ -164,8 +164,8 @@ by (rule if_True,rule if_False)
 lemma not_simps: "(\<not> True) = False" "(\<not> False) = True" "(\<not> \<not> b) = b"
 by (rule simp_thms,rule simp_thms,rule nnf_simps)
 
-lemma prod_simps: "fst z = (case z of (x,_) \<Rightarrow> x)" "snd z = (case z of (_,y) \<Rightarrow> y)"
-by (rule fst_def,rule snd_def)
+lemma prod_simps: "fst (x,y) = x" "snd (x,y) = y"
+unfolding fst_def snd_def by simp_all
 
 lemma case_nnf:
 "(case Pre b i v of Pre b' i' v' \<Rightarrow> f b' i' v' |
@@ -205,12 +205,15 @@ by (rule simp_thms)
 lemma inject_simps: "(True \<and> P) = P" "(False \<and> P) = False"
 by (rule simp_thms,rule simp_thms)
 
-lemmas simps = check_def prover_simps all_def bump_def sb_def
+lemmas simps = check_def prover_simps all_def sb_def
   append_simps concat_simps map_simps if_simps not_simps prod_simps
-  solve.simps track.simps stop.simps fresh.simps maxl.simps dec.simps maxm.simps maxp.simps bind.simps subst.simps fv.simps adjust.simps adj.simps
-  case_nnf case_nat case_list case_prod reflexivity
-  nnf.inject nat.inject list.inject char.inject prod.inject inject_simps
+  solve.simps track.simps stop.simps fresh.simps maxl.simps dec.simps maxm.simps maxp.simps
+  bind.simps subst.simps bump.simps fv.simps adjust.simps adj.simps reflexivity
+  nnf.inject nat.inject list.inject char.inject inject_simps
   nnf.distinct nat.distinct list.distinct bool.distinct nibble.distinct
+
+lemma "bump f 0 = 0"  "bump f (Suc n) = Suc (f n)"
+by (simp only: simps(45),simp only: simps(46))
 
 proposition "check test"
 unfolding test_def
@@ -219,7 +222,7 @@ by (simp only: simps(1-))
 section "Basics"
 
 lemma mmm[simp]: "(maxp (maxm n n') n') = (max n n')"
-by (induct n' arbitrary: n) (simp,metis Suc_pred' add_Suc_right maxp.simps(2) maxm.simps dec.simps(1) dec.simps(2) max_Suc_Suc max_def nat_minus_add_max not_gr0)+
+by (induct n' arbitrary: n) (simp,metis Suc_pred' add_Suc_right maxp.simps(2) maxm.simps dec.simps max_Suc_Suc max_def nat_minus_add_max not_gr0)+
 
 lemma all: "all f = (concat \<circ> map f)" using all_def comp_apply by fastforce
 
