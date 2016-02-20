@@ -64,8 +64,8 @@ primrec bind :: "nat \<Rightarrow> nat \<Rightarrow> nat" where
   "bind _ (Suc n) = n"
 
 primrec maxn :: "nat \<Rightarrow> nat \<Rightarrow> nat" where
-  "maxn 0 x = x" |
-  "maxn (Suc n) x = Suc (case x of 0 \<Rightarrow> n | Suc y \<Rightarrow> maxn n y)"
+  "maxn x 0 = x" |
+  "maxn x (Suc n) = Suc (case x of 0 \<Rightarrow> n | Suc y \<Rightarrow> maxn y n)"
 
 primrec maxl :: "nat list \<Rightarrow> nat" where
   "maxl [] = 0" |
@@ -211,7 +211,7 @@ by (simp only: simps(1-))
 section "Basics"
 
 lemma mmm[simp]: "(maxn n n') = (max n n')"
-by (induct n arbitrary: n') (simp_all add: Nitpick.case_nat_unfold max_Suc1)
+by (induct n' arbitrary: n) (auto simp: Nitpick.case_nat_unfold max_Suc1)
 
 lemma all: "all f = (concat \<circ> map f)" using all_def comp_apply by fastforce
 
