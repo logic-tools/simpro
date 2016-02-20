@@ -63,17 +63,25 @@ primrec bind :: "nat \<Rightarrow> nat \<Rightarrow> nat" where
   "bind x 0 = x" |
   "bind _ (Suc n) = n"
 
-primrec maxn :: "nat \<Rightarrow> nat \<Rightarrow> nat" where
-  "maxn x 0 = x" |
-  "maxn x (Suc n) = Suc (case x of 0 \<Rightarrow> n | Suc y \<Rightarrow> maxn y n)"
+primrec dec :: "nat \<Rightarrow> nat" where
+  "dec 0 = 0" |
+  "dec (Suc n) = n"
+
+primrec maxm :: "nat \<Rightarrow> nat \<Rightarrow> nat" where
+  "maxm x 0 = x" |
+  "maxm x (Suc n) = maxm (dec x) n"
+
+primrec maxp :: "nat \<Rightarrow> nat \<Rightarrow> nat" where
+  "maxp x 0 = x" |
+  "maxp x (Suc n) = Suc (maxp x n)"
 
 primrec maxl :: "nat list \<Rightarrow> nat" where
   "maxl [] = 0" |
-  "maxl (h # t) = maxn h (maxl t)"
+  "maxl (h # t) = maxp (maxm (maxl t) h) h"
 
 primrec fresh :: "nat list \<Rightarrow> nat" where
   "fresh [] = 0" |
-  "fresh (h # t) = Suc (maxn h (maxl t))"
+  "fresh (h # t) = Suc (maxp (maxm (maxl t) h) h)"
 
 definition all :: "('a \<Rightarrow> 'b list) \<Rightarrow> 'a list \<Rightarrow> 'b list" where
   "all f l \<equiv> concat (map f l)"
@@ -199,7 +207,7 @@ by (rule simp_thms,rule simp_thms)
 
 lemmas simps = check_def prover_simps all_def bump_def sb_def
   append_simps concat_simps map_simps if_simps not_simps prod_simps
-  solve.simps track.simps stop.simps fresh.simps maxl.simps maxn.simps bind.simps subst.simps fv.simps adjust.simps adj.simps
+  solve.simps track.simps stop.simps fresh.simps maxl.simps dec.simps maxm.simps maxp.simps bind.simps subst.simps fv.simps adjust.simps adj.simps
   case_nnf case_nat case_list case_prod reflexivity
   nnf.inject nat.inject list.inject char.inject prod.inject inject_simps
   nnf.distinct nat.distinct list.distinct bool.distinct nibble.distinct
@@ -210,8 +218,8 @@ by (simp only: simps(1-))
 
 section "Basics"
 
-lemma mmm[simp]: "(maxn n n') = (max n n')"
-by (induct n' arbitrary: n) (auto simp: Nitpick.case_nat_unfold max_Suc1)
+lemma mmm[simp]: "(maxp (maxm n n') n') = (max n n')"
+by (induct n' arbitrary: n) (simp,metis Suc_pred' add_Suc_right maxp.simps(2) maxm.simps dec.simps(1) dec.simps(2) max_Suc_Suc max_def nat_minus_add_max not_gr0)+
 
 lemma all: "all f = (concat \<circ> map f)" using all_def comp_apply by fastforce
 
