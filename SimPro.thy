@@ -65,12 +65,9 @@ primrec maxl :: "nat list \<Rightarrow> nat" where
   "maxl [] = 0" |
   "maxl (h # t) = maxn h (maxl t)"
 
-primrec null :: "'a list \<Rightarrow> bool" where
-  "null [] = True" |
-  "null (_ # _) = False"
-
-definition fresh :: "nat list \<Rightarrow> nat" where
-  "fresh l \<equiv> if null l then 0 else Suc (maxl l)"
+primrec fresh :: "nat list \<Rightarrow> nat" where
+  "fresh [] = 0" |
+  "fresh (h # t) = Suc (maxn h (maxl t))"
 
 definition all :: "('a \<Rightarrow> 'b list) \<Rightarrow> 'a list \<Rightarrow> 'b list" where
   "all f l \<equiv> concat (map f l)"
@@ -188,16 +185,16 @@ by (rule simp_thms)
 lemma inject_simps: "(True \<and> P) = P" "(False \<and> P) = False"
 by (rule simp_thms,rule simp_thms)
 
-lemmas simps = check_def prover_simps solve_def all_def fresh_def bind_def bump_def
+lemmas simps = check_def prover_simps solve_def all_def bind_def bump_def
   append_simps concat_simps map_simps if_simps not_simps prod_simps
-  member.simps null.simps maxl.simps maxn.simps subst.simps fv.simps adjust.simps
+  member.simps fresh.simps maxl.simps maxn.simps subst.simps fv.simps adjust.simps
   case_nnf case_nat case_list case_prod reflexivity
   nnf.inject nat.inject list.inject char.inject prod.inject inject_simps
   nnf.distinct nat.distinct list.distinct bool.distinct nibble.distinct
 
 proposition "check test"
 unfolding test_def
-by (simp only: simps(1-329))
+by (simp only: simps(1-328))
 
 section "Basics"
 
@@ -474,7 +471,7 @@ lemma maxl: "\<forall>v \<in> set l. v \<le> maxl l"
   by (induct l) (auto simp: max_def)
 
 lemma fresh: "fresh l \<notin> (set l)"
-  using maxl fresh_def by (auto,metis null.simps(2) empty_iff list.exhaust list.set(1),force)
+  using maxl fresh.simps maxl.simps list.set_cases not_less_eq_eq order_refl by metis
 
 lemma soundness':
   assumes "init s"
