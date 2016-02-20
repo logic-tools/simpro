@@ -63,13 +63,13 @@ primrec bind :: "nat \<Rightarrow> nat \<Rightarrow> nat" where
   "bind x 0 = x" |
   "bind _ (Suc n) = n"
 
-primrec dec :: "nat \<Rightarrow> nat" where
-  "dec 0 = 0" |
-  "dec (Suc n) = n"
+primrec maxd :: "nat \<Rightarrow> nat" where
+  "maxd 0 = 0" |
+  "maxd (Suc n) = n"
 
 primrec maxm :: "nat \<Rightarrow> nat \<Rightarrow> nat" where
   "maxm x 0 = x" |
-  "maxm x (Suc n) = maxm (dec x) n"
+  "maxm x (Suc n) = maxm (maxd x) n"
 
 primrec maxp :: "nat \<Rightarrow> nat \<Rightarrow> nat" where
   "maxp x 0 = x" |
@@ -90,8 +90,8 @@ primrec stop :: "'a list \<Rightarrow> 'b \<Rightarrow> 'b list \<Rightarrow> 'a
   "stop a _ [] = a" |
   "stop a p (h # t) = (if p = h then [] else stop a p t)"
 
-definition sb :: "nnf \<Rightarrow> nat \<Rightarrow> nnf" where
-  "sb p n \<equiv> subst (bind n) p"
+definition inst :: "nnf \<Rightarrow> nat \<Rightarrow> nnf" where
+  "inst p n \<equiv> subst (bind n) p"
 
 type_synonym sequent = "(nat \<times> nnf) list"
 
@@ -99,8 +99,8 @@ primrec track :: "sequent \<Rightarrow> nat \<Rightarrow> nnf \<Rightarrow> sequ
   "track s _ (Pre b i v) = stop [s @ [(0,Pre b i v)]] (Pre (\<not> b) i v) (map snd s)" |
   "track s _ (Con p q) = [s @ [(0,p)],s @ [(0,q)]]" |
   "track s _ (Dis p q) = [s @ [(0,p),(0,q)]]" |
-  "track s _ (Uni p) = [s @ [(0,sb p (fresh (all fv (Uni p # map snd s))))]]" |
-  "track s n (Exi p) = [s @ [(0,sb p n),(Suc n,Exi p)]]"
+  "track s _ (Uni p) = [s @ [(0,inst p (fresh (all fv (Uni p # map snd s))))]]" |
+  "track s n (Exi p) = [s @ [(0,inst p n),(Suc n,Exi p)]]"
 
 primrec solve :: "sequent \<Rightarrow> sequent list" where
   "solve [] = [[]]" |
@@ -165,64 +165,155 @@ lemma not_simps: "(\<not> True) = False" "(\<not> False) = True" "(\<not> \<not>
 by (rule simp_thms,rule simp_thms,rule nnf_simps)
 
 lemma prod_simps: "fst (x,y) = x" "snd (x,y) = y"
-unfolding fst_def snd_def by simp_all
+unfolding fst_def snd_def by (rule prod.case,rule prod.case)
 
-lemma case_nnf:
-"(case Pre b i v of Pre b' i' v' \<Rightarrow> f b' i' v' |
-  Con p' q' \<Rightarrow> f' p' q' | Dis p'' q'' \<Rightarrow> f'' p'' q'' |
-  Uni p''' \<Rightarrow> f''' p''' | Exi p'''' \<Rightarrow> f'''' p'''') = f b i v"
-"(case Con p q of Pre b' i' v' \<Rightarrow> f b' i' v' |
-  Con p' q' \<Rightarrow> f' p' q' | Dis p'' q'' \<Rightarrow> f'' p'' q'' |
-  Uni p''' \<Rightarrow> f''' p''' | Exi p'''' \<Rightarrow> f'''' p'''') = f' p q"
-"(case Dis p q of Pre b' i' v' \<Rightarrow> f b' i' v' |
-  Con p' q' \<Rightarrow> f' p' q' | Dis p'' q'' \<Rightarrow> f'' p'' q'' |
-  Uni p''' \<Rightarrow> f''' p''' | Exi p'''' \<Rightarrow> f'''' p'''') = f'' p q"
-"(case Uni p of Pre b' i' v' \<Rightarrow> f b' i' v' |
-  Con p' q' \<Rightarrow> f' p' q' | Dis p'' q'' \<Rightarrow> f'' p'' q'' |
-  Uni p''' \<Rightarrow> f''' p''' | Exi p'''' \<Rightarrow> f'''' p'''') = f''' p"
-"(case Exi p of Pre b' i' v' \<Rightarrow> f b' i' v' |
-  Con p' q' \<Rightarrow> f' p' q' | Dis p'' q'' \<Rightarrow> f'' p'' q'' |
-  Uni p''' \<Rightarrow> f''' p''' | Exi p'''' \<Rightarrow> f'''' p'''') = f'''' p"
-by (rule nnf.case(1),rule nnf.case(2),rule nnf.case(3),rule nnf.case(4),rule nnf.case(5))
+lemma reflexivity: "(0 = 0) = True" "([] = []) = True"
+  "(True = True) = True" "(False = False) = True"
+  "(Nibble0 = Nibble0) = True" "(Nibble1 = Nibble1) = True"
+  "(Nibble2 = Nibble2) = True" "(Nibble3 = Nibble3) = True"
+  "(Nibble4 = Nibble4) = True" "(Nibble5 = Nibble5) = True"
+  "(Nibble6 = Nibble6) = True" "(Nibble7 = Nibble7) = True"
+  "(Nibble8 = Nibble8) = True" "(Nibble9 = Nibble9) = True"
+  "(NibbleA = NibbleA) = True" "(NibbleB = NibbleB) = True"
+  "(NibbleC = NibbleC) = True" "(NibbleD = NibbleD) = True"
+  "(NibbleE = NibbleE) = True" "(NibbleF = NibbleF) = True"
+by (rule simp_thms)+
 
-lemma case_nat:
-"(case 0 of 0 \<Rightarrow> x | Suc n' \<Rightarrow> f n') = x"
-"(case Suc n of 0 \<Rightarrow> x | Suc n' \<Rightarrow> f n') = f n"
-by (rule nat.case(1),rule nat.case(2))
-
-lemma case_list:
-"(case [] of [] \<Rightarrow> x | h' # t' \<Rightarrow> f h' t') = x"
-"(case h # t of [] \<Rightarrow> x | h' # t' \<Rightarrow> f h' t') = f h t"
-by (rule list.case(1),rule list.case(2))
-
-lemma case_prod:
-"(case (x,y) of (x',y') \<Rightarrow> f x' y') = f x y"
-by (rule prod.case(1))
-
-lemma reflexivity: "(x = x) = True"
-by (rule simp_thms)
-
-lemma inject_simps: "(True \<and> P) = P" "(False \<and> P) = False"
+lemma inject_simps: "(True \<and> b) = b" "(False \<and> b) = False"
 by (rule simp_thms,rule simp_thms)
 
-lemmas simps = check_def prover_simps all_def sb_def
-  append_simps concat_simps map_simps if_simps not_simps prod_simps
-  solve.simps track.simps stop.simps fresh.simps maxl.simps dec.simps maxm.simps maxp.simps
-  bind.simps subst.simps bump.simps fv.simps adjust.simps adj.simps reflexivity
-  nnf.inject nat.inject list.inject char.inject inject_simps
-  nnf.distinct nat.distinct list.distinct bool.distinct nibble.distinct
+lemmas simps = check_def prover_simps all_def inst_def append_simps concat_simps map_simps if_simps
+  not_simps prod_simps solve.simps track.simps stop.simps fresh.simps maxl.simps maxd.simps
+  maxm.simps maxp.simps bind.simps subst.simps bump.simps fv.simps adjust.simps adj.simps
 
-lemma "bump f 0 = 0"  "bump f (Suc n) = Suc (f n)"
-by (simp only: simps(45),simp only: simps(46))
+lemmas extra = inject_simps nnf.inject nat.inject list.inject char.inject reflexivity
+  nnf.distinct nat.distinct list.distinct bool.distinct nibble.distinct
 
 proposition "check test"
 unfolding test_def
-by (simp only: simps(1-))
+by (simp only: simps extra)
+
+theorem SIMPS:
+  "\<And>p. check p \<equiv> prover [[(0,p)]]"
+  "prover [] \<equiv> True"
+  "\<And>h t. prover (h # t) \<equiv> prover (solve h @ all solve t)"
+  "\<And>f l. all f l \<equiv> concat (map f l)"
+  "\<And>p n. inst p n \<equiv> subst (bind n) p"
+  "\<And>l. [] @ l \<equiv> l"
+  "\<And>h t l. (h # t) @ l \<equiv> h # t @ l"
+  "concat [] \<equiv> []"
+  "\<And>h t . concat (h # t) \<equiv> h @ concat t"
+  "\<And>f. map f [] \<equiv> []"
+  "\<And>f h t. map f (h # t) \<equiv> f h # map f t"
+  "\<And>x y. if True then x else y \<equiv> x"
+  "\<And>x y. if False then x else y \<equiv> y"
+  "\<not> True \<equiv> False"
+  "\<not> False \<equiv> True"
+  "\<And>b. \<not> \<not> b \<equiv> b"
+  "\<And>x y. fst (x,y) \<equiv> x"
+  "\<And>x y. snd (x,y) \<equiv> y"
+  "solve [] \<equiv> [[]]"
+  "\<And>h t. solve (h # t) \<equiv> track t (fst h) (snd h)"
+  "\<And>s n b i v. track s n (Pre b i v) \<equiv> stop [s @ [(0,Pre b i v)]] (Pre (\<not> b) i v) (map snd s)"
+  "\<And>s n p q. track s n (Con p q) \<equiv> [s @ [(0,p)],s @ [(0,q)]]"
+  "\<And>s n p q. track s n (Dis p q) \<equiv> [s @ [(0,p),(0,q)]]"
+  "\<And>s n p. track s n (Uni p) \<equiv> [s @ [(0,inst p (fresh (all fv (Uni p # map snd s))))]]"
+  "\<And>s n p. track s n (Exi p) \<equiv> [s @ [(0,inst p n),(Suc n,Exi p)]]"
+  "\<And>a p h t. stop a p [] \<equiv> a"
+  "\<And>a p h t. stop a p (h # t) \<equiv> (if p = h then [] else stop a p t)"
+  "fresh [] \<equiv> 0"
+  "\<And>h t. fresh (h # t) \<equiv> Suc (maxp (maxm (maxl t) h) h)"
+  "maxl [] \<equiv> 0"
+  "\<And>h t. maxl (h # t) \<equiv> maxp (maxm (maxl t) h) h"
+  "maxd 0 \<equiv> 0"
+  "\<And>n. maxd (Suc n) \<equiv> n"
+  "\<And>x. maxm x 0 \<equiv> x"
+  "\<And>x n. maxm x (Suc n) \<equiv> maxm (maxd x) n"
+  "\<And>x. maxp x 0 \<equiv> x"
+  "\<And>x n. maxp x (Suc n) \<equiv> Suc (maxp x n)"
+  "\<And>x. bind x 0 \<equiv> x"
+  "\<And>x n. bind n (Suc n) \<equiv> n"
+  "\<And>f b i v. subst f (Pre b i v) \<equiv> Pre b i (map f v)"
+  "\<And>f p q. subst f (Con p q) \<equiv> Con (subst f p) (subst f q)"
+  "\<And>f p q. subst f (Dis p q) \<equiv> Dis (subst f p) (subst f q)"
+  "\<And>f p. subst f (Uni p) \<equiv> Uni (subst (bump f) p)"
+  "\<And>f p. subst f (Exi p) \<equiv> Exi (subst (bump f) p)"
+  "\<And>f. bump f 0 \<equiv> 0"
+  "\<And>f n. bump f (Suc n) \<equiv> Suc (f n)"
+  "\<And>b i v. fv (Pre b i v) \<equiv> v"
+  "\<And>p q. fv (Con p q) \<equiv> fv p @ fv q"
+  "\<And>p q. fv (Dis p q) \<equiv> fv p @ fv q"
+  "\<And>p. fv (Uni p) \<equiv> adjust (fv p)"
+  "\<And>p. fv (Exi p) \<equiv> adjust (fv p)"
+  "adjust [] \<equiv> []"
+  "\<And>h t. adjust (h # t) \<equiv> adj (adjust t) h"
+  "\<And>l. adj l 0 \<equiv> l"
+  "\<And>l n. adj l (Suc n) \<equiv> n # l"
+apply (simp only: simps(1))
+apply (simp only: simps(2))
+apply (simp only: simps(3))
+apply (simp only: simps(4))
+apply (simp only: simps(5))
+apply (simp only: simps(6))
+apply (simp only: simps(7))
+apply (simp only: simps(8))
+apply (simp only: simps(9))
+apply (simp only: simps(10))
+apply (simp only: simps(11))
+apply (simp only: simps(12))
+apply (simp only: simps(13))
+apply (simp only: simps(14))
+apply (simp only: simps(15))
+apply (simp only: simps(16))
+apply (simp only: simps(17))
+apply (simp only: simps(18))
+apply (simp only: simps(19))
+apply (simp only: simps(20))
+apply (simp only: simps(21))
+apply (simp only: simps(22))
+apply (simp only: simps(23))
+apply (simp only: simps(24))
+apply (simp only: simps(25))
+apply (simp only: simps(26))
+apply (simp only: simps(27))
+apply (simp only: simps(28))
+apply (simp only: simps(29))
+apply (simp only: simps(30))
+apply (simp only: simps(31))
+apply (simp only: simps(32))
+apply (simp only: simps(33))
+apply (simp only: simps(34))
+apply (simp only: simps(35))
+apply (simp only: simps(36))
+apply (simp only: simps(37))
+apply (simp only: simps(38))
+apply (simp only: simps(39))
+apply (simp only: simps(40))
+apply (simp only: simps(41))
+apply (simp only: simps(42))
+apply (simp only: simps(43))
+apply (simp only: simps(44))
+apply (simp only: simps(45))
+apply (simp only: simps(46))
+apply (simp only: simps(47))
+apply (simp only: simps(48))
+apply (simp only: simps(49))
+apply (simp only: simps(50))
+apply (simp only: simps(51))
+apply (simp only: simps(52))
+apply (simp only: simps(53))
+apply (simp only: simps(54))
+apply (simp only: simps(55))
+done
+
+proposition "check test"
+unfolding test_def
+by (simp only: SIMPS extra)
 
 section "Basics"
 
 lemma mmm[simp]: "(maxp (maxm n n') n') = (max n n')"
-by (induct n' arbitrary: n) (simp,metis Suc_pred' add_Suc_right maxp.simps(2) maxm.simps dec.simps max_Suc_Suc max_def nat_minus_add_max not_gr0)+
+by (induct n' arbitrary: n) (simp,metis Suc_pred' add_Suc_right maxp.simps(2) maxm.simps maxd.simps max_Suc_Suc max_def nat_minus_add_max not_gr0)+
 
 lemma all: "all f = (concat \<circ> map f)" using all_def comp_apply by fastforce
 
@@ -255,7 +346,7 @@ lemma pre:  "(n,(m,Pre b i v) # xs) \<in> calculation(nfs) \<Longrightarrow> \<n
   and dis:  "(n,(m,Dis p q) # xs) \<in> calculation(nfs) \<Longrightarrow> \<not> is_axiom (list_sequent ((m,Dis p q) # xs)) \<Longrightarrow> (Suc n,xs@[(0,p),(0,q)]) \<in> calculation(nfs)"
   and uni:  "(n,(m,Uni p) # xs) \<in> calculation(nfs) \<Longrightarrow> \<not> is_axiom (list_sequent ((m,Uni p) # xs)) \<Longrightarrow> (Suc n,xs@[(0,subst (bind (fresh ((concat \<circ> map fv) (list_sequent ((m,Uni p) # xs))))) p)]) \<in> calculation(nfs)"
   and exi:  "(n,(m,Exi p) # xs) \<in> calculation(nfs) \<Longrightarrow> \<not> is_axiom (list_sequent ((m,Exi p) # xs)) \<Longrightarrow> (Suc n,xs@[(0,subst (bind m) p),(Suc m,Exi p)]) \<in> calculation(nfs)"
-  by (auto simp: list_sequent_def all sb_def stop)
+  by (auto simp: list_sequent_def all inst_def stop)
 
 lemmas not_is_axiom_subs = pre con1 con2 dis uni exi
 
@@ -562,7 +653,7 @@ lemma soundness':
           case notAxiom: False then show ?thesis proof (cases "\<exists>a f list. t = (a,Uni f) # list")
             case True
             then obtain a and f and list where 1: "t = (a,Uni f) # list" by blast
-            then show ?thesis using IH assms * ** fv_list_def fresh list_sequent_def sb_def
+            then show ?thesis using IH assms * ** fv_list_def fresh list_sequent_def inst_def
               by simp (frule calculation.step,simp add: all,
                  metis (no_types,lifting) Suc_leD diff_Suc_Suc diff_diff_cancel diff_le_self
                   le_SucI list.map map_append snd_conv sound_Uni)
@@ -570,7 +661,7 @@ lemma soundness':
             case notUni: False then show ?thesis proof (cases "\<exists>a f list. t = (a,Exi f) # list")
               case True
               then obtain a and f and list where 1: "t = (a,Exi f) # list" by blast
-              then show ?thesis using IH assms * ** fresh list_sequent_def sb_def
+              then show ?thesis using IH assms * ** fresh list_sequent_def inst_def
                 by simp (frule calculation.step,simp,
                    metis (no_types,lifting) Suc_leD diff_Suc_Suc diff_diff_cancel diff_le_self
                     le_SucI list.map map_append snd_conv sound_Exi)
@@ -579,7 +670,7 @@ lemma soundness':
               then show ?thesis proof (cases t)
                 case Nil
                 then show ?thesis using assms notAxiom IH * ** calculation_upwards
-                   by (metis (no_types, lifting) calculation.step diff_Suc_Suc diff_diff_cancel diff_le_self list.set_intros(1) not_less_eq_eq solve.simps(1))
+                   by (metis (no_types,lifting) calculation.step diff_Suc_Suc diff_diff_cancel diff_le_self list.set_intros(1) not_less_eq_eq solve.simps(1))
               next
                 case (Cons a list)
                 then show ?thesis using IH proof (simp add: valid_def semantics_alternative_def2,intro allI impI)
@@ -803,7 +894,7 @@ lemma contains_propagates_Uni:
     then show ?thesis proof (cases "snd (f (n + l))")
       case Nil then show ?thesis using 1 considers_def by simp
     next
-      case Cons then show ?thesis using 1 2 considers_def contains_def sb_def
+      case Cons then show ?thesis using 1 2 considers_def contains_def inst_def
         by (rule_tac x="l" in exI) (simp add: fv_list_def all_def)
     qed
   qed
@@ -821,7 +912,7 @@ lemma contains_propagates_Exi:
     then show ?thesis proof (cases "snd (f (n + l))")
       case Nil then show ?thesis using 1 considers_def by simp
     next
-      case Cons then show ?thesis using 1 2 considers_def contains_def sb_def
+      case Cons then show ?thesis using 1 2 considers_def contains_def inst_def
         by (rule_tac x="Suc l" in exI) simp
     qed
   qed
