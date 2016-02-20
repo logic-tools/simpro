@@ -73,18 +73,24 @@ definition all :: "('a \<Rightarrow> 'b list) \<Rightarrow> 'a list \<Rightarrow
   "all f l \<equiv> concat (map f l)"
 
 primrec stop :: "'a list \<Rightarrow> 'b \<Rightarrow> 'b list \<Rightarrow> 'a list" where
-  "stop l _ [] = l" |
-  "stop l a (h # t) = (if a = h then [] else stop l a t)"
+  "stop a _ [] = a" |
+  "stop a p (h # t) = (if p = h then [] else stop a p t)"
+
+definition sb :: "nnf \<Rightarrow> nat \<Rightarrow> nnf" where
+  "sb p n \<equiv> subst (bind n) p"
 
 type_synonym sequent = "(nat \<times> nnf) list"
 
-definition solve :: "sequent \<Rightarrow> sequent list" where
-  "solve s \<equiv> case s of [] \<Rightarrow> [[]] | h # t \<Rightarrow> (case h of (n,r) \<Rightarrow> (case r of
-    Pre b i v \<Rightarrow> stop [t @ [(0,r)]] (Pre (\<not> b) i v) (map snd t) |
-    Con p q \<Rightarrow> [t @ [(0,p)],t @ [(0,q)]] |
-    Dis p q \<Rightarrow> [t @ [(0,p),(0,q)]] |
-    Uni p \<Rightarrow> [t @ [(0,subst (bind (fresh (all fv (r # (map snd t))))) p)]] |
-    Exi p \<Rightarrow> [t @ [(0,subst (bind n) p),(Suc n,r)]]))"
+primrec track :: "sequent \<Rightarrow> nat \<Rightarrow> nnf \<Rightarrow> sequent list" where
+  "track s _ (Pre b i v) = stop [s @ [(0,Pre b i v)]] (Pre (\<not> b) i v) (map snd s)" |
+  "track s _ (Con p q) = [s @ [(0,p)],s @ [(0,q)]]" |
+  "track s _ (Dis p q) = [s @ [(0,p),(0,q)]]" |
+  "track s _ (Uni p) = [s @ [(0,sb p (fresh (all fv (Uni p # map snd s))))]]" |
+  "track s n (Exi p) = [s @ [(0,sb p n),(Suc n,Exi p)]]"
+
+primrec solve :: "sequent \<Rightarrow> sequent list" where
+  "solve [] = [[]]" |
+  "solve (h # t) = track t (fst h) (snd h)"
 
 primrec repeat :: "('a \<Rightarrow> 'a) \<Rightarrow> 'a \<Rightarrow> nat \<Rightarrow> 'a" where
   "repeat _ a 0 = a" |
@@ -185,16 +191,16 @@ by (rule simp_thms)
 lemma inject_simps: "(True \<and> P) = P" "(False \<and> P) = False"
 by (rule simp_thms,rule simp_thms)
 
-lemmas simps = check_def prover_simps solve_def all_def bind_def bump_def
+lemmas simps = check_def prover_simps all_def bind_def bump_def sb_def
   append_simps concat_simps map_simps if_simps not_simps prod_simps
-  stop.simps fresh.simps maxl.simps maxn.simps subst.simps fv.simps adjust.simps
+  solve.simps track.simps stop.simps fresh.simps maxl.simps maxn.simps subst.simps fv.simps adjust.simps
   case_nnf case_nat case_list case_prod reflexivity
   nnf.inject nat.inject list.inject char.inject prod.inject inject_simps
   nnf.distinct nat.distinct list.distinct bool.distinct nibble.distinct
 
 proposition "check test"
 unfolding test_def
-by (simp only: simps(1-328))
+by (simp only: simps(1-))
 
 section "Basics"
 
@@ -232,7 +238,7 @@ lemma pre:  "(n,(m,Pre b i v) # xs) \<in> calculation(nfs) \<Longrightarrow> \<n
   and dis:  "(n,(m,Dis p q) # xs) \<in> calculation(nfs) \<Longrightarrow> \<not> is_axiom (list_sequent ((m,Dis p q) # xs)) \<Longrightarrow> (Suc n,xs@[(0,p),(0,q)]) \<in> calculation(nfs)"
   and uni:  "(n,(m,Uni p) # xs) \<in> calculation(nfs) \<Longrightarrow> \<not> is_axiom (list_sequent ((m,Uni p) # xs)) \<Longrightarrow> (Suc n,xs@[(0,subst (bind (fresh ((concat \<circ> map fv) (list_sequent ((m,Uni p) # xs))))) p)]) \<in> calculation(nfs)"
   and exi:  "(n,(m,Exi p) # xs) \<in> calculation(nfs) \<Longrightarrow> \<not> is_axiom (list_sequent ((m,Exi p) # xs)) \<Longrightarrow> (Suc n,xs@[(0,subst (bind m) p),(Suc m,Exi p)]) \<in> calculation(nfs)"
-  by (auto simp: solve_def list_sequent_def all stop)
+  by (auto simp: list_sequent_def all sb_def stop)
 
 lemmas not_is_axiom_subs = pre con1 con2 dis uni exi
 
@@ -243,12 +249,12 @@ lemma calculation_upwards:
   assumes "(n,k) \<in> calculation s" and "\<not> is_axiom (list_sequent (k))"
   shows "(\<exists>l. (Suc n,l) \<in> calculation s \<and> l \<in> set (solve k))"
   proof (cases k)
-    case Nil then show ?thesis using assms(1) solve_def by auto
+    case Nil then show ?thesis using assms(1) by auto
   next
     case (Cons a _) then show ?thesis
     proof (cases a)
       case (Pair _ p) then show ?thesis
-        using Cons assms by (cases p) (fastforce simp: list_sequent_def solve_def stop)+
+        using Cons assms by (cases p) (fastforce simp: list_sequent_def stop)+
     qed
   qed
 
@@ -267,7 +273,7 @@ lemma calculation_downwards: "(Suc n,k) \<in> calculation s \<Longrightarrow> \<
     next
       case (Cons a _) then show ?thesis proof (cases a)
         case (Pair _ p) then show ?thesis
-          using 1 2 3 4 Cons solve_def list_sequent_def by (cases p) (auto simp: stop)
+          using 1 2 3 4 Cons list_sequent_def by (cases p) (auto simp: stop)
       qed
     qed
   qed
@@ -464,11 +470,11 @@ lemma index0:
         then obtain t where 3: "(x,t) \<in> calculation s \<and> k \<in> set (solve t) \<and> \<not> is_axiom (list_sequent t)"
           using calculation_downwards by blast
         then show ?thesis proof (cases t)
-          case Nil then show ?thesis using assms IH 1 3 solve_def by simp
+          case Nil then show ?thesis using assms IH 1 3 by simp
         next
           case (Cons a _) then show ?thesis proof (cases a)
             case (Pair _ q) then show ?thesis using 1 2 3 IH Cons
-              by (cases q) (fastforce simp: solve_def list_sequent_def stop is_Exi_def)+
+              by (cases q) (fastforce simp: list_sequent_def stop is_Exi_def)+
           qed
         qed
       qed
@@ -527,7 +533,7 @@ lemma soundness':
           case notAxiom: False then show ?thesis proof (cases "\<exists>a f list. t = (a,Uni f) # list")
             case True
             then obtain a and f and list where 1: "t = (a,Uni f) # list" by blast
-            then show ?thesis using IH assms * ** solve_def fv_list_def fresh list_sequent_def
+            then show ?thesis using IH assms * ** fv_list_def fresh list_sequent_def sb_def
               by simp (frule calculation.step,simp add: all,
                  metis (no_types,lifting) Suc_leD diff_Suc_Suc diff_diff_cancel diff_le_self
                   le_SucI list.map map_append snd_conv sound_Uni)
@@ -535,7 +541,7 @@ lemma soundness':
             case notUni: False then show ?thesis proof (cases "\<exists>a f list. t = (a,Exi f) # list")
               case True
               then obtain a and f and list where 1: "t = (a,Exi f) # list" by blast
-              then show ?thesis using IH assms * ** solve_def fresh list_sequent_def
+              then show ?thesis using IH assms * ** fresh list_sequent_def sb_def
                 by simp (frule calculation.step,simp,
                    metis (no_types,lifting) Suc_leD diff_Suc_Suc diff_diff_cancel diff_le_self
                     le_SucI list.map map_append snd_conv sound_Exi)
@@ -543,9 +549,8 @@ lemma soundness':
               case notExi: False
               then show ?thesis proof (cases t)
                 case Nil
-                then show ?thesis using assms notAxiom IH * ** calculation_upwards split_list_first solve_def
-                  using list.simps(4) by (metis (no_types,lifting) Suc_diff_Suc Suc_leD Un_iff append_Nil2 diff_diff_cancel
-                       diff_le_self insert_iff le_simps(3) list.set set_append)
+                then show ?thesis using assms notAxiom IH * ** calculation_upwards
+                   by (metis (no_types, lifting) calculation.step diff_Suc_Suc diff_diff_cancel diff_le_self list.set_intros(1) not_less_eq_eq solve.simps(1))
               next
                 case (Cons a list)
                 then show ?thesis using IH proof (simp add: valid_def semantics_alternative_def2,intro allI impI)
@@ -668,7 +673,7 @@ lemma progress:
       using assms is_path_f by blast
     then show ?thesis proof (cases a)
       case (Pair _ p)
-      then show ?thesis using suc solve_def
+      then show ?thesis using suc
         by (induct p,safe,simp_all add: stop split: if_splits) blast
   qed
 qed
@@ -710,7 +715,7 @@ lemma contains_propagates_Pre[rule_format]:
       using assms is_path_f by blast
     then show ?case proof (cases ys)
       case Nil
-      then show ?thesis using 1 2 contains_def solve_def
+      then show ?thesis using 1 2 contains_def
         by (simp add: stop split: if_splits)
     next
       case (Cons a _) then show ?thesis proof (cases a)
@@ -733,7 +738,7 @@ lemma contains_propagates_Con:
     then show ?thesis proof (cases "snd (f (n + l))")
       case Nil then show ?thesis using 1 considers_def by simp
     next
-      case Cons then show ?thesis using 1 2 considers_def contains_def solve_def
+      case Cons then show ?thesis using 1 2 considers_def contains_def
         by (rule_tac x="Suc l" in exI) auto
     qed
   qed
@@ -751,7 +756,7 @@ lemma contains_propagates_Dis:
     then show ?thesis proof (cases "snd (f (n + l))")
       case Nil then show ?thesis using 1 considers_def by simp
     next
-      case Cons then show ?thesis using 1 2 considers_def contains_def solve_def
+      case Cons then show ?thesis using 1 2 considers_def contains_def
         by (rule_tac x="Suc l" in exI) simp_all
     qed
   qed
@@ -769,7 +774,7 @@ lemma contains_propagates_Uni:
     then show ?thesis proof (cases "snd (f (n + l))")
       case Nil then show ?thesis using 1 considers_def by simp
     next
-      case Cons then show ?thesis using 1 2 considers_def contains_def solve_def
+      case Cons then show ?thesis using 1 2 considers_def contains_def sb_def
         by (rule_tac x="l" in exI) (simp add: fv_list_def all_def)
     qed
   qed
@@ -787,7 +792,7 @@ lemma contains_propagates_Exi:
     then show ?thesis proof (cases "snd (f (n + l))")
       case Nil then show ?thesis using 1 considers_def by simp
     next
-      case Cons then show ?thesis using 1 2 considers_def contains_def solve_def
+      case Cons then show ?thesis using 1 2 considers_def contains_def sb_def
         by (rule_tac x="Suc l" in exI) simp
     qed
   qed
@@ -807,23 +812,23 @@ lemma Exi_downward:
       then show ?case proof (cases "f x")
         case fxPair: (Pair _ l)
         then show ?thesis proof (cases l)
-          case Nil then show ?thesis using fxSuc fxPair solve_def by simp
+          case Nil then show ?thesis using fxSuc fxPair by simp
         next
           case (Cons a _) then show ?thesis proof (cases a)
             case (Pair _ p) then show ?thesis proof (cases p)
-              case Pre then show ?thesis using IH fxSuc fxPair Cons Pair solve_def
+              case Pre then show ?thesis using IH fxSuc fxPair Cons Pair
                 by (simp add: stop split: if_splits)
             next
-              case Con then show ?thesis using IH fxSuc fxPair Cons Pair solve_def
+              case Con then show ?thesis using IH fxSuc fxPair Cons Pair
                 by (simp split: if_splits) fastforce
             next
-              case Dis then show ?thesis using IH fxSuc fxPair Cons Pair solve_def
+              case Dis then show ?thesis using IH fxSuc fxPair Cons Pair
                 by (simp split: if_splits)
             next
-              case Uni then show ?thesis using IH fxSuc fxPair Cons Pair solve_def
+              case Uni then show ?thesis using IH fxSuc fxPair Cons Pair
                 by (simp split: if_splits)
             next
-              case Exi then show ?thesis using IH fxSuc fxPair Cons Pair solve_def
+              case Exi then show ?thesis using IH fxSuc fxPair Cons Pair
                 by (simp split: if_splits) (metis list.set_intros(1) snd_eqD)
             qed
           qed
