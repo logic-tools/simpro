@@ -179,19 +179,37 @@ lemma reflexivity: "(0 = 0) = True" "([] = []) = True"
   "(NibbleE = NibbleE) = True" "(NibbleF = NibbleF) = True"
 by (rule simp_thms)+
 
+lemma "0 = 0" "[] = []" "True = True" "False = False"
+  "Nibble0 = Nibble0" "Nibble1 = Nibble1" "Nibble2 = Nibble2" "Nibble3 = Nibble3"
+  "Nibble4 = Nibble4" "Nibble5 = Nibble5" "Nibble6 = Nibble6" "Nibble7 = Nibble7"
+  "Nibble8 = Nibble8" "Nibble9 = Nibble9" "NibbleA = NibbleA" "NibbleB = NibbleB"
+  "NibbleC = NibbleC" "NibbleD = NibbleD" "NibbleE = NibbleE" "NibbleF = NibbleF"
+by (simp_all only: reflexivity)
+
+lemma "0 = 0 \<equiv> True" "[] = [] \<equiv> True"
+  "True = True \<equiv> True" "False = False \<equiv> True"
+  "Nibble0 = Nibble0 \<equiv> True" "Nibble1 = Nibble1 \<equiv> True" 
+  "Nibble2 = Nibble2 \<equiv> True" "Nibble3 = Nibble3 \<equiv> True"
+  "Nibble4 = Nibble4 \<equiv> True" "Nibble5 = Nibble5 \<equiv> True"
+  "Nibble6 = Nibble6 \<equiv> True" "Nibble7 = Nibble7 \<equiv> True"
+  "Nibble8 = Nibble8 \<equiv> True" "Nibble9 = Nibble9 \<equiv> True"
+  "NibbleA = NibbleA \<equiv> True" "NibbleB = NibbleB \<equiv> True"
+  "NibbleC = NibbleC \<equiv> True" "NibbleD = NibbleD \<equiv> True"
+  "NibbleE = NibbleE \<equiv> True" "NibbleF = NibbleF \<equiv> True"
+by (simp_all only: reflexivity)
+
 lemma inject_simps: "(True \<and> b) = b" "(False \<and> b) = False"
 by (rule simp_thms,rule simp_thms)
 
 lemmas simps = check_def prover_simps all_def inst_def append_simps concat_simps map_simps if_simps
   not_simps prod_simps solve.simps track.simps stop.simps fresh.simps maxl.simps maxd.simps
   maxm.simps maxp.simps bind.simps subst.simps bump.simps fv.simps adjust.simps adj.simps
-
-lemmas extra = inject_simps nnf.inject nat.inject list.inject char.inject reflexivity
-  nnf.distinct nat.distinct list.distinct bool.distinct nibble.distinct
+  reflexivity inject_simps nnf.inject nat.inject list.inject char.inject
+  nat.distinct list.distinct bool.distinct nibble.distinct nnf.distinct
 
 proposition "check test"
 unfolding test_def
-by (simp only: simps extra)
+by (simp only: simps)
 
 theorem SIMPS:
   "\<And>p. check p \<equiv> prover [[(0,p)]]"
@@ -249,6 +267,50 @@ theorem SIMPS:
   "\<And>h t. adjust (h # t) \<equiv> adj (adjust t) h"
   "\<And>l. adj l 0 \<equiv> l"
   "\<And>l n. adj l (Suc n) \<equiv> n # l"
+  "0 = 0 \<equiv> True"
+  "[] = [] \<equiv> True"
+  "True = True \<equiv> True"
+  "False = False \<equiv> True"
+  "Nibble0 = Nibble0 \<equiv> True"
+  "Nibble1 = Nibble1 \<equiv> True" 
+  "Nibble2 = Nibble2 \<equiv> True"
+  "Nibble3 = Nibble3 \<equiv> True"
+  "Nibble4 = Nibble4 \<equiv> True"
+  "Nibble5 = Nibble5 \<equiv> True"
+  "Nibble6 = Nibble6 \<equiv> True"
+  "Nibble7 = Nibble7 \<equiv> True"
+  "Nibble8 = Nibble8 \<equiv> True"
+  "Nibble9 = Nibble9 \<equiv> True"
+  "NibbleA = NibbleA \<equiv> True"
+  "NibbleB = NibbleB \<equiv> True"
+  "NibbleC = NibbleC \<equiv> True"
+  "NibbleD = NibbleD \<equiv> True"
+  "NibbleE = NibbleE \<equiv> True"
+  "NibbleF = NibbleF \<equiv> True"
+  "\<And>b. True \<and> b \<equiv> b"
+  "\<And>b. False \<and> b \<equiv> False"
+  "\<And>b i v b' i' v'. Pre b i v = Pre b' i' v' \<equiv> b = b' \<and> i = i' \<and> v = v'"
+  "\<And>p q p' q'. Con p q = Con p' q' \<equiv> p = p' \<and> q = q'"
+  "\<And>p q p' q'. Dis p q = Dis p' q' \<equiv> p = p' \<and> q = q'"
+  "\<And>p p'. Uni p = Uni p' \<equiv> p = p'"
+  "\<And>p p'. Exi p = Exi p' \<equiv> p = p'"
+  "\<And>n n'. Suc n = Suc n' \<equiv> n = n'"
+  "\<And>h t h' t'. h # t = h' # t' \<equiv> h = h' \<and> t = t'"
+  "\<And>x y x' y'. Char x y = Char x' y' \<equiv> x = x' \<and> y = y'"
+  "\<And>n. 0 = Suc n \<equiv> False"
+  "\<And>n. Suc n = 0 \<equiv> False"
+  "\<And>h t. [] = h # t \<equiv> False"
+  "\<And>h t. h # t = [] \<equiv> False"
+  "True = False \<equiv> False"
+  "False = True \<equiv> False"
+  "Nibble0 = Nibble1 \<equiv> False"
+  "Nibble1 = Nibble0 \<equiv> False"
+  "Nibble0 = Nibble2 \<equiv> False"
+  "Nibble2 = Nibble0 \<equiv> False"
+  "Nibble0 = Nibble3 \<equiv> False"
+  "Nibble3 = Nibble0 \<equiv> False"
+  "Nibble0 = Nibble4 \<equiv> False"
+  "Nibble4 = Nibble0 \<equiv> False"
 apply (simp only: simps(1))
 apply (simp only: simps(2))
 apply (simp only: simps(3))
@@ -304,11 +366,57 @@ apply (simp only: simps(52))
 apply (simp only: simps(53))
 apply (simp only: simps(54))
 apply (simp only: simps(55))
+apply (simp only: simps(56))
+apply (simp only: simps(57))
+apply (simp only: simps(58))
+apply (simp only: simps(59))
+apply (simp only: simps(60))
+apply (simp only: simps(61))
+apply (simp only: simps(62))
+apply (simp only: simps(63))
+apply (simp only: simps(64))
+apply (simp only: simps(65))
+apply (simp only: simps(66))
+apply (simp only: simps(67))
+apply (simp only: simps(68))
+apply (simp only: simps(69))
+apply (simp only: simps(70))
+apply (simp only: simps(71))
+apply (simp only: simps(72))
+apply (simp only: simps(73))
+apply (simp only: simps(74))
+apply (simp only: simps(75))
+apply (simp only: simps(76))
+apply (simp only: simps(77))
+apply (simp only: simps(78))
+apply (simp only: simps(79))
+apply (simp only: simps(80))
+apply (simp only: simps(81))
+apply (simp only: simps(82))
+apply (simp only: simps(83))
+apply (simp only: simps(84))
+apply (simp only: simps(85))
+apply (simp only: simps(86))
+apply (simp only: simps(87))
+apply (simp only: simps(88))
+apply (simp only: simps(89))
+apply (simp only: simps(90))
+apply (simp only: simps(91))
+apply (simp only: simps(92))
+apply (simp only: simps(93))
+apply (simp only: simps(94))
+apply (simp only: simps(95))
+apply (simp only: simps(96))
+apply (simp only: simps(97))
+apply (simp only: simps(98))
+apply (simp only: simps(99))
 done
+
+lemmas extra = nibble.distinct(9-) nnf.distinct
 
 proposition "check test"
 unfolding test_def
-by (simp only: SIMPS extra)
+by (simp only: SIMPS extra(1-252))
 
 section "Basics"
 
