@@ -186,18 +186,6 @@ lemma "0 = 0" "[] = []" "True = True" "False = False"
   "NibbleC = NibbleC" "NibbleD = NibbleD" "NibbleE = NibbleE" "NibbleF = NibbleF"
 by (simp_all only: reflexivity)
 
-lemma "0 = 0 \<equiv> True" "[] = [] \<equiv> True"
-  "True = True \<equiv> True" "False = False \<equiv> True"
-  "Nibble0 = Nibble0 \<equiv> True" "Nibble1 = Nibble1 \<equiv> True" 
-  "Nibble2 = Nibble2 \<equiv> True" "Nibble3 = Nibble3 \<equiv> True"
-  "Nibble4 = Nibble4 \<equiv> True" "Nibble5 = Nibble5 \<equiv> True"
-  "Nibble6 = Nibble6 \<equiv> True" "Nibble7 = Nibble7 \<equiv> True"
-  "Nibble8 = Nibble8 \<equiv> True" "Nibble9 = Nibble9 \<equiv> True"
-  "NibbleA = NibbleA \<equiv> True" "NibbleB = NibbleB \<equiv> True"
-  "NibbleC = NibbleC \<equiv> True" "NibbleD = NibbleD \<equiv> True"
-  "NibbleE = NibbleE \<equiv> True" "NibbleF = NibbleF \<equiv> True"
-by (simp_all only: reflexivity)
-
 lemma inject_simps: "(True \<and> b) = b" "(False \<and> b) = False"
 by (rule simp_thms,rule simp_thms)
 
