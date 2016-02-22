@@ -83,8 +83,8 @@ primrec fresh :: "nat list \<Rightarrow> nat" where
   "fresh [] = 0" |
   "fresh (h # t) = Suc (maxp (maxm (maxl t) h) h)"
 
-definition all :: "('a \<Rightarrow> 'b list) \<Rightarrow> 'a list \<Rightarrow> 'b list" where
-  "all f l \<equiv> concat (map f l)"
+definition maps :: "('a \<Rightarrow> 'b list) \<Rightarrow> 'a list \<Rightarrow> 'b list" where
+  "maps f l \<equiv> concat (map f l)"
 
 primrec stop :: "'a list \<Rightarrow> 'b \<Rightarrow> 'b list \<Rightarrow> 'a list" where
   "stop a _ [] = a" |
@@ -99,7 +99,7 @@ primrec track :: "sequent \<Rightarrow> nat \<Rightarrow> nnf \<Rightarrow> sequ
   "track s _ (Pre b i v) = stop [s @ [(0,Pre b i v)]] (Pre (\<not> b) i v) (map snd s)" |
   "track s _ (Con p q) = [s @ [(0,p)],s @ [(0,q)]]" |
   "track s _ (Dis p q) = [s @ [(0,p),(0,q)]]" |
-  "track s _ (Uni p) = [s @ [(0,inst p (fresh (all fv (Uni p # map snd s))))]]" |
+  "track s _ (Uni p) = [s @ [(0,inst p (fresh (maps fv (Uni p # map snd s))))]]" |
   "track s n (Exi p) = [s @ [(0,inst p n),(Suc n,Exi p)]]"
 
 primrec solve :: "sequent \<Rightarrow> sequent list" where
@@ -111,7 +111,7 @@ primrec repeat :: "('a \<Rightarrow> 'a) \<Rightarrow> 'a \<Rightarrow> nat \<Ri
   "repeat f a (Suc n) = f (repeat f a n)"
 
 definition prover :: "sequent list \<Rightarrow> bool" where
-  "prover a \<equiv> \<exists>n. repeat (all solve) a n = []"
+  "prover a \<equiv> \<exists>n. repeat (maps solve) a n = []"
 
 definition check :: "nnf \<Rightarrow> bool" where
   "check p \<equiv> prover [[(0,p)]]"
@@ -145,9 +145,9 @@ by (induct n) simp_all
 proposition "(\<exists>n. r (repeat f a n)) = (if r a then True else \<exists>n. r (repeat f (f a) n))"
 by (metis repeat.simps repeat_once not0_implies_Suc)
 
-lemma prover_simps: "prover [] = True" "prover (h # t) = prover (solve h @ all solve t)"
+lemma prover_simps: "prover [] = True" "prover (h # t) = prover (solve h @ maps solve t)"
 unfolding prover_def
-by (metis repeat.simps(1),metis repeat.simps(2) repeat_once list.map concat.simps all_def)
+by (metis repeat.simps(1),metis repeat.simps(2) repeat_once list.map concat.simps maps_def)
 
 lemma append_simps: "[] @ l = l" "(h # t) @ l = h # t @ l"
 by (rule append.simps(1),rule append.simps(2))
@@ -189,7 +189,7 @@ by (simp_all only: reflexivity)
 lemma inject_simps: "(True \<and> b) = b" "(False \<and> b) = False"
 by (rule simp_thms,rule simp_thms)
 
-lemmas simps = check_def prover_simps all_def inst_def append_simps concat_simps map_simps if_simps
+lemmas simps = check_def prover_simps maps_def inst_def append_simps concat_simps map_simps if_simps
   not_simps prod_simps solve.simps track.simps stop.simps fresh.simps maxl.simps maxd.simps
   maxm.simps maxp.simps bind.simps subst.simps bump.simps fv.simps adjust.simps adj.simps
   reflexivity inject_simps nnf.inject nat.inject list.inject char.inject
@@ -202,8 +202,8 @@ by (simp only: simps)
 theorem SIMPS:
   "\<And>p. check p \<equiv> prover [[(0,p)]]"
   "prover [] \<equiv> True"
-  "\<And>h t. prover (h # t) \<equiv> prover (solve h @ all solve t)"
-  "\<And>f l. all f l \<equiv> concat (map f l)"
+  "\<And>h t. prover (h # t) \<equiv> prover (solve h @ maps solve t)"
+  "\<And>f l. maps f l \<equiv> concat (map f l)"
   "\<And>p n. inst p n \<equiv> subst (bind n) p"
   "\<And>l. [] @ l \<equiv> l"
   "\<And>h t l. (h # t) @ l \<equiv> h # t @ l"
@@ -223,7 +223,7 @@ theorem SIMPS:
   "\<And>s n b i v. track s n (Pre b i v) \<equiv> stop [s @ [(0,Pre b i v)]] (Pre (\<not> b) i v) (map snd s)"
   "\<And>s n p q. track s n (Con p q) \<equiv> [s @ [(0,p)],s @ [(0,q)]]"
   "\<And>s n p q. track s n (Dis p q) \<equiv> [s @ [(0,p),(0,q)]]"
-  "\<And>s n p. track s n (Uni p) \<equiv> [s @ [(0,inst p (fresh (all fv (Uni p # map snd s))))]]"
+  "\<And>s n p. track s n (Uni p) \<equiv> [s @ [(0,inst p (fresh (maps fv (Uni p # map snd s))))]]"
   "\<And>s n p. track s n (Exi p) \<equiv> [s @ [(0,inst p n),(Suc n,Exi p)]]"
   "\<And>a p h t. stop a p [] \<equiv> a"
   "\<And>a p h t. stop a p (h # t) \<equiv> (if p = h then [] else stop a p t)"
@@ -411,7 +411,7 @@ section "Basics"
 lemma mmm[simp]: "(maxp (maxm n n') n') = (max n n')"
 by (induct n' arbitrary: n) (simp,metis Suc_pred' add_Suc_right maxp.simps(2) maxm.simps maxd.simps max_Suc_Suc max_def nat_minus_add_max not_gr0)+
 
-lemma all: "all f = (concat \<circ> map f)" using all_def comp_apply by fastforce
+lemma maps: "maps f = (concat \<circ> map f)" using maps_def comp_apply by fastforce
 
 definition make_sequent :: "nnf list \<Rightarrow> sequent" where
   "make_sequent l = map (\<lambda>p. (0,p)) l"
@@ -420,7 +420,7 @@ definition list_sequent :: "sequent \<Rightarrow> nnf list" where
   "list_sequent s = map snd s"
 
 definition fv_list :: "nnf list \<Rightarrow> nat list" where
-  "fv_list \<equiv> all fv"
+  "fv_list \<equiv> maps fv"
 
 primrec is_axiom :: "nnf list \<Rightarrow> bool" where
   "is_axiom [] = False"
@@ -442,7 +442,7 @@ lemma pre:  "(n,(m,Pre b i v) # xs) \<in> calculation(nfs) \<Longrightarrow> \<n
   and dis:  "(n,(m,Dis p q) # xs) \<in> calculation(nfs) \<Longrightarrow> \<not> is_axiom (list_sequent ((m,Dis p q) # xs)) \<Longrightarrow> (Suc n,xs@[(0,p),(0,q)]) \<in> calculation(nfs)"
   and uni:  "(n,(m,Uni p) # xs) \<in> calculation(nfs) \<Longrightarrow> \<not> is_axiom (list_sequent ((m,Uni p) # xs)) \<Longrightarrow> (Suc n,xs@[(0,subst (bind (fresh ((concat \<circ> map fv) (list_sequent ((m,Uni p) # xs))))) p)]) \<in> calculation(nfs)"
   and exi:  "(n,(m,Exi p) # xs) \<in> calculation(nfs) \<Longrightarrow> \<not> is_axiom (list_sequent ((m,Exi p) # xs)) \<Longrightarrow> (Suc n,xs@[(0,subst (bind m) p),(Suc m,Exi p)]) \<in> calculation(nfs)"
-  by (auto simp: list_sequent_def all inst_def stop)
+  by (auto simp: list_sequent_def maps inst_def stop)
 
 lemmas not_is_axiom_subs = pre con1 con2 dis uni exi
 
@@ -601,7 +601,7 @@ lemma semantics_alternative_append: "semantics_alternative m e (s @ s') = ((sema
   by (induct s) auto
 
 lemma fv_list_cons: "fv_list (a # list) = (fv a) @ (fv_list list)"
-  by (simp add: fv_list_def all)
+  by (simp add: fv_list_def maps)
 
 lemma semantics_alternative_cong: "(\<forall>x. x \<in> set (fv_list s) \<longrightarrow> e x = e' x) \<longrightarrow> semantics_alternative m e s = semantics_alternative m e' s" 
   by (induct s) (simp_all,metis eval_cong Un_iff set_append fv_list_cons)
@@ -750,7 +750,7 @@ lemma soundness':
             case True
             then obtain a and f and list where 1: "t = (a,Uni f) # list" by blast
             then show ?thesis using IH assms * ** fv_list_def fresh list_sequent_def inst_def
-              by simp (frule calculation.step,simp add: all,
+              by simp (frule calculation.step,simp add: maps,
                  metis (no_types,lifting) Suc_leD diff_Suc_Suc diff_diff_cancel diff_le_self
                   le_SucI list.map map_append snd_conv sound_Uni)
           next
@@ -991,7 +991,7 @@ lemma contains_propagates_Uni:
       case Nil then show ?thesis using 1 considers_def by simp
     next
       case Cons then show ?thesis using 1 2 considers_def contains_def inst_def
-        by (rule_tac x="l" in exI) (simp add: fv_list_def all_def)
+        by (rule_tac x="l" in exI) (simp add: fv_list_def maps_def)
     qed
   qed
 
@@ -1294,7 +1294,7 @@ lemma finite_calculation: "finite (calculation s) = (\<exists>m. loop [s] m = []
   using finite_calculation' finite_calculation'' by blast
 
 corollary finite_calculation_prover: "finite (calculation s) = prover [s]"
-  using finite_calculation loop_def prover_def by (simp add: all)
+  using finite_calculation loop_def prover_def by (simp add: maps)
 
 section "Correctness"
 
@@ -1360,16 +1360,14 @@ fun member _ [] = false
 fun concat [] = []
   | concat (h :: t) = h @ concat t
 
-fun all f l = concat (map f l)
-
 fun solve s = case s of [] => [[]] | h :: t => case h of (n,r) => case r of
   Pre (b,i,v) => if member (Pre (not b,i,v)) (map snd t) then [] else [t @ [(0,Pre (b,i,v))]]
 | Con (p,q) => [t @ [(0,p)],t @ [(0,q)]]
 | Dis (p,q) => [t @ [(0,p),(0,q)]]
-| Uni p => [t @ [(0,bind p (fresh (all fv (map snd s))))]]
+| Uni p => [t @ [(0,bind p (fresh (maps fv (map snd s))))]]
 | Exi p => [t @ [(0,bind p n),(n + 1,r)]]
 
-fun prover a = if a = [] then () else prover (all solve a)
+fun prover a = if a = [] then () else prover (maps solve a)
 
 fun check p = prover [[(0,p)]]
 
@@ -1402,3 +1400,5 @@ val () = SimPro_check SimPro_test
 *}
 
 *)
+
+end
