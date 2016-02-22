@@ -1357,9 +1357,6 @@ fun bind p y = subst (fn 0 => y | n => n - 1) p
 fun member _ [] = false
   | member a (h :: t) = if a = h then true else member a t
 
-fun concat [] = []
-  | concat (h :: t) = h @ concat t
-
 fun solve s = case s of [] => [[]] | h :: t => case h of (n,r) => case r of
   Pre (b,i,v) => if member (Pre (not b,i,v)) (map snd t) then [] else [t @ [(0,Pre (b,i,v))]]
 | Con (p,q) => [t @ [(0,p)],t @ [(0,q)]]
