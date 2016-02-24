@@ -49,7 +49,7 @@ primrec fv :: "nnf \<Rightarrow> nat list" where
   "fv (Exi p) = adjust (fv p)"
 
 primrec bump :: "(nat \<Rightarrow> nat) \<Rightarrow> nat \<Rightarrow> nat" where
-  "bump f 0 = 0" |
+  "bump _ 0 = 0" |
   "bump f (Suc n) = Suc (f n)"
 
 primrec subst :: "(nat \<Rightarrow> nat) \<Rightarrow> nnf \<Rightarrow> nnf" where
@@ -1324,14 +1324,19 @@ ML
 
 {*
 
-datatype nnf = Pre of bool * string * int list | Con of nnf * nnf | Uni of nnf
+datatype nat = Zero | Suc of nat
+
+datatype nnf = Pre of bool * string * nat list | Con of nnf * nnf | Uni of nnf
                                                | Dis of nnf * nnf | Exi of nnf
 
-val test = Dis (Uni (Con (Pre (false,"P",[0]),Pre (false,"Q",[0]))),
-                Dis (Exi (Pre (true,"Q",[0])),Exi (Pre (true,"P",[0]))))
+val test = Dis (Uni (Con (Pre (false,"P",[Zero]),Pre (false,"Q",[Zero]))),
+                Dis (Exi (Pre (true,"Q",[Zero])),Exi (Pre (true,"P",[Zero]))))
+
+fun extend l Zero = l
+  | extend l (Suc n) = n :: l
 
 fun adjust [] = []
-  | adjust (h :: t) = case h of 0 => adjust t | n => n - 1 :: adjust t
+  | adjust (h :: t) = extend (adjust t) h
 
 fun fv (Pre (_,_,v)) = v
   | fv (Con (p,q)) = fv p @ fv q
@@ -1339,34 +1344,50 @@ fun fv (Pre (_,_,v)) = v
   | fv (Uni p) = adjust (fv p)
   | fv (Exi p) = adjust (fv p)
 
-fun maxn x y = if x > y then x else y
-
-fun maxl [] = 0
-  | maxl (h :: t) = maxn h (maxl t)
-
-fun fresh l = if l = [] then 0 else (maxl l) + 1
+fun bump _ Zero = Zero
+  | bump f (Suc n) = Suc (f n)
 
 fun subst f (Pre (b,i,v)) = Pre (b,i,map f v)
   | subst f (Con (p,q)) = Con (subst f p,subst f q)
   | subst f (Dis (p,q)) = Dis (subst f p,subst f q)
-  | subst f (Uni p) = Uni (subst (fn 0 => 0 | n => f (n - 1) + 1) p)
-  | subst f (Exi p) = Exi (subst (fn 0 => 0 | n => f (n - 1) + 1) p)
+  | subst f (Uni p) = Uni (subst (bump f) p)
+  | subst f (Exi p) = Exi (subst (bump f) p)
 
-fun bind p y = subst (fn 0 => y | n => n - 1) p
+fun bind x Zero = x
+  | bind _ (Suc n) = n
 
-fun member _ [] = false
-  | member a (h :: t) = if a = h then true else member a t
+fun maxd Zero = Zero
+  | maxd (Suc n) = n
 
-fun solve s = case s of [] => [[]] | h :: t => case h of (n,r) => case r of
-  Pre (b,i,v) => if member (Pre (not b,i,v)) (map snd t) then [] else [t @ [(0,Pre (b,i,v))]]
-| Con (p,q) => [t @ [(0,p)],t @ [(0,q)]]
-| Dis (p,q) => [t @ [(0,p),(0,q)]]
-| Uni p => [t @ [(0,bind p (fresh (maps fv (map snd s))))]]
-| Exi p => [t @ [(0,bind p n),(n + 1,r)]]
+fun maxm x Zero = x
+  | maxm x (Suc n) = maxm (maxd x) n
+
+fun maxp x Zero = x
+  | maxp x (Suc n) = Suc (maxp x n)
+
+fun maxl [] = Zero
+  | maxl (h :: t) = maxp (maxm (maxl t) h) h
+
+fun fresh [] = Zero
+  | fresh (h :: t) = Suc (maxp (maxm (maxl t) h) h)
+
+fun stop a _ [] = a
+  | stop a p (h :: t) = if p = h then [] else stop a p t
+
+fun inst p n = subst (bind n) p
+
+fun track s _ (Pre (b,i,v)) = stop [s @ [(Zero,Pre (b,i,v))]] (Pre (not b,i,v)) (map snd s)
+  | track s _ (Con (p,q)) = [s @ [(Zero,p)],s @ [(Zero,q)]]
+  | track s _ (Dis (p,q)) = [s @ [(Zero,p),(Zero,q)]]
+  | track s _ (Uni p) = [s @ [(Zero,inst p (fresh (maps fv (Uni p :: map snd s))))]]
+  | track s n (Exi p) = [s @ [(Zero,inst p n),(Suc n,Exi p)]]
+
+fun solve [] = [[]]
+  | solve (h :: t) = track t (fst h) (snd h)
 
 fun prover a = if a = [] then () else prover (maps solve a)
 
-fun check p = prover [[(0,p)]]
+fun check p = prover [[(Zero,p)]]
 
 val () = check test
 
