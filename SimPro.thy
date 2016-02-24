@@ -33,13 +33,13 @@ primrec semantics :: "model \<Rightarrow> environment \<Rightarrow> nnf \<Righta
   "semantics m e (Uni p) = (\<forall>z \<in> fst m. semantics m (\<lambda>x. case x of 0 \<Rightarrow> z | Suc n \<Rightarrow> e n) p)" |
   "semantics m e (Exi p) = (\<exists>z \<in> fst m. semantics m (\<lambda>x. case x of 0 \<Rightarrow> z | Suc n \<Rightarrow> e n) p)"
 
-primrec adj :: "nat list \<Rightarrow> nat \<Rightarrow> nat list" where
-  "adj l 0 = l" |
-  "adj l (Suc n) = n # l"
+primrec extend :: "nat list \<Rightarrow> nat \<Rightarrow> nat list" where
+  "extend l 0 = l" |
+  "extend l (Suc n) = n # l"
 
 primrec adjust :: "nat list \<Rightarrow> nat list" where
   "adjust [] = []" |
-  "adjust (h # t) = adj (adjust t) h"
+  "adjust (h # t) = extend (adjust t) h"
 
 primrec fv :: "nnf \<Rightarrow> nat list" where
   "fv (Pre _ _ v) = v" |
@@ -191,7 +191,7 @@ by (rule simp_thms,rule simp_thms)
 
 lemmas simps = check_def prover_simps maps_def inst_def append_simps concat_simps map_simps if_simps
   not_simps prod_simps solve.simps track.simps stop.simps fresh.simps maxl.simps maxd.simps
-  maxm.simps maxp.simps bind.simps subst.simps bump.simps fv.simps adjust.simps adj.simps
+  maxm.simps maxp.simps bind.simps subst.simps bump.simps fv.simps adjust.simps extend.simps
   reflexivity inject_simps nnf.inject nat.inject list.inject char.inject
   nat.distinct list.distinct bool.distinct nibble.distinct nnf.distinct
 
@@ -252,9 +252,9 @@ theorem SIMPS:
   "\<And>p. fv (Uni p) \<equiv> adjust (fv p)"
   "\<And>p. fv (Exi p) \<equiv> adjust (fv p)"
   "adjust [] \<equiv> []"
-  "\<And>h t. adjust (h # t) \<equiv> adj (adjust t) h"
-  "\<And>l. adj l 0 \<equiv> l"
-  "\<And>l n. adj l (Suc n) \<equiv> n # l"
+  "\<And>h t. adjust (h # t) \<equiv> extend (adjust t) h"
+  "\<And>l. extend l 0 \<equiv> l"
+  "\<And>l n. extend l (Suc n) \<equiv> n # l"
   "0 = 0 \<equiv> True"
   "[] = [] \<equiv> True"
   "True = True \<equiv> True"
