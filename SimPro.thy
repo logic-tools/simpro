@@ -1384,25 +1384,29 @@ val () = check test
 
 *}
 
+definition make_sequents :: "nnf \<Rightarrow> sequent list" where
+  "make_sequents p \<equiv> [[(0,p)]]"
+
+definition next_sequents :: "sequent list \<Rightarrow> sequent list" where
+  "next_sequents a \<equiv> maps solve a"
+
 (*
 
-export_code make_sequent concat solve test in SML module_name SimPro file "SimPro.sml"
+export_code make_sequents next_sequents test in SML module_name SimPro file "SimPro.sml"
 
 SML_file "SimPro.sml"
 
-SML_export "val SimPro_make_sequent = SimPro.make_sequent"
+SML_export "val SimPro_make_sequents = SimPro.make_sequents"
 
-SML_export "val SimPro_concat = SimPro.concat"
-
-SML_export "val SimPro_inference = SimPro.inference"
+SML_export "val SimPro_next_sequents = SimPro.next_sequents"
 
 SML_export "val SimPro_test = SimPro.test"
 
 ML {*
 
-fun SimPro_prover a = if a = () then true else SimPro_prover ((SimPro_concat o map SimPro_inference) a);
+fun SimPro_prover a = if a = [] then () else SimPro_prover (SimPro_next_sequents a);
 
-fun SimPro_check p = SimPro_prover [SimPro_make_sequent [p]]
+fun SimPro_check p = SimPro_prover (SimPro_make_sequents p)
 
 val () = SimPro_check SimPro_test
 
