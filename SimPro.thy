@@ -79,9 +79,8 @@ primrec maxl :: "nat list \<Rightarrow> nat" where
   "maxl [] = 0" |
   "maxl (h # t) = maxp (maxm (maxl t) h) h"
 
-primrec fresh :: "nat list \<Rightarrow> nat" where
-  "fresh [] = 0" |
-  "fresh (h # t) = Suc (maxp (maxm (maxl t) h) h)"
+definition fresh :: "nat list \<Rightarrow> nat" where
+  "fresh l \<equiv> if l = [] then 0 else Suc (maxl l)"
 
 definition maps :: "('a \<Rightarrow> 'b list) \<Rightarrow> 'a list \<Rightarrow> 'b list" where
   "maps f l \<equiv> concat (map f l)"
@@ -189,8 +188,8 @@ by (simp_all only: reflexivity)
 lemma inject_simps: "(True \<and> b) = b" "(False \<and> b) = False"
 by (rule simp_thms,rule simp_thms)
 
-lemmas simps = check_def prover_simps maps_def inst_def append_simps concat_simps map_simps if_simps
-  not_simps prod_simps solve.simps track.simps stop.simps fresh.simps maxl.simps maxd.simps
+lemmas simps = check_def prover_simps maps_def inst_def fresh_def append_simps concat_simps
+  map_simps if_simps not_simps prod_simps solve.simps track.simps stop.simps maxl.simps maxd.simps
   maxm.simps maxp.simps bind.simps subst.simps bump.simps fv.simps adjust.simps extend.simps
   reflexivity inject_simps nnf.inject nat.inject list.inject char.inject
   nat.distinct list.distinct bool.distinct nibble.distinct nnf.distinct
@@ -205,6 +204,7 @@ theorem SIMPS:
   "\<And>h t. prover (h # t) \<equiv> prover (solve h @ maps solve t)"
   "\<And>f l. maps f l \<equiv> concat (map f l)"
   "\<And>p n. inst p n \<equiv> subst (bind n) p"
+  "\<And>l. fresh l \<equiv> if l = [] then 0 else Suc (maxl l)"
   "\<And>l. [] @ l \<equiv> l"
   "\<And>h t l. (h # t) @ l \<equiv> h # t @ l"
   "concat [] \<equiv> []"
@@ -227,8 +227,6 @@ theorem SIMPS:
   "\<And>s n p. track s n (Exi p) \<equiv> [s @ [(0,inst p n),(Suc n,Exi p)]]"
   "\<And>a p h t. stop a p [] \<equiv> a"
   "\<And>a p h t. stop a p (h # t) \<equiv> (if p = h then [] else stop a p t)"
-  "fresh [] \<equiv> 0"
-  "\<And>h t. fresh (h # t) \<equiv> Suc (maxp (maxm (maxl t) h) h)"
   "maxl [] \<equiv> 0"
   "\<And>h t. maxl (h # t) \<equiv> maxp (maxm (maxl t) h) h"
   "maxd 0 \<equiv> 0"
@@ -299,6 +297,8 @@ theorem SIMPS:
   "Nibble3 = Nibble0 \<equiv> False"
   "Nibble0 = Nibble4 \<equiv> False"
   "Nibble4 = Nibble0 \<equiv> False"
+  "Nibble0 = Nibble5 \<equiv> False"
+  "Nibble5 = Nibble0 \<equiv> False"
 apply (simp only: simps(1))
 apply (simp only: simps(2))
 apply (simp only: simps(3))
@@ -398,13 +398,14 @@ apply (simp only: simps(96))
 apply (simp only: simps(97))
 apply (simp only: simps(98))
 apply (simp only: simps(99))
+apply (simp only: simps(100))
 done
 
-lemmas extra = nibble.distinct(9-) nnf.distinct
+lemmas extra = nibble.distinct(11-) nnf.distinct
 
 proposition "check test"
 unfolding test_def
-by (simp only: SIMPS extra(1-252))
+by (simp only: SIMPS extra(1-250))
 
 section "Basics"
 
@@ -701,7 +702,7 @@ lemma maxl: "\<forall>v \<in> set l. v \<le> maxl l"
   by (induct l) (auto simp: max_def)
 
 lemma fresh: "fresh l \<notin> (set l)"
-  using maxl fresh.simps maxl.simps list.set_cases not_less_eq_eq order_refl by metis
+  using maxl fresh_def maxl.simps not_less_eq_eq order_refl empty_iff list.set(1) by metis
 
 lemma soundness':
   assumes "init s"
@@ -1324,16 +1325,14 @@ ML
 
 {*
 
-datatype nat = Zero | Suc of nat
-
-datatype nnf = Pre of bool * string * nat list | Con of nnf * nnf | Uni of nnf
+datatype nnf = Pre of bool * string * int list | Con of nnf * nnf | Uni of nnf
                                                | Dis of nnf * nnf | Exi of nnf
 
-val test = Dis (Uni (Con (Pre (false,"P",[Zero]),Pre (false,"Q",[Zero]))),
-                Dis (Exi (Pre (true,"Q",[Zero])),Exi (Pre (true,"P",[Zero]))))
+val test = Dis (Uni (Con (Pre (false,"P",[0]),Pre (false,"Q",[0]))),
+                Dis (Exi (Pre (true,"Q",[0])),Exi (Pre (true,"P",[0]))))
 
-fun extend l Zero = l
-  | extend l (Suc n) = n :: l
+fun extend l 0 = l
+  | extend l n = n-1 :: l
 
 fun adjust [] = []
   | adjust (h :: t) = extend (adjust t) h
@@ -1344,8 +1343,8 @@ fun fv (Pre (_,_,v)) = v
   | fv (Uni p) = adjust (fv p)
   | fv (Exi p) = adjust (fv p)
 
-fun bump _ Zero = Zero
-  | bump f (Suc n) = Suc (f n)
+fun bump _ 0 = 0
+  | bump f n = (f n-1)+1
 
 fun subst f (Pre (b,i,v)) = Pre (b,i,map f v)
   | subst f (Con (p,q)) = Con (subst f p,subst f q)
@@ -1353,41 +1352,33 @@ fun subst f (Pre (b,i,v)) = Pre (b,i,map f v)
   | subst f (Uni p) = Uni (subst (bump f) p)
   | subst f (Exi p) = Exi (subst (bump f) p)
 
-fun bind x Zero = x
-  | bind _ (Suc n) = n
+fun bind x 0 = x
+  | bind _ n = n-1
 
-fun maxd Zero = Zero
-  | maxd (Suc n) = n
+fun max x y = if x > y then x else y
 
-fun maxm x Zero = x
-  | maxm x (Suc n) = maxm (maxd x) n
+fun maxl [] = 0
+  | maxl (h :: t) = max h (maxl t)
 
-fun maxp x Zero = x
-  | maxp x (Suc n) = Suc (maxp x n)
-
-fun maxl [] = Zero
-  | maxl (h :: t) = maxp (maxm (maxl t) h) h
-
-fun fresh [] = Zero
-  | fresh (h :: t) = Suc (maxp (maxm (maxl t) h) h)
+fun fresh l = if l = [] then 0 else (maxl l)+1
 
 fun stop a _ [] = a
   | stop a p (h :: t) = if p = h then [] else stop a p t
 
 fun inst p n = subst (bind n) p
 
-fun track s _ (Pre (b,i,v)) = stop [s @ [(Zero,Pre (b,i,v))]] (Pre (not b,i,v)) (map snd s)
-  | track s _ (Con (p,q)) = [s @ [(Zero,p)],s @ [(Zero,q)]]
-  | track s _ (Dis (p,q)) = [s @ [(Zero,p),(Zero,q)]]
-  | track s _ (Uni p) = [s @ [(Zero,inst p (fresh (maps fv (Uni p :: map snd s))))]]
-  | track s n (Exi p) = [s @ [(Zero,inst p n),(Suc n,Exi p)]]
+fun track s _ (Pre (b,i,v)) = stop [s @ [(0,Pre (b,i,v))]] (Pre (not b,i,v)) (map snd s)
+  | track s _ (Con (p,q)) = [s @ [(0,p)],s @ [(0,q)]]
+  | track s _ (Dis (p,q)) = [s @ [(0,p),(0,q)]]
+  | track s _ (Uni p) = [s @ [(0,inst p (fresh (maps fv (Uni p :: map snd s))))]]
+  | track s n (Exi p) = [s @ [(0,inst p n),(n+1,Exi p)]]
 
 fun solve [] = [[]]
   | solve (h :: t) = track t (fst h) (snd h)
 
 fun prover a = if a = [] then () else prover (maps solve a)
 
-fun check p = prover [[(Zero,p)]]
+fun check p = prover [[(0,p)]]
 
 val () = check test
 
