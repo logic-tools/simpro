@@ -1319,7 +1319,9 @@ proof -
     unfolding correctness using magic check_def correctness(1) by (auto,metis) 
 qed
 
-section "Appendix"
+section \<open>Appendix\<close>
+
+text \<open>Code by hand\<close>
 
 ML
 
@@ -1376,13 +1378,17 @@ fun track s _ (Pre (b,i,v)) = stop [s @ [(0,Pre (b,i,v))]] (Pre (not b,i,v)) (ma
 fun solve [] = [[]]
   | solve (h :: t) = track t (fst h) (snd h)
 
-fun prover a = if a = [] then () else prover (maps solve a)
+fun main prover p = prover (maps solve) [[(0,p)]] 
 
-fun check p = prover [[(0,p)]]
+fun prover advances a = if a = [] then () else prover advances (advances a)
+
+val check = main prover
 
 val () = check test
 
 *}
+
+text \<open>Code generation\<close>
 
 definition make_sequents :: "nnf \<Rightarrow> sequent list" where
   "make_sequents p \<equiv> [[(0,p)]]"
