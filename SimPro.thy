@@ -236,7 +236,7 @@ theorem SIMPS:
   "\<And>x. maxp x 0 \<equiv> x"
   "\<And>x n. maxp x (Suc n) \<equiv> Suc (maxp x n)"
   "\<And>x. bind x 0 \<equiv> x"
-  "\<And>x n. bind n (Suc n) \<equiv> n"
+  "\<And>x n n'. bind x (Suc n) \<equiv> n"
   "\<And>f b i v. subst f (Pre b i v) \<equiv> Pre b i (map f v)"
   "\<And>f p q. subst f (Con p q) \<equiv> Con (subst f p) (subst f q)"
   "\<And>f p q. subst f (Dis p q) \<equiv> Dis (subst f p) (subst f q)"
