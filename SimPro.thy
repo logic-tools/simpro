@@ -105,15 +105,18 @@ primrec solve :: "sequent \<Rightarrow> sequent list" where
   "solve [] = [[]]" |
   "solve (h # t) = track t (fst h) (snd h)"
 
+definition main :: "((sequent list \<Rightarrow> sequent list) \<Rightarrow> sequent list \<Rightarrow> bool) \<Rightarrow> nnf \<Rightarrow> bool" where
+  "main prover p \<equiv> prover (maps solve) [[(0,p)]]" 
+
 primrec repeat :: "('a \<Rightarrow> 'a) \<Rightarrow> 'a \<Rightarrow> nat \<Rightarrow> 'a" where
   "repeat _ a 0 = a" |
   "repeat f a (Suc n) = f (repeat f a n)"
 
-definition prover :: "sequent list \<Rightarrow> bool" where
-  "prover a \<equiv> \<exists>n. repeat (maps solve) a n = []"
+definition prover :: "(sequent list \<Rightarrow> sequent list) \<Rightarrow> sequent list \<Rightarrow> bool" where
+  "prover advances a \<equiv> \<exists>n. repeat advances a n = []"
 
 definition check :: "nnf \<Rightarrow> bool" where
-  "check p \<equiv> prover [[(0,p)]]"
+  "check \<equiv> main prover"
 
 abbreviation (input) "CHECK \<equiv> check = (\<lambda>p. \<forall>m e. is_model_environment m e \<longrightarrow> semantics m e p)"
 
@@ -144,7 +147,7 @@ by (induct n) simp_all
 proposition "(\<exists>n. r (repeat f a n)) = (if r a then True else \<exists>n. r (repeat f (f a) n))"
 by (metis repeat.simps repeat_once not0_implies_Suc)
 
-lemma prover_simps: "prover [] = True" "prover (h # t) = prover (solve h @ maps solve t)"
+lemma prover_simps: "prover (maps solve) [] = True" "prover (maps solve) (h # t) = prover (maps solve) (solve h @ maps solve t)"
 unfolding prover_def
 by (metis repeat.simps(1),metis repeat.simps(2) repeat_once list.map concat.simps maps_def)
 
@@ -178,7 +181,7 @@ by (rule simp_thms,rule simp_thms)
 lemma inject_simps: "(True \<and> b) = b" "(False \<and> b) = False"
 by (rule simp_thms,rule simp_thms)
 
-lemmas simps = check_def prover_simps maps_def inst_def fresh_def append_simps concat_simps
+lemmas simps = check_def prover_simps main_def maps_def inst_def fresh_def append_simps concat_simps
   map_simps if_simps not_simps prod_simps solve.simps track.simps stop.simps maxl.simps maxd.simps
   maxm.simps maxp.simps bind.simps subst.simps bump.simps fv.simps adjust.simps extend.simps
   nat_simps list_simps bool_simps inject_simps nnf.inject nat.inject list.inject
@@ -189,9 +192,10 @@ unfolding test_def
 by (simp only: simps)
 
 theorem SIMPS:
-  "\<And>p. check p \<equiv> prover [[(0,p)]]"
-  "prover [] \<equiv> True"
-  "\<And>h t. prover (h # t) \<equiv> prover (solve h @ maps solve t)"
+  "check \<equiv> main prover"
+  "prover (maps solve) [] \<equiv> True"
+  "\<And>h t. prover (maps solve) (h # t) \<equiv> prover (maps solve) (solve h @ maps solve t)"
+  "\<And>p. main prover p \<equiv> prover (maps solve) [[(0,p)]]"
   "\<And>f l. maps f l \<equiv> concat (map f l)"
   "\<And>p n. inst p n \<equiv> subst (bind n) p"
   "\<And>l. fresh l \<equiv> if l = [] then 0 else Suc (maxl l)"
@@ -375,6 +379,7 @@ apply (simp only: simps(90))
 apply (simp only: simps(91))
 apply (simp only: simps(92))
 apply (simp only: simps(93))
+apply (simp only: simps(94))
 done
 
 proposition "check test"
@@ -1268,7 +1273,7 @@ lemma finite_calculation'':
 lemma finite_calculation: "finite (calculation s) = (\<exists>m. loop [s] m = [])"
   using finite_calculation' finite_calculation'' by blast
 
-corollary finite_calculation_prover: "finite (calculation s) = prover [s]"
+corollary finite_calculation_prover: "finite (calculation s) = prover (maps solve) [s]"
   using finite_calculation loop_def prover_def by (simp add: maps)
 
 section "Correctness"
@@ -1279,7 +1284,7 @@ theorem correctness: CHECK VALID
 proof -
   have "\<forall>p. [[(0,p)]] = [map (Pair 0) [p]]" by simp
   then have CHECK
-    using magic check_def valid_def make_sequent_def semantics_alternative.simps by metis
+    using magic check_def valid_def make_sequent_def semantics_alternative.simps main_def by metis
   also have VALID
     using magic make_sequent_def by force
   then show CHECK VALID using calculation by simp_all
@@ -1290,7 +1295,7 @@ proof -
   have "\<not> valid [Pre True 0 []]" "valid [Dis (Pre True 0 []) (Pre False 0 [])]"
     using valid_def is_model_environment_def by auto
   then show "\<exists>p. check p" "\<exists>p. \<not> check p"
-    unfolding correctness using magic check_def correctness(1) by (auto,metis) 
+    using magic correctness semantics_alternative.simps valid_def by (metis,metis)
 qed
 
 section \<open>Appendix\<close>
@@ -1364,31 +1369,23 @@ val () = check test
 
 text \<open>Code generation\<close>
 
-definition make_sequents :: "nnf \<Rightarrow> sequent list" where
-  "make_sequents p \<equiv> [[(0,p)]]"
-
-definition next_sequents :: "sequent list \<Rightarrow> sequent list" where
-  "next_sequents a \<equiv> maps solve a"
-
 (*
 
-export_code make_sequents next_sequents test in SML module_name SimPro file "SimPro.sml"
+export_code main test in SML module_name SimPro file "SimPro.sml"
 
 SML_file "SimPro.sml"
 
-SML_export "val SimPro_make_sequents = SimPro.make_sequents"
-
-SML_export "val SimPro_next_sequents = SimPro.next_sequents"
+SML_export "val SimPro_main = SimPro.main"
 
 SML_export "val SimPro_test = SimPro.test"
 
 ML {*
 
-fun SimPro_prover a = if a = [] then () else SimPro_prover (SimPro_next_sequents a);
+fun SimPro_prover advances a = if a = [] then true else SimPro_prover advances (advances a)
 
-fun SimPro_check p = SimPro_prover (SimPro_make_sequents p)
+val SimPro_check = SimPro_main SimPro_prover
 
-val () = SimPro_check SimPro_test
+val true = SimPro_check SimPro_test
 
 *}
 
