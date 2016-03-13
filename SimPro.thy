@@ -2,7 +2,7 @@ section \<open>A Simple Prover in Isabelle\<close>
 
 theory SimPro imports Main begin
 
-datatype nnf = Pre bool "char list" "nat list" | Con nnf nnf | Dis nnf nnf | Uni nnf | Exi nnf
+datatype nnf = Pre bool nat "nat list" | Con nnf nnf | Dis nnf nnf | Uni nnf | Exi nnf
 
 abbreviation (input) "TEST P Q \<equiv> (\<exists>x. P x \<or> Q x) \<longrightarrow> (\<exists>x. Q x) \<or> (\<exists>x. P x)"
 
@@ -14,12 +14,12 @@ by fast
 
 definition \<comment> \<open>TEST P Q\<close>
   "test \<equiv> Dis
-    (Uni (Con (Pre False ''P'' [0]) (Pre False ''Q'' [0]))) 
-    (Dis (Exi (Pre True ''Q'' [0])) (Exi (Pre True ''P'' [0])))"
+    (Uni (Con (Pre False 0 [0]) (Pre False (Suc 0) [0]))) 
+    (Dis (Exi (Pre True (Suc 0) [0])) (Exi (Pre True 0 [0])))"
 
 type_synonym proxy = "unit list"
 
-type_synonym model = "proxy set \<times> (char list \<Rightarrow> proxy list \<Rightarrow> bool)"
+type_synonym model = "proxy set \<times> (nat \<Rightarrow> proxy list \<Rightarrow> bool)"
 
 type_synonym environment = "nat \<Rightarrow> proxy"
 
@@ -166,24 +166,14 @@ by (rule simp_thms,rule simp_thms,rule nnf_simps)
 lemma prod_simps: "fst (x,y) = x" "snd (x,y) = y"
 unfolding fst_def snd_def by (rule prod.case,rule prod.case)
 
-lemma reflexivity: "(0 = 0) = True" "([] = []) = True"
-  "(True = True) = True" "(False = False) = True"
-  "(Nibble0 = Nibble0) = True" "(Nibble1 = Nibble1) = True"
-  "(Nibble2 = Nibble2) = True" "(Nibble3 = Nibble3) = True"
-  "(Nibble4 = Nibble4) = True" "(Nibble5 = Nibble5) = True"
-  "(Nibble6 = Nibble6) = True" "(Nibble7 = Nibble7) = True"
-  "(Nibble8 = Nibble8) = True" "(Nibble9 = Nibble9) = True"
-  "(NibbleA = NibbleA) = True" "(NibbleB = NibbleB) = True"
-  "(NibbleC = NibbleC) = True" "(NibbleD = NibbleD) = True"
-  "(NibbleE = NibbleE) = True" "(NibbleF = NibbleF) = True"
-by (rule simp_thms)+
+lemma nat_simps: "(0 = 0) = True"
+by (rule simp_thms)
 
-lemma "0 = 0" "[] = []" "True = True" "False = False"
-  "Nibble0 = Nibble0" "Nibble1 = Nibble1" "Nibble2 = Nibble2" "Nibble3 = Nibble3"
-  "Nibble4 = Nibble4" "Nibble5 = Nibble5" "Nibble6 = Nibble6" "Nibble7 = Nibble7"
-  "Nibble8 = Nibble8" "Nibble9 = Nibble9" "NibbleA = NibbleA" "NibbleB = NibbleB"
-  "NibbleC = NibbleC" "NibbleD = NibbleD" "NibbleE = NibbleE" "NibbleF = NibbleF"
-by (simp_all only: reflexivity)
+lemma list_simps: "([] = []) = True"
+by (rule simp_thms)
+
+lemma bool_simps: "(True = True) = True" "(False = False) = True"
+by (rule simp_thms,rule simp_thms)
 
 lemma inject_simps: "(True \<and> b) = b" "(False \<and> b) = False"
 by (rule simp_thms,rule simp_thms)
@@ -191,8 +181,8 @@ by (rule simp_thms,rule simp_thms)
 lemmas simps = check_def prover_simps maps_def inst_def fresh_def append_simps concat_simps
   map_simps if_simps not_simps prod_simps solve.simps track.simps stop.simps maxl.simps maxd.simps
   maxm.simps maxp.simps bind.simps subst.simps bump.simps fv.simps adjust.simps extend.simps
-  reflexivity inject_simps nnf.inject nat.inject list.inject char.inject
-  nat.distinct list.distinct bool.distinct nibble.distinct nnf.distinct
+  nat_simps list_simps bool_simps inject_simps nnf.inject nat.inject list.inject
+  nat.distinct list.distinct bool.distinct nnf.distinct
 
 proposition "check test"
 unfolding test_def
@@ -257,22 +247,6 @@ theorem SIMPS:
   "[] = [] \<equiv> True"
   "True = True \<equiv> True"
   "False = False \<equiv> True"
-  "Nibble0 = Nibble0 \<equiv> True"
-  "Nibble1 = Nibble1 \<equiv> True" 
-  "Nibble2 = Nibble2 \<equiv> True"
-  "Nibble3 = Nibble3 \<equiv> True"
-  "Nibble4 = Nibble4 \<equiv> True"
-  "Nibble5 = Nibble5 \<equiv> True"
-  "Nibble6 = Nibble6 \<equiv> True"
-  "Nibble7 = Nibble7 \<equiv> True"
-  "Nibble8 = Nibble8 \<equiv> True"
-  "Nibble9 = Nibble9 \<equiv> True"
-  "NibbleA = NibbleA \<equiv> True"
-  "NibbleB = NibbleB \<equiv> True"
-  "NibbleC = NibbleC \<equiv> True"
-  "NibbleD = NibbleD \<equiv> True"
-  "NibbleE = NibbleE \<equiv> True"
-  "NibbleF = NibbleF \<equiv> True"
   "\<And>b. True \<and> b \<equiv> b"
   "\<And>b. False \<and> b \<equiv> False"
   "\<And>b i v b' i' v'. Pre b i v = Pre b' i' v' \<equiv> b = b' \<and> i = i' \<and> v = v'"
@@ -282,23 +256,32 @@ theorem SIMPS:
   "\<And>p p'. Exi p = Exi p' \<equiv> p = p'"
   "\<And>n n'. Suc n = Suc n' \<equiv> n = n'"
   "\<And>h t h' t'. h # t = h' # t' \<equiv> h = h' \<and> t = t'"
-  "\<And>x y x' y'. Char x y = Char x' y' \<equiv> x = x' \<and> y = y'"
   "\<And>n. 0 = Suc n \<equiv> False"
   "\<And>n. Suc n = 0 \<equiv> False"
   "\<And>h t. [] = h # t \<equiv> False"
   "\<And>h t. h # t = [] \<equiv> False"
   "True = False \<equiv> False"
   "False = True \<equiv> False"
-  "Nibble0 = Nibble1 \<equiv> False"
-  "Nibble1 = Nibble0 \<equiv> False"
-  "Nibble0 = Nibble2 \<equiv> False"
-  "Nibble2 = Nibble0 \<equiv> False"
-  "Nibble0 = Nibble3 \<equiv> False"
-  "Nibble3 = Nibble0 \<equiv> False"
-  "Nibble0 = Nibble4 \<equiv> False"
-  "Nibble4 = Nibble0 \<equiv> False"
-  "Nibble0 = Nibble5 \<equiv> False"
-  "Nibble5 = Nibble0 \<equiv> False"
+  "\<And>b i v p q. Pre b i v = Con p q \<equiv> False"
+  "\<And>b i v p q. Con p q = Pre b i v \<equiv> False"
+  "\<And>b i v p q. Pre b i v = Dis p q \<equiv> False"
+  "\<And>b i v p q. Dis p q = Pre b i v \<equiv> False"
+  "\<And>b i v p. Pre b i v = Uni p \<equiv> False"
+  "\<And>b i v p. Uni p = Pre b i v \<equiv> False"
+  "\<And>b i v p. Pre b i v = Exi p \<equiv> False"
+  "\<And>b i v p. Exi p = Pre b i v \<equiv> False"
+  "\<And>p q p' q'. Con p q = Dis p' q' \<equiv> False"
+  "\<And>p q p' q'. Dis p' q' = Con p q \<equiv> False"
+  "\<And>p q p'. Con p q = Uni p' \<equiv> False"
+  "\<And>p q p'. Uni p' = Con p q \<equiv> False"
+  "\<And>p q p'. Con p q = Exi p' \<equiv> False"
+  "\<And>p q p'. Exi p' = Con p q \<equiv> False"
+  "\<And>p q p'. Dis p q = Uni p' \<equiv> False"
+  "\<And>p q p'. Uni p' = Dis p q \<equiv> False"
+  "\<And>p q p'. Dis p q = Exi p' \<equiv> False"
+  "\<And>p q p'. Exi p' = Dis p q \<equiv> False"
+  "\<And>p p'. Uni p = Exi p' \<equiv> False"
+  "\<And>p p'. Exi p' = Uni p \<equiv> False"
 apply (simp only: simps(1))
 apply (simp only: simps(2))
 apply (simp only: simps(3))
@@ -392,20 +375,11 @@ apply (simp only: simps(90))
 apply (simp only: simps(91))
 apply (simp only: simps(92))
 apply (simp only: simps(93))
-apply (simp only: simps(94))
-apply (simp only: simps(95))
-apply (simp only: simps(96))
-apply (simp only: simps(97))
-apply (simp only: simps(98))
-apply (simp only: simps(99))
-apply (simp only: simps(100))
 done
-
-lemmas extra = nibble.distinct(11-) nnf.distinct
 
 proposition "check test"
 unfolding test_def
-by (simp only: SIMPS extra(1-250))
+by (simp only: SIMPS)
 
 section "Basics"
 
@@ -1313,7 +1287,7 @@ qed
 
 corollary "\<exists>p. check p" "\<exists>p. \<not> check p"
 proof -
-  have "\<not> valid [Pre True '''' []]" "valid [Dis (Pre True '''' []) (Pre False '''' [])]"
+  have "\<not> valid [Pre True 0 []]" "valid [Dis (Pre True 0 []) (Pre False 0 [])]"
     using valid_def is_model_environment_def by auto
   then show "\<exists>p. check p" "\<exists>p. \<not> check p"
     unfolding correctness using magic check_def correctness(1) by (auto,metis) 
