@@ -112,8 +112,8 @@ primrec repeat :: "('a \<Rightarrow> 'a) \<Rightarrow> 'a \<Rightarrow> nat \<Ri
   "repeat _ a 0 = a" |
   "repeat f a (Suc n) = f (repeat f a n)"
 
-definition prover :: "(sequent list \<Rightarrow> sequent list) \<Rightarrow> sequent list \<Rightarrow> bool" where
-  "prover advances a \<equiv> \<exists>n. repeat advances a n = []"
+definition prover :: "('a list \<Rightarrow> 'a list ) \<Rightarrow> 'a list \<Rightarrow> bool" where
+  "prover f a \<equiv> \<exists>n. repeat f a n = []"
 
 definition check :: "nnf \<Rightarrow> bool" where
   "check \<equiv> main prover"
@@ -151,9 +151,9 @@ lemma prover_done: "prover (maps solve) [] = True"
 unfolding prover_def
 by (metis repeat.simps(1))
 
-lemma prover_next: "prover (maps solve) (h # t) = prover (maps solve) (solve h @ maps solve t)"
+lemma prover_next: "prover (maps solve) (h # t) = prover (maps solve) (maps solve (h # t))"
 unfolding prover_def
-by (metis repeat.simps(2) repeat_once list.map concat.simps maps_def)
+by (metis repeat.simps(2) repeat_once list.map(1) concat.simps(1) maps_def)
 
 lemma append_simps: "[] @ l = l" "(h # t) @ l = h # t @ l"
 by (rule append.simps(1),rule append.simps(2))
@@ -197,7 +197,7 @@ by (simp only: simps)
 
 theorem SIMPS:
   "\<And>p. main prover p \<equiv> prover (maps solve) [[(0,p)]]"
-  "\<And>h t. prover (maps solve) (h # t) \<equiv> prover (maps solve) (solve h @ maps solve t)"
+  "\<And>h t. prover (maps solve) (h # t) \<equiv> prover (maps solve) (maps solve (h # t))"
   "prover (maps solve) [] \<equiv> True"
   "solve [] \<equiv> [[]]"
   "\<And>h t. solve (h # t) \<equiv> track t (fst h) (snd h)"
@@ -529,7 +529,6 @@ lemma fSuc:
   and "f n \<in> calculation s \<and> fst (f n) = n \<and> infinite (calculation (snd (f n))) \<and> \<not> is_axiom (list_sequent (snd (f n)))"
   shows "f (Suc n) \<in> calculation s \<and> fst (f (Suc n)) = Suc n \<and> (snd (f (Suc n))) \<in> set (solve (snd (f n))) \<and> infinite (calculation (snd (f (Suc n)))) \<and> \<not> is_axiom (list_sequent (snd (f (Suc n))))"
   proof -
-    fix g Y
     have "infinite (\<Union> (calculation ` {w. \<not> is_axiom (list_sequent (snd (f n))) \<and> w \<in> set (solve (snd (f n)))}))"
       using assms by (metis (mono_tags,lifting) Collect_cong calculation finite.insertI finite_imageI)
     then show ?thesis using assms calculation.step is_axiom_finite_calculation
@@ -1275,9 +1274,9 @@ lemma finite_calculation: "finite (calculation s) = (\<exists>m. loop [s] m = []
   using finite_calculation' finite_calculation'' by blast
 
 corollary finite_calculation_prover: "finite (calculation s) = prover (maps solve) [s]"
-  using finite_calculation loop_def prover_def by (simp add: maps)
+  using finite_calculation loop_def prover_def maps by metis
 
-section "Correctness"
+section \<open>Correctness\<close>
 
 lemmas magic = soundness completeness finite_calculation_prover
 
@@ -1360,7 +1359,7 @@ fun solve [] = [[]]
 
 fun main prover p = prover (maps solve) [[(0,p)]] 
 
-fun prover advances a = if a = [] then () else prover advances (advances a)
+fun prover f a = if a = [] then () else prover f (f a)
 
 val check = main prover
 
@@ -1382,7 +1381,7 @@ SML_export "val SimPro_test = SimPro.test"
 
 ML {*
 
-fun SimPro_prover advances a = if a = [] then true else SimPro_prover advances (advances a)
+fun SimPro_prover f a = if a = [] then true else SimPro_prover f (f a)
 
 val SimPro_check = SimPro_main SimPro_prover
 
