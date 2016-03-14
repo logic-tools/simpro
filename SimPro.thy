@@ -181,21 +181,20 @@ by (rule simp_thms,rule simp_thms)
 lemma inject_simps: "(True \<and> b) = b" "(False \<and> b) = False"
 by (rule simp_thms,rule simp_thms)
 
-lemmas simps = check_def prover_simps main_def maps_def inst_def fresh_def append_simps concat_simps
+lemmas simps = main_def prover_simps maps_def inst_def fresh_def append_simps concat_simps
   map_simps if_simps not_simps prod_simps solve.simps track.simps stop.simps maxl.simps maxd.simps
   maxm.simps maxp.simps bind.simps subst.simps bump.simps fv.simps adjust.simps extend.simps
   nat_simps list_simps bool_simps inject_simps nnf.inject nat.inject list.inject
   nat.distinct list.distinct bool.distinct nnf.distinct
 
 proposition "check test"
-unfolding test_def
+unfolding check_def test_def
 by (simp only: simps)
 
 theorem SIMPS:
-  "check \<equiv> main prover"
+  "\<And>p. main prover p \<equiv> prover (maps solve) [[(0,p)]]"
   "prover (maps solve) [] \<equiv> True"
   "\<And>h t. prover (maps solve) (h # t) \<equiv> prover (maps solve) (solve h @ maps solve t)"
-  "\<And>p. main prover p \<equiv> prover (maps solve) [[(0,p)]]"
   "\<And>f l. maps f l \<equiv> concat (map f l)"
   "\<And>p n. inst p n \<equiv> subst (bind n) p"
   "\<And>l. fresh l \<equiv> if l = [] then 0 else Suc (maxl l)"
@@ -286,104 +285,102 @@ theorem SIMPS:
   "\<And>p q p'. Exi p' = Dis p q \<equiv> False"
   "\<And>p p'. Uni p = Exi p' \<equiv> False"
   "\<And>p p'. Exi p' = Uni p \<equiv> False"
-apply (simp only: simps(1))
-apply (simp only: simps(2))
-apply (simp only: simps(3))
-apply (simp only: simps(4))
-apply (simp only: simps(5))
-apply (simp only: simps(6))
-apply (simp only: simps(7))
-apply (simp only: simps(8))
-apply (simp only: simps(9))
-apply (simp only: simps(10))
-apply (simp only: simps(11))
-apply (simp only: simps(12))
-apply (simp only: simps(13))
-apply (simp only: simps(14))
-apply (simp only: simps(15))
-apply (simp only: simps(16))
-apply (simp only: simps(17))
-apply (simp only: simps(18))
-apply (simp only: simps(19))
-apply (simp only: simps(20))
-apply (simp only: simps(21))
-apply (simp only: simps(22))
-apply (simp only: simps(23))
-apply (simp only: simps(24))
-apply (simp only: simps(25))
-apply (simp only: simps(26))
-apply (simp only: simps(27))
-apply (simp only: simps(28))
-apply (simp only: simps(29))
-apply (simp only: simps(30))
-apply (simp only: simps(31))
-apply (simp only: simps(32))
-apply (simp only: simps(33))
-apply (simp only: simps(34))
-apply (simp only: simps(35))
-apply (simp only: simps(36))
-apply (simp only: simps(37))
-apply (simp only: simps(38))
-apply (simp only: simps(39))
-apply (simp only: simps(40))
-apply (simp only: simps(41))
-apply (simp only: simps(42))
-apply (simp only: simps(43))
-apply (simp only: simps(44))
-apply (simp only: simps(45))
-apply (simp only: simps(46))
-apply (simp only: simps(47))
-apply (simp only: simps(48))
-apply (simp only: simps(49))
-apply (simp only: simps(50))
-apply (simp only: simps(51))
-apply (simp only: simps(52))
-apply (simp only: simps(53))
-apply (simp only: simps(54))
-apply (simp only: simps(55))
-apply (simp only: simps(56))
-apply (simp only: simps(57))
-apply (simp only: simps(58))
-apply (simp only: simps(59))
-apply (simp only: simps(60))
-apply (simp only: simps(61))
-apply (simp only: simps(62))
-apply (simp only: simps(63))
-apply (simp only: simps(64))
-apply (simp only: simps(65))
-apply (simp only: simps(66))
-apply (simp only: simps(67))
-apply (simp only: simps(68))
-apply (simp only: simps(69))
-apply (simp only: simps(70))
-apply (simp only: simps(71))
-apply (simp only: simps(72))
-apply (simp only: simps(73))
-apply (simp only: simps(74))
-apply (simp only: simps(75))
-apply (simp only: simps(76))
-apply (simp only: simps(77))
-apply (simp only: simps(78))
-apply (simp only: simps(79))
-apply (simp only: simps(80))
-apply (simp only: simps(81))
-apply (simp only: simps(82))
-apply (simp only: simps(83))
-apply (simp only: simps(84))
-apply (simp only: simps(85))
-apply (simp only: simps(86))
-apply (simp only: simps(87))
-apply (simp only: simps(88))
-apply (simp only: simps(89))
-apply (simp only: simps(90))
-apply (simp only: simps(91))
-apply (simp only: simps(92))
-apply (simp only: simps(93))
-apply (simp only: simps(94))
-done
+by ((simp only: simps(1)),
+    (simp only: simps(2)),
+    (simp only: simps(3)),
+    (simp only: simps(4)),
+    (simp only: simps(5)),
+    (simp only: simps(6)),
+    (simp only: simps(7)),
+    (simp only: simps(8)),
+    (simp only: simps(9)),
+    (simp only: simps(10)),
+    (simp only: simps(11)),
+    (simp only: simps(12)),
+    (simp only: simps(13)),
+    (simp only: simps(14)),
+    (simp only: simps(15)),
+    (simp only: simps(16)),
+    (simp only: simps(17)),
+    (simp only: simps(18)),
+    (simp only: simps(19)),
+    (simp only: simps(20)),
+    (simp only: simps(21)),
+    (simp only: simps(22)),
+    (simp only: simps(23)),
+    (simp only: simps(24)),
+    (simp only: simps(25)),
+    (simp only: simps(26)),
+    (simp only: simps(27)),
+    (simp only: simps(28)),
+    (simp only: simps(29)),
+    (simp only: simps(30)),
+    (simp only: simps(31)),
+    (simp only: simps(32)),
+    (simp only: simps(33)),
+    (simp only: simps(34)),
+    (simp only: simps(35)),
+    (simp only: simps(36)),
+    (simp only: simps(37)),
+    (simp only: simps(38)),
+    (simp only: simps(39)),
+    (simp only: simps(40)),
+    (simp only: simps(41)),
+    (simp only: simps(42)),
+    (simp only: simps(43)),
+    (simp only: simps(44)),
+    (simp only: simps(45)),
+    (simp only: simps(46)),
+    (simp only: simps(47)),
+    (simp only: simps(48)),
+    (simp only: simps(49)),
+    (simp only: simps(50)),
+    (simp only: simps(51)),
+    (simp only: simps(52)),
+    (simp only: simps(53)),
+    (simp only: simps(54)),
+    (simp only: simps(55)),
+    (simp only: simps(56)),
+    (simp only: simps(57)),
+    (simp only: simps(58)),
+    (simp only: simps(59)),
+    (simp only: simps(60)),
+    (simp only: simps(61)),
+    (simp only: simps(62)),
+    (simp only: simps(63)),
+    (simp only: simps(64)),
+    (simp only: simps(65)),
+    (simp only: simps(66)),
+    (simp only: simps(67)),
+    (simp only: simps(68)),
+    (simp only: simps(69)),
+    (simp only: simps(70)),
+    (simp only: simps(71)),
+    (simp only: simps(72)),
+    (simp only: simps(73)),
+    (simp only: simps(74)),
+    (simp only: simps(75)),
+    (simp only: simps(76)),
+    (simp only: simps(77)),
+    (simp only: simps(78)),
+    (simp only: simps(79)),
+    (simp only: simps(80)),
+    (simp only: simps(81)),
+    (simp only: simps(82)),
+    (simp only: simps(83)),
+    (simp only: simps(84)),
+    (simp only: simps(85)),
+    (simp only: simps(86)),
+    (simp only: simps(87)),
+    (simp only: simps(88)),
+    (simp only: simps(89)),
+    (simp only: simps(90)),
+    (simp only: simps(91)),
+    (simp only: simps(92)),
+    (simp only: simps(93)))
 
 proposition "check test"
-unfolding test_def
+unfolding check_def test_def
 by (simp only: SIMPS)
 
 section "Basics"
