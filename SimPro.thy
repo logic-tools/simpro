@@ -82,15 +82,15 @@ primrec maxl :: "nat list \<Rightarrow> nat" where
 definition fresh :: "nat list \<Rightarrow> nat" where
   "fresh l \<equiv> if l = [] then 0 else Suc (maxl l)"
 
-definition maps :: "('a \<Rightarrow> 'b list) \<Rightarrow> 'a list \<Rightarrow> 'b list" where
-  "maps f l \<equiv> concat (map f l)"
-
 primrec stop :: "'a list \<Rightarrow> 'b \<Rightarrow> 'b list \<Rightarrow> 'a list" where
   "stop a _ [] = a" |
   "stop a p (h # t) = (if p = h then [] else stop a p t)"
 
 definition inst :: "nnf \<Rightarrow> nat \<Rightarrow> nnf" where
   "inst p n \<equiv> subst (bind n) p"
+
+definition maps :: "('a \<Rightarrow> 'b list) \<Rightarrow> 'a list \<Rightarrow> 'b list" where
+  "maps f l \<equiv> concat (map f l)"
 
 type_synonym sequent = "(nat \<times> nnf) list"
 
@@ -147,9 +147,13 @@ by (induct n) simp_all
 proposition "(\<exists>n. r (repeat f a n)) = (if r a then True else \<exists>n. r (repeat f (f a) n))"
 by (metis repeat.simps repeat_once not0_implies_Suc)
 
-lemma prover_simps: "prover (maps solve) [] = True" "prover (maps solve) (h # t) = prover (maps solve) (solve h @ maps solve t)"
+lemma prover_done: "prover (maps solve) [] = True"
 unfolding prover_def
-by (metis repeat.simps(1),metis repeat.simps(2) repeat_once list.map concat.simps maps_def)
+by (metis repeat.simps(1))
+
+lemma prover_next: "prover (maps solve) (h # t) = prover (maps solve) (solve h @ maps solve t)"
+unfolding prover_def
+by (metis repeat.simps(2) repeat_once list.map concat.simps maps_def)
 
 lemma append_simps: "[] @ l = l" "(h # t) @ l = h # t @ l"
 by (rule append.simps(1),rule append.simps(2))
@@ -181,36 +185,20 @@ by (rule simp_thms,rule simp_thms)
 lemma inject_simps: "(True \<and> b) = b" "(False \<and> b) = False"
 by (rule simp_thms,rule simp_thms)
 
-lemmas simps = main_def prover_simps maps_def inst_def fresh_def append_simps concat_simps
-  map_simps if_simps not_simps prod_simps solve.simps track.simps stop.simps maxl.simps maxd.simps
-  maxm.simps maxp.simps bind.simps subst.simps bump.simps fv.simps adjust.simps extend.simps
+lemmas simps = main_def prover_next prover_done solve.simps track.simps maps_def inst_def
+  stop.simps fresh_def maxl.simps maxd.simps maxm.simps maxp.simps bind.simps subst.simps
+  bump.simps fv.simps adjust.simps extend.simps append_simps concat_simps map_simps
+  if_simps not_simps prod_simps nnf.distinct nat.distinct list.distinct bool.distinct
   nat_simps list_simps bool_simps inject_simps nnf.inject nat.inject list.inject
-  nat.distinct list.distinct bool.distinct nnf.distinct
-
+ 
 proposition "check test"
 unfolding check_def test_def
 by (simp only: simps)
 
 theorem SIMPS:
   "\<And>p. main prover p \<equiv> prover (maps solve) [[(0,p)]]"
-  "prover (maps solve) [] \<equiv> True"
   "\<And>h t. prover (maps solve) (h # t) \<equiv> prover (maps solve) (solve h @ maps solve t)"
-  "\<And>f l. maps f l \<equiv> concat (map f l)"
-  "\<And>p n. inst p n \<equiv> subst (bind n) p"
-  "\<And>l. fresh l \<equiv> if l = [] then 0 else Suc (maxl l)"
-  "\<And>l. [] @ l \<equiv> l"
-  "\<And>h t l. (h # t) @ l \<equiv> h # t @ l"
-  "concat [] \<equiv> []"
-  "\<And>h t . concat (h # t) \<equiv> h @ concat t"
-  "\<And>f. map f [] \<equiv> []"
-  "\<And>f h t. map f (h # t) \<equiv> f h # map f t"
-  "\<And>x y. if True then x else y \<equiv> x"
-  "\<And>x y. if False then x else y \<equiv> y"
-  "\<not> True \<equiv> False"
-  "\<not> False \<equiv> True"
-  "\<And>b. \<not> \<not> b \<equiv> b"
-  "\<And>x y. fst (x,y) \<equiv> x"
-  "\<And>x y. snd (x,y) \<equiv> y"
+  "prover (maps solve) [] \<equiv> True"
   "solve [] \<equiv> [[]]"
   "\<And>h t. solve (h # t) \<equiv> track t (fst h) (snd h)"
   "\<And>s n b i v. track s n (Pre b i v) \<equiv> stop [s @ [(0,Pre b i v)]] (Pre (\<not> b) i v) (map snd s)"
@@ -218,8 +206,11 @@ theorem SIMPS:
   "\<And>s n p q. track s n (Dis p q) \<equiv> [s @ [(0,p),(0,q)]]"
   "\<And>s n p. track s n (Uni p) \<equiv> [s @ [(0,inst p (fresh (maps fv (Uni p # map snd s))))]]"
   "\<And>s n p. track s n (Exi p) \<equiv> [s @ [(0,inst p n),(Suc n,Exi p)]]"
+  "\<And>f l. maps f l \<equiv> concat (map f l)"
+  "\<And>p n. inst p n \<equiv> subst (bind n) p"
   "\<And>a p h t. stop a p [] \<equiv> a"
   "\<And>a p h t. stop a p (h # t) \<equiv> (if p = h then [] else stop a p t)"
+  "\<And>l. fresh l \<equiv> if l = [] then 0 else Suc (maxl l)"
   "maxl [] \<equiv> 0"
   "\<And>h t. maxl (h # t) \<equiv> maxp (maxm (maxl t) h) h"
   "maxd 0 \<equiv> 0"
@@ -246,25 +237,19 @@ theorem SIMPS:
   "\<And>h t. adjust (h # t) \<equiv> extend (adjust t) h"
   "\<And>l. extend l 0 \<equiv> l"
   "\<And>l n. extend l (Suc n) \<equiv> n # l"
-  "0 = 0 \<equiv> True"
-  "[] = [] \<equiv> True"
-  "True = True \<equiv> True"
-  "False = False \<equiv> True"
-  "\<And>b. True \<and> b \<equiv> b"
-  "\<And>b. False \<and> b \<equiv> False"
-  "\<And>b i v b' i' v'. Pre b i v = Pre b' i' v' \<equiv> b = b' \<and> i = i' \<and> v = v'"
-  "\<And>p q p' q'. Con p q = Con p' q' \<equiv> p = p' \<and> q = q'"
-  "\<And>p q p' q'. Dis p q = Dis p' q' \<equiv> p = p' \<and> q = q'"
-  "\<And>p p'. Uni p = Uni p' \<equiv> p = p'"
-  "\<And>p p'. Exi p = Exi p' \<equiv> p = p'"
-  "\<And>n n'. Suc n = Suc n' \<equiv> n = n'"
-  "\<And>h t h' t'. h # t = h' # t' \<equiv> h = h' \<and> t = t'"
-  "\<And>n. 0 = Suc n \<equiv> False"
-  "\<And>n. Suc n = 0 \<equiv> False"
-  "\<And>h t. [] = h # t \<equiv> False"
-  "\<And>h t. h # t = [] \<equiv> False"
-  "True = False \<equiv> False"
-  "False = True \<equiv> False"
+  "\<And>l. [] @ l \<equiv> l"
+  "\<And>h t l. (h # t) @ l \<equiv> h # t @ l"
+  "concat [] \<equiv> []"
+  "\<And>h t . concat (h # t) \<equiv> h @ concat t"
+  "\<And>f. map f [] \<equiv> []"
+  "\<And>f h t. map f (h # t) \<equiv> f h # map f t"
+  "\<And>x y. if True then x else y \<equiv> x"
+  "\<And>x y. if False then x else y \<equiv> y"
+  "\<not> True \<equiv> False"
+  "\<not> False \<equiv> True"
+  "\<And>b. \<not> \<not> b \<equiv> b"
+  "\<And>x y. fst (x,y) \<equiv> x"
+  "\<And>x y. snd (x,y) \<equiv> y"
   "\<And>b i v p q. Pre b i v = Con p q \<equiv> False"
   "\<And>b i v p q. Con p q = Pre b i v \<equiv> False"
   "\<And>b i v p q. Pre b i v = Dis p q \<equiv> False"
@@ -285,6 +270,25 @@ theorem SIMPS:
   "\<And>p q p'. Exi p' = Dis p q \<equiv> False"
   "\<And>p p'. Uni p = Exi p' \<equiv> False"
   "\<And>p p'. Exi p' = Uni p \<equiv> False"
+  "\<And>n. 0 = Suc n \<equiv> False"
+  "\<And>n. Suc n = 0 \<equiv> False"
+  "\<And>h t. [] = h # t \<equiv> False"
+  "\<And>h t. h # t = [] \<equiv> False"
+  "True = False \<equiv> False"
+  "False = True \<equiv> False"
+  "0 = 0 \<equiv> True"
+  "[] = [] \<equiv> True"
+  "True = True \<equiv> True"
+  "False = False \<equiv> True"
+  "\<And>b. True \<and> b \<equiv> b"
+  "\<And>b. False \<and> b \<equiv> False"
+  "\<And>b i v b' i' v'. Pre b i v = Pre b' i' v' \<equiv> b = b' \<and> i = i' \<and> v = v'"
+  "\<And>p q p' q'. Con p q = Con p' q' \<equiv> p = p' \<and> q = q'"
+  "\<And>p q p' q'. Dis p q = Dis p' q' \<equiv> p = p' \<and> q = q'"
+  "\<And>p p'. Uni p = Uni p' \<equiv> p = p'"
+  "\<And>p p'. Exi p = Exi p' \<equiv> p = p'"
+  "\<And>n n'. Suc n = Suc n' \<equiv> n = n'"
+  "\<And>h t h' t'. h # t = h' # t' \<equiv> h = h' \<and> t = t'"
 by ((simp only: simps(1)),
     (simp only: simps(2)),
     (simp only: simps(3)),
