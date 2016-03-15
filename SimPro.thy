@@ -63,6 +63,9 @@ primrec bind :: "nat \<Rightarrow> nat \<Rightarrow> nat" where
   "bind x 0 = x" |
   "bind _ (Suc n) = n"
 
+definition inst :: "nnf \<Rightarrow> nat \<Rightarrow> nnf" where
+  "inst p x \<equiv> subst (bind x) p"
+
 primrec maxd :: "nat \<Rightarrow> nat" where
   "maxd 0 = 0" |
   "maxd (Suc n) = n"
@@ -85,9 +88,6 @@ definition fresh :: "nat list \<Rightarrow> nat" where
 primrec stop :: "'a list \<Rightarrow> 'b \<Rightarrow> 'b list \<Rightarrow> 'a list" where
   "stop a _ [] = a" |
   "stop a p (h # t) = (if p = h then [] else stop a p t)"
-
-definition inst :: "nnf \<Rightarrow> nat \<Rightarrow> nnf" where
-  "inst p n \<equiv> subst (bind n) p"
 
 definition maps :: "('a \<Rightarrow> 'b list) \<Rightarrow> 'a list \<Rightarrow> 'b list" where
   "maps f l \<equiv> concat (map f l)"
@@ -185,8 +185,8 @@ by (rule simp_thms,rule simp_thms)
 lemma inject_simps: "(True \<and> b) = b" "(False \<and> b) = False"
 by (rule simp_thms,rule simp_thms)
 
-lemmas simps = main_def prover_next prover_done solve.simps track.simps maps_def inst_def
-  stop.simps fresh_def maxl.simps maxd.simps maxm.simps maxp.simps bind.simps subst.simps
+lemmas simps = main_def prover_next prover_done solve.simps track.simps maps_def stop.simps
+  fresh_def maxl.simps maxd.simps maxm.simps maxp.simps inst_def bind.simps subst.simps
   bump.simps fv.simps adjust.simps extend.simps append_simps concat_simps map_simps
   if_simps not_simps prod_simps nnf.distinct nat.distinct list.distinct bool.distinct
   nat_simps list_simps bool_simps inject_simps nnf.inject nat.inject list.inject
@@ -207,8 +207,7 @@ theorem SIMPS:
   "\<And>s n p. track s n (Uni p) \<equiv> [s @ [(0,inst p (fresh (maps fv (Uni p # map snd s))))]]"
   "\<And>s n p. track s n (Exi p) \<equiv> [s @ [(0,inst p n),(Suc n,Exi p)]]"
   "\<And>f l. maps f l \<equiv> concat (map f l)"
-  "\<And>p n. inst p n \<equiv> subst (bind n) p"
-  "\<And>a p h t. stop a p [] \<equiv> a"
+  "\<And>a p. stop a p [] \<equiv> a"
   "\<And>a p h t. stop a p (h # t) \<equiv> (if p = h then [] else stop a p t)"
   "\<And>l. fresh l \<equiv> if l = [] then 0 else Suc (maxl l)"
   "maxl [] \<equiv> 0"
@@ -219,8 +218,9 @@ theorem SIMPS:
   "\<And>x n. maxm x (Suc n) \<equiv> maxm (maxd x) n"
   "\<And>x. maxp x 0 \<equiv> x"
   "\<And>x n. maxp x (Suc n) \<equiv> Suc (maxp x n)"
+  "\<And>p x. inst p x \<equiv> subst (bind x) p"
   "\<And>x. bind x 0 \<equiv> x"
-  "\<And>x n n'. bind x (Suc n) \<equiv> n"
+  "\<And>x n. bind x (Suc n) \<equiv> n"
   "\<And>f b i v. subst f (Pre b i v) \<equiv> Pre b i (map f v)"
   "\<And>f p q. subst f (Con p q) \<equiv> Con (subst f p) (subst f q)"
   "\<And>f p q. subst f (Dis p q) \<equiv> Dis (subst f p) (subst f q)"
@@ -1336,6 +1336,8 @@ fun subst f (Pre (b,i,v)) = Pre (b,i,map f v)
 fun bind x 0 = x
   | bind _ n = n-1
 
+fun inst p x = subst (bind x) p
+
 fun max x y = if x > y then x else y
 
 fun maxl [] = 0
@@ -1345,8 +1347,6 @@ fun fresh l = if l = [] then 0 else (maxl l)+1
 
 fun stop a _ [] = a
   | stop a p (h :: t) = if p = h then [] else stop a p t
-
-fun inst p n = subst (bind n) p
 
 fun track s _ (Pre (b,i,v)) = stop [s @ [(0,Pre (b,i,v))]] (Pre (not b,i,v)) (map snd s)
   | track s _ (Con (p,q)) = [s @ [(0,p)],s @ [(0,q)]]
