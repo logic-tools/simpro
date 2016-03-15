@@ -2,8 +2,9 @@ structure SimPro : sig
   type nat
   type nnf
   val main :
-    ((((nat * nnf) list) list -> ((nat * nnf) list) list) ->
-      ((nat * nnf) list) list -> bool) ->
+    ((((nat * nnf) list) list -> bool) ->
+      (((nat * nnf) list) list -> ((nat * nnf) list) list) ->
+        ((nat * nnf) list) list -> bool) ->
       nnf -> bool
   val test : nnf
 end = struct
@@ -71,9 +72,6 @@ val equal_nnf = {equal = equal_nnfa} : nnf equal;
 fun maps f [] = []
   | maps f (x :: xs) = f x @ maps f xs;
 
-fun null [] = true
-  | null (x :: xs) = false;
-
 fun extend l Zero_nat = l
   | extend l (Suc n) = n :: l;
 
@@ -101,11 +99,14 @@ fun subst f (Pre (b, i, v)) = Pre (b, i, map f v)
   | subst f (Uni p) = Uni (subst (bump f) p)
   | subst f (Exi p) = Exi (subst (bump f) p);
 
-fun inst p n = subst (bind n) p;
+fun inst p x = subst (bind x) p;
 
 fun snd (x1, x2) = x2;
 
 fun fst (x1, x2) = x1;
+
+fun null [] = true
+  | null (uu :: uv) = false;
 
 fun maxp x Zero_nat = x
   | maxp x (Suc n) = Suc (maxp x n);
@@ -138,7 +139,7 @@ fun track s uu (Pre (b, i, v)) =
 fun solve [] = [[]]
   | solve (h :: t) = track t (fst h) (snd h);
 
-fun main prover p = prover (mapsa solve) [[(Zero_nat, p)]];
+fun main prover p = prover null (mapsa solve) [[(Zero_nat, p)]];
 
 val test : nnf =
   Dis (Uni (Con (Pre (false, Zero_nat, [Zero_nat]),
