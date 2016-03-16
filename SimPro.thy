@@ -52,19 +52,19 @@ primrec bump :: "(nat \<Rightarrow> nat) \<Rightarrow> nat \<Rightarrow> nat" wh
   "bump _ 0 = 0" |
   "bump f (Suc n) = Suc (f n)"
 
-primrec subst :: "(nat \<Rightarrow> nat) \<Rightarrow> nnf \<Rightarrow> nnf" where
-  "subst f (Pre b i v) = Pre b i (map f v)" |
-  "subst f (Con p q) = Con (subst f p) (subst f q)" |
-  "subst f (Dis p q) = Dis (subst f p) (subst f q)" |
-  "subst f (Uni p) = Uni (subst (bump f) p)" |
-  "subst f (Exi p) = Exi (subst (bump f) p)"
+primrec sv :: "(nat \<Rightarrow> nat) \<Rightarrow> nnf \<Rightarrow> nnf" where
+  "sv f (Pre b i v) = Pre b i (map f v)" |
+  "sv f (Con p q) = Con (sv f p) (sv f q)" |
+  "sv f (Dis p q) = Dis (sv f p) (sv f q)" |
+  "sv f (Uni p) = Uni (sv (bump f) p)" |
+  "sv f (Exi p) = Exi (sv (bump f) p)"
 
 primrec bind :: "nat \<Rightarrow> nat \<Rightarrow> nat" where
   "bind x 0 = x" |
   "bind _ (Suc n) = n"
 
 definition inst :: "nnf \<Rightarrow> nat \<Rightarrow> nnf" where
-  "inst p x \<equiv> subst (bind x) p"
+  "inst p x \<equiv> sv (bind x) p"
 
 primrec maxd :: "nat \<Rightarrow> nat" where
   "maxd 0 = 0" |
@@ -201,7 +201,7 @@ lemma inject_simps: "(True \<and> b) = b" "(False \<and> b) = False"
 by (rule simp_thms,rule simp_thms)
 
 lemmas simps = check_prover prover_next prover_done solve.simps track.simps maps_def stop.simps
-  fresh_def null.simps maxl.simps maxp.simps maxm.simps maxd.simps inst_def bind.simps subst.simps
+  fresh_def null.simps maxl.simps maxp.simps maxm.simps maxd.simps inst_def bind.simps sv.simps
   bump.simps fv.simps adjust.simps extend.simps append_simps concat_simps map_simps
   if_simps not_simps prod_simps nnf.distinct nat.distinct list.distinct bool.distinct
   nat_simps list_simps bool_simps inject_simps nnf.inject nat.inject list.inject
@@ -235,14 +235,14 @@ theorem SIMPS:
   "\<And>x n. maxm x (Suc n) \<equiv> maxm (maxd x) n"
   "maxd 0 \<equiv> 0"
   "\<And>n. maxd (Suc n) \<equiv> n"
-  "\<And>p x. inst p x \<equiv> subst (bind x) p"
+  "\<And>p x. inst p x \<equiv> sv (bind x) p"
   "\<And>x. bind x 0 \<equiv> x"
   "\<And>x n. bind x (Suc n) \<equiv> n"
-  "\<And>f b i v. subst f (Pre b i v) \<equiv> Pre b i (map f v)"
-  "\<And>f p q. subst f (Con p q) \<equiv> Con (subst f p) (subst f q)"
-  "\<And>f p q. subst f (Dis p q) \<equiv> Dis (subst f p) (subst f q)"
-  "\<And>f p. subst f (Uni p) \<equiv> Uni (subst (bump f) p)"
-  "\<And>f p. subst f (Exi p) \<equiv> Exi (subst (bump f) p)"
+  "\<And>f b i v. sv f (Pre b i v) \<equiv> Pre b i (map f v)"
+  "\<And>f p q. sv f (Con p q) \<equiv> Con (sv f p) (sv f q)"
+  "\<And>f p q. sv f (Dis p q) \<equiv> Dis (sv f p) (sv f q)"
+  "\<And>f p. sv f (Uni p) \<equiv> Uni (sv (bump f) p)"
+  "\<And>f p. sv f (Exi p) \<equiv> Exi (sv (bump f) p)"
   "\<And>f. bump f 0 \<equiv> 0"
   "\<And>f n. bump f (Suc n) \<equiv> Suc (f n)"
   "\<And>b i v. fv (Pre b i v) \<equiv> v"
@@ -440,8 +440,8 @@ lemma pre:  "(n,(m,Pre b i v) # xs) \<in> calculation(nfs) \<Longrightarrow> \<n
   and con1: "(n,(m,Con p q) # xs) \<in> calculation(nfs) \<Longrightarrow> \<not> is_axiom (list_sequent ((m,Con p q) # xs)) \<Longrightarrow> (Suc n,xs@[(0,p)]) \<in> calculation(nfs)"
   and con2: "(n,(m,Con p q) # xs) \<in> calculation(nfs) \<Longrightarrow> \<not> is_axiom (list_sequent ((m,Con p q) # xs)) \<Longrightarrow> (Suc n,xs@[(0,q)]) \<in> calculation(nfs)"
   and dis:  "(n,(m,Dis p q) # xs) \<in> calculation(nfs) \<Longrightarrow> \<not> is_axiom (list_sequent ((m,Dis p q) # xs)) \<Longrightarrow> (Suc n,xs@[(0,p),(0,q)]) \<in> calculation(nfs)"
-  and uni:  "(n,(m,Uni p) # xs) \<in> calculation(nfs) \<Longrightarrow> \<not> is_axiom (list_sequent ((m,Uni p) # xs)) \<Longrightarrow> (Suc n,xs@[(0,subst (bind (fresh ((concat \<circ> map fv) (list_sequent ((m,Uni p) # xs))))) p)]) \<in> calculation(nfs)"
-  and exi:  "(n,(m,Exi p) # xs) \<in> calculation(nfs) \<Longrightarrow> \<not> is_axiom (list_sequent ((m,Exi p) # xs)) \<Longrightarrow> (Suc n,xs@[(0,subst (bind m) p),(Suc m,Exi p)]) \<in> calculation(nfs)"
+  and uni:  "(n,(m,Uni p) # xs) \<in> calculation(nfs) \<Longrightarrow> \<not> is_axiom (list_sequent ((m,Uni p) # xs)) \<Longrightarrow> (Suc n,xs@[(0,sv (bind (fresh ((concat \<circ> map fv) (list_sequent ((m,Uni p) # xs))))) p)]) \<in> calculation(nfs)"
+  and exi:  "(n,(m,Exi p) # xs) \<in> calculation(nfs) \<Longrightarrow> \<not> is_axiom (list_sequent ((m,Exi p) # xs)) \<Longrightarrow> (Suc n,xs@[(0,sv (bind m) p),(Suc m,Exi p)]) \<in> calculation(nfs)"
   by (auto simp: list_sequent_def maps inst_def stop)
 
 lemmas not_is_axiom_subs = pre con1 con2 dis uni exi
@@ -616,7 +616,7 @@ definition bump' :: "(nat \<Rightarrow> nat) \<Rightarrow> nat \<Rightarrow> nat
 lemma bump'[simp]: "bump f x = bump' f x"
   by (metis Nitpick.case_nat_unfold bump.simps Suc_pred' bump'_def not_gr0)
 
-lemma eval_subst: "semantics m e (subst f p) = semantics m (e \<circ> f) p"
+lemma eval_subst: "semantics m e (sv f p) = semantics m (e \<circ> f) p"
   using eval_cong by (induct p arbitrary: e f) (simp_all add: Nitpick.case_nat_unfold bump'_def ball)
 
 definition bind' :: "nat \<Rightarrow> nat \<Rightarrow> nat" where
@@ -625,12 +625,12 @@ definition bind' :: "nat \<Rightarrow> nat \<Rightarrow> nat" where
 lemma bind'[simp]: "bind y x = bind' y x"
   by (metis Nitpick.case_nat_unfold bind.simps Suc_pred' bind'_def not_gr0)
 
-lemma eval_bind: "semantics m e (subst (bind n) p) = semantics m (case_nat (e n) e) p"
+lemma eval_bind: "semantics m e (sv (bind n) p) = semantics m (case_nat (e n) e) p"
   using eval_cong eval_subst by (simp add: Nitpick.case_nat_unfold bind'_def)
 
 lemma sound_Uni:
   assumes "u \<notin> set (fv_list (Uni p # s))"
-  and "valid (s@[subst (bind u) p])"
+  and "valid (s@[sv (bind u) p])"
   shows "valid (Uni p # s)"
   proof (clarsimp simp: valid_def)
     fix M I e z
@@ -641,7 +641,7 @@ lemma sound_Uni:
         using assms
         by (clarsimp simp: Nitpick.case_nat_unfold fv_list_cons intro!: eval_cong[rule_format])
            (metis One_nat_def Suc_pred' adjust)
-      have "is_model_environment (M,I) (e(u := z)) \<longrightarrow> semantics_alternative (M,I) (e(u := z)) (s @ [subst (bind u) p])"
+      have "is_model_environment (M,I) (e(u := z)) \<longrightarrow> semantics_alternative (M,I) (e(u := z)) (s @ [sv (bind u) p])"
         using assms valid_def by blast
       then have 2: "(\<forall>n. (if n = u then z else e n) \<in> M) \<longrightarrow> semantics_alternative (M,I) (e(u := z)) s \<or> semantics (M,I) (case_nat z e) p"
        using 1 eval_bind is_model_environment_def semantics_alternative_append by simp
@@ -655,7 +655,7 @@ lemma sound_Uni:
     qed
   qed
   
-lemma sound_Exi: "valid (s@[subst (bind u) p,Exi p]) \<Longrightarrow> valid (Exi p # s)"
+lemma sound_Exi: "valid (s@[sv (bind u) p,Exi p]) \<Longrightarrow> valid (Exi p # s)"
   by (simp add: valid_def semantics_alternative_append eval_bind)
      (metis is_model_environment_def prod.sel(1))
 
@@ -980,7 +980,7 @@ lemma contains_propagates_Uni:
   assumes "f = failing_path (calculation s)"
   and "infinite (calculation s)"
   and "contains f n (0,Uni p)"
-  shows "(\<exists>y. contains f (Suc(n+y)) (0,(subst (bind (fresh (fv_list (map snd (snd (f (n+y))))))) p)))"
+  shows "(\<exists>y. contains f (Suc(n+y)) (0,(sv (bind (fresh (fv_list (map snd (snd (f (n+y))))))) p)))"
   proof -
     have "(\<exists>l. considers f (n+l) (0,Uni p))" using assms contains_considers by blast
     then obtain l where 1: "considers f (n+l) (0,Uni p)" by blast
@@ -998,7 +998,7 @@ lemma contains_propagates_Exi:
   assumes "f = failing_path (calculation s)"
   and "infinite (calculation s)"
   and "contains f n (m,Exi p)"
-  shows "(\<exists>y. (contains f (n+y) (0,(subst (bind m) p)) \<and> (contains f (n+y) (Suc m,Exi p))))"
+  shows "(\<exists>y. (contains f (n+y) (0,(sv (bind m) p)) \<and> (contains f (n+y) (Suc m,Exi p))))"
   proof -
     have "(\<exists>l. considers f (n+l) (m,Exi p))" using assms contains_considers by blast
     then obtain l where 1: "considers f (n+l) (m,Exi p)" by blast
@@ -1071,7 +1071,7 @@ lemma Exi_upward:
   and "infinite (calculation s)"
   and "init s"
   and "contains f n (m,Exi g)"
-  shows "(\<forall>m'. \<exists>n'. contains f n' (0,subst (bind m') g))"
+  shows "(\<forall>m'. \<exists>n'. contains f n' (0,sv (bind m') g))"
   proof -
     fix m'
     have "\<exists>n'. contains f n' (m',Exi g)" using assms Exi0 Exi_upward' by metis
@@ -1104,10 +1104,10 @@ lemma not_is_Exi:
   shows "\<not> is_Exi p \<Longrightarrow> m = 0"
   using assms contains_def index0 is_path_f' prod.collapse by metis
 
-lemma size_subst[simp]: "size (subst f p) = size p"
+lemma size_subst[simp]: "size (sv f p) = size p"
   by (induct p arbitrary: f) simp_all
 
-lemma size_bind[simp]: "size (subst (bind m) p) = size p"
+lemma size_bind[simp]: "size (sv (bind m) p) = size p"
   using bind_def by simp
 
 lemma model':
@@ -1165,9 +1165,9 @@ lemma model':
           proof -
             assume 1: "size p = n" and 2: "contains f na (m,p)"
             then have "m = 0" using assms Uni is_Exi not_is_Exi by simp
-            then have "\<exists>y. contains f (Suc (na + y)) (0,(subst (bind (fresh (fv_list (map snd (snd (f (na + y))))))) q))"
+            then have "\<exists>y. contains f (Suc (na + y)) (0,(sv (bind (fresh (fv_list (map snd (snd (f (na + y))))))) q))"
               using assms Uni 2 contains_propagates_Uni by simp
-            then obtain y where 3: "contains f (Suc (na + y)) (0,subst (bind (fresh (fv_list (map snd (snd (f (na + y))))))) q)"
+            then obtain y where 3: "contains f (Suc (na + y)) (0,sv (bind (fresh (fv_list (map snd (snd (f (na + y))))))) q)"
               by blast
             have 4: "Suc (size q) = n" using Uni 1 by simp
             then show ?thesis using Uni proof (simp)
@@ -1190,7 +1190,7 @@ lemma model':
           proof -
             assume "n = Suc (size q)" and "contains f na (m,Exi q)"
             and 1: "semantics (model s) (case_nat z ntou) q"
-            then have "\<forall>m'. \<not> semantics (model s) ntou (subst (bind m') q)"
+            then have "\<forall>m'. \<not> semantics (model s) ntou (sv (bind m') q)"
               using assms * by (meson Exi_upward eval_cong id_apply lessI size_bind)
             also have "\<forall>u. ntou (uton u) = u" by simp
             ultimately show ?thesis using 1 eval_bind by metis
@@ -1348,16 +1348,16 @@ fun fv (Pre (_,_,v)) = v
 fun bump _ 0 = 0
   | bump f n = (f n-1)+1
 
-fun subst f (Pre (b,i,v)) = Pre (b,i,map f v)
-  | subst f (Con (p,q)) = Con (subst f p,subst f q)
-  | subst f (Dis (p,q)) = Dis (subst f p,subst f q)
-  | subst f (Uni p) = Uni (subst (bump f) p)
-  | subst f (Exi p) = Exi (subst (bump f) p)
+fun sv f (Pre (b,i,v)) = Pre (b,i,map f v)
+  | sv f (Con (p,q)) = Con (sv f p,sv f q)
+  | sv f (Dis (p,q)) = Dis (sv f p,sv f q)
+  | sv f (Uni p) = Uni (sv (bump f) p)
+  | sv f (Exi p) = Exi (sv (bump f) p)
 
 fun bind x 0 = x
   | bind _ n = n-1
 
-fun inst p x = subst (bind x) p
+fun inst p x = sv (bind x) p
 
 fun max x y = if x > y then x else y
 
