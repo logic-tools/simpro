@@ -84,22 +84,22 @@ fun fv (Pre (uu, uv, v)) = v
   | fv (Uni p) = adjust (fv p)
   | fv (Exi p) = adjust (fv p);
 
-fun bind x Zero_nat = x
-  | bind uu (Suc n) = n;
+fun map f [] = []
+  | map f (x21 :: x22) = f x21 :: map f x22;
 
 fun bump uu Zero_nat = Zero_nat
   | bump f (Suc n) = Suc (f n);
 
-fun map f [] = []
-  | map f (x21 :: x22) = f x21 :: map f x22;
+fun sv f (Pre (b, i, v)) = Pre (b, i, map f v)
+  | sv f (Con (p, q)) = Con (sv f p, sv f q)
+  | sv f (Dis (p, q)) = Dis (sv f p, sv f q)
+  | sv f (Uni p) = Uni (sv (bump f) p)
+  | sv f (Exi p) = Exi (sv (bump f) p);
 
-fun subst f (Pre (b, i, v)) = Pre (b, i, map f v)
-  | subst f (Con (p, q)) = Con (subst f p, subst f q)
-  | subst f (Dis (p, q)) = Dis (subst f p, subst f q)
-  | subst f (Uni p) = Uni (subst (bump f) p)
-  | subst f (Exi p) = Exi (subst (bump f) p);
+fun bind x Zero_nat = x
+  | bind uu (Suc n) = n;
 
-fun inst p x = subst (bind x) p;
+fun inst p x = sv (bind x) p;
 
 fun snd (x1, x2) = x2;
 
