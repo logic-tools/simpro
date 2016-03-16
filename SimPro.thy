@@ -1364,9 +1364,6 @@ fun max x y = if x > y then x else y
 fun maxl [] = 0
   | maxl (h :: t) = max h (maxl t)
 
-fun null [] = true
-  | null (_ :: _) = false
-
 fun fresh l = if null l then 0 else (maxl l)+1
 
 fun stop c _ [] = c
@@ -1381,11 +1378,9 @@ fun track s _ (Pre (b,i,v)) = stop [s @ [(0,Pre (b,i,v))]] (Pre (not b,i,v)) (ma
 fun solve [] = [[]]
   | solve (h :: t) = track t (fst h) (snd h)
 
-fun main a p = a null (maps solve) [[(0,p)]] 
+fun prover c = if null c then () else prover (maps solve c)
 
-fun prover g f c = if g c then () else prover g f (f c)
-
-val check = main prover
+fun check p = prover [[(0,p)]]
 
 val () = check test
 
