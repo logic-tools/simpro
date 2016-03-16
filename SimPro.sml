@@ -122,8 +122,8 @@ fun maxl [] = Zero_nat
 
 fun fresh l = (if null l then Zero_nat else Suc (maxl l));
 
-fun stop B_ a uu [] = a
-  | stop B_ a p (h :: t) = (if eq B_ p h then [] else stop B_ a p t);
+fun stop B_ c uu [] = c
+  | stop B_ c p (h :: t) = (if eq B_ p h then [] else stop B_ c p t);
 
 fun mapsa f l = maps f l;
 
@@ -139,7 +139,7 @@ fun track s uu (Pre (b, i, v)) =
 fun solve [] = [[]]
   | solve (h :: t) = track t (fst h) (snd h);
 
-fun main prover p = prover null (mapsa solve) [[(Zero_nat, p)]];
+fun main a p = a null (mapsa solve) [[(Zero_nat, p)]];
 
 val test : nnf =
   Dis (Uni (Con (Pre (false, Zero_nat, [Zero_nat]),

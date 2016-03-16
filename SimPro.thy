@@ -90,8 +90,8 @@ definition fresh :: "nat list \<Rightarrow> nat" where
   "fresh l \<equiv> if null l then 0 else Suc (maxl l)"
 
 primrec stop :: "'a list \<Rightarrow> 'b \<Rightarrow> 'b list \<Rightarrow> 'a list" where
-  "stop a _ [] = a" |
-  "stop a p (h # t) = (if p = h then [] else stop a p t)"
+  "stop c _ [] = c" |
+  "stop c p (h # t) = (if p = h then [] else stop c p t)"
 
 definition maps :: "('a \<Rightarrow> 'b list) \<Rightarrow> 'a list \<Rightarrow> 'b list" where
   "maps f l \<equiv> concat (map f l)"
@@ -109,17 +109,17 @@ primrec solve :: "sequent \<Rightarrow> sequent list" where
   "solve [] = [[]]" |
   "solve (h # t) = track t (fst h) (snd h)"
 
-type_synonym 'a prover_type = "('a \<Rightarrow> bool) \<Rightarrow> ('a \<Rightarrow> 'a) \<Rightarrow> 'a \<Rightarrow> bool"
+type_synonym 'a algorithm = "('a \<Rightarrow> bool) \<Rightarrow> ('a \<Rightarrow> 'a) \<Rightarrow> 'a \<Rightarrow> bool"
 
-definition main :: "sequent list prover_type \<Rightarrow> nnf \<Rightarrow> bool" where
-  "main prover p \<equiv> prover null (maps solve) [[(0,p)]]" 
+definition main :: "sequent list algorithm \<Rightarrow> nnf \<Rightarrow> bool" where
+  "main a p \<equiv> a null (maps solve) [[(0,p)]]" 
 
 primrec repeat :: "('a \<Rightarrow> 'a) \<Rightarrow> 'a \<Rightarrow> nat \<Rightarrow> 'a" where
-  "repeat _ a 0 = a" |
-  "repeat f a (Suc n) = f (repeat f a n)"
+  "repeat _ c 0 = c" |
+  "repeat f c (Suc n) = f (repeat f c n)"
 
-definition prover :: "'a prover_type" where
-  "prover r f a \<equiv> \<exists>n. r (repeat f a n)"
+definition prover :: "'a algorithm" where
+  "prover g f c \<equiv> \<exists>n. g (repeat f c n)"
 
 definition check :: "nnf \<Rightarrow> bool" where
   "check \<equiv> main prover"
@@ -147,19 +147,28 @@ proposition "\<exists>m. \<forall>e. is_model_environment m e \<and> infinite (f
 using is_model_environment_def infinite_UNIV_listI
 by auto
 
-lemma repeat_once: "repeat f (f a) n = f (repeat f a n)"
+lemma repeat_once: "repeat f (f c) n = f (repeat f c n)"
 by (induct n) simp_all
 
-proposition "prover r f a = (if r a then True else prover r f (f a))"
+proposition "prover g f c = (if g c then True else prover g f (f c))"
 unfolding prover_def
 by (metis repeat.simps repeat_once not0_implies_Suc)
 
-lemma prover_done: "prover null (maps solve) [] = True"
+abbreviation (input) "PROVER \<equiv> prover null (maps solve)"
+
+lemma check_prover: "check p \<equiv> PROVER [[(0,p)]]"
+unfolding check_def main_def prover_def by -
+
+lemma prover: "PROVER c = PROVER (maps solve c)"
+unfolding prover_def
+by (induct c) (simp add: maps_def,metis repeat.simps null.simps(2) old.nat.exhaust repeat_once)
+
+lemma prover_next: "PROVER (h # t) = PROVER (maps solve (h # t))"
+using prover by -
+
+lemma prover_done: "PROVER [] = True"
 unfolding prover_def
 by (metis repeat.simps(1) null.simps(1))
-
-lemma prover_next: "prover null (maps solve) (h # t) = prover null (maps solve) (maps solve (h # t))"
-unfolding prover_def by (metis null.simps(2) old.nat.exhaust repeat.simps repeat_once)
 
 lemma append_simps: "[] @ l = l" "(h # t) @ l = h # t @ l"
 by (rule append.simps(1),rule append.simps(2))
@@ -191,20 +200,20 @@ by (rule simp_thms,rule simp_thms)
 lemma inject_simps: "(True \<and> b) = b" "(False \<and> b) = False"
 by (rule simp_thms,rule simp_thms)
 
-lemmas simps = main_def prover_next prover_done solve.simps track.simps maps_def stop.simps
-  fresh_def null.simps maxl.simps maxd.simps maxm.simps maxp.simps inst_def bind.simps subst.simps
+lemmas simps = check_prover prover_next prover_done solve.simps track.simps maps_def stop.simps
+  fresh_def null.simps maxl.simps maxp.simps maxm.simps maxd.simps inst_def bind.simps subst.simps
   bump.simps fv.simps adjust.simps extend.simps append_simps concat_simps map_simps
   if_simps not_simps prod_simps nnf.distinct nat.distinct list.distinct bool.distinct
   nat_simps list_simps bool_simps inject_simps nnf.inject nat.inject list.inject
  
 proposition "check test"
-unfolding check_def test_def
+unfolding test_def
 by (simp only: simps)
 
 theorem SIMPS:
-  "\<And>p. main prover p \<equiv> prover null (maps solve) [[(0,p)]]"
-  "\<And>h t. prover null (maps solve) (h # t) \<equiv> prover null (maps solve) (maps solve (h # t))"
-  "prover null (maps solve) [] \<equiv> True"
+  "\<And>p. check p \<equiv> PROVER [[(0,p)]]"
+  "\<And>h t. PROVER (h # t) \<equiv> PROVER (maps solve (h # t))"
+  "PROVER [] \<equiv> True"
   "solve [] \<equiv> [[]]"
   "\<And>h t. solve (h # t) \<equiv> track t (fst h) (snd h)"
   "\<And>s n b i v. track s n (Pre b i v) \<equiv> stop [s @ [(0,Pre b i v)]] (Pre (\<not> b) i v) (map snd s)"
@@ -213,19 +222,19 @@ theorem SIMPS:
   "\<And>s n p. track s n (Uni p) \<equiv> [s @ [(0,inst p (fresh (maps fv (Uni p # map snd s))))]]"
   "\<And>s n p. track s n (Exi p) \<equiv> [s @ [(0,inst p n),(Suc n,Exi p)]]"
   "\<And>f l. maps f l \<equiv> concat (map f l)"
-  "\<And>a p. stop a p [] \<equiv> a"
-  "\<And>a p h t. stop a p (h # t) \<equiv> (if p = h then [] else stop a p t)"
+  "\<And>c p. stop c p [] \<equiv> c"
+  "\<And>c p h t. stop c p (h # t) \<equiv> (if p = h then [] else stop c p t)"
   "\<And>l. fresh l \<equiv> if null l then 0 else Suc (maxl l)"
   "null [] \<equiv> True"
   "\<And>h t. null (h # t) \<equiv> False"
   "maxl [] \<equiv> 0"
   "\<And>h t. maxl (h # t) \<equiv> maxp (maxm (maxl t) h) h"
-  "maxd 0 \<equiv> 0"
-  "\<And>n. maxd (Suc n) \<equiv> n"
-  "\<And>x. maxm x 0 \<equiv> x"
-  "\<And>x n. maxm x (Suc n) \<equiv> maxm (maxd x) n"
   "\<And>x. maxp x 0 \<equiv> x"
   "\<And>x n. maxp x (Suc n) \<equiv> Suc (maxp x n)"
+  "\<And>x. maxm x 0 \<equiv> x"
+  "\<And>x n. maxm x (Suc n) \<equiv> maxm (maxd x) n"
+  "maxd 0 \<equiv> 0"
+  "\<And>n. maxd (Suc n) \<equiv> n"
   "\<And>p x. inst p x \<equiv> subst (bind x) p"
   "\<And>x. bind x 0 \<equiv> x"
   "\<And>x n. bind x (Suc n) \<equiv> n"
@@ -394,13 +403,13 @@ by ((simp only: simps(1)),
     (simp only: simps(95)))
 
 proposition "check test"
-unfolding check_def test_def
+unfolding test_def
 by (simp only: SIMPS)
 
 section "Basics"
 
 lemma mmm[simp]: "(maxp (maxm n n') n') = (max n n')"
-by (induct n' arbitrary: n) (simp,metis Suc_pred' add_Suc_right maxp.simps(2) maxm.simps maxd.simps max_Suc_Suc max_def nat_minus_add_max not_gr0)+
+by (induct n' arbitrary: n) (simp,metis (no_types,lifting) Nitpick.case_nat_unfold maxd.simps Suc_pred' max_Suc2 max_def maxm.simps(2) maxp.simps(2) not_gr0)
 
 lemma maps: "maps f = (concat \<circ> map f)" using maps_def comp_apply by fastforce
 
@@ -526,7 +535,7 @@ lemma f0:
   assumes "f = failing_path (calculation s)"
   and "infinite (calculation s)"
   shows "f 0 \<in> (calculation s) \<and> fst (f 0) = 0 \<and> infinite (calculation (snd (f 0))) \<and> \<not> is_axiom (list_sequent (snd (f 0)))"
-  using assms by simp (metis (mono_tags,lifting) calculation.init is_axiom_finite_calculation fst_conv snd_conv someI_ex)
+  using assms by (simp,metis (mono_tags,lifting) calculation.init is_axiom_finite_calculation fst_conv snd_conv someI_ex)
 
 lemma infinite_union: "finite Y \<Longrightarrow> infinite (Union (f ` Y)) \<Longrightarrow> \<exists>y. y \<in> Y \<and> infinite (f y)"
   by auto
@@ -608,7 +617,7 @@ lemma bump'[simp]: "bump f x = bump' f x"
   by (metis Nitpick.case_nat_unfold bump.simps Suc_pred' bump'_def not_gr0)
 
 lemma eval_subst: "semantics m e (subst f p) = semantics m (e \<circ> f) p"
-  using eval_cong bump'_def by (induct p arbitrary: e f) (simp_all add: Nitpick.case_nat_unfold ball)
+  using eval_cong by (induct p arbitrary: e f) (simp_all add: Nitpick.case_nat_unfold bump'_def ball)
 
 definition bind' :: "nat \<Rightarrow> nat \<Rightarrow> nat" where
   "bind' y x \<equiv> (case x of 0 \<Rightarrow> y | Suc n \<Rightarrow> n)"
@@ -1048,7 +1057,7 @@ lemma Exi0:
   and "infinite (calculation s)"
   and "init s"
   shows "\<forall>n. contains f n (m,Exi g) \<longrightarrow> (\<exists>n'. contains f n' (0,Exi g))"
-  using assms Exi_downward contains_def by (induct m) (simp,blast)
+  using assms Exi_downward contains_def by (induct m) auto
      
 lemma Exi_upward':
   assumes "f = failing_path (calculation s)"
@@ -1294,9 +1303,11 @@ theorem correctness: CHECK VALID
 proof -
   have "\<forall>p. [[(0,p)]] = [map (Pair 0) [p]]" by simp
   then have CHECK
-    using magic check_def valid_def make_sequent_def semantics_alternative.simps main_def by metis
+    unfolding check_def
+    using magic valid_def make_sequent_def semantics_alternative.simps main_def
+    by (metis (no_types,hide_lams))
   also have VALID
-    using magic make_sequent_def by force
+    using magic make_sequent_def by fastforce
   then show CHECK VALID using calculation by simp_all
 qed
 
@@ -1358,8 +1369,8 @@ fun null [] = true
 
 fun fresh l = if null l then 0 else (maxl l)+1
 
-fun stop a _ [] = a
-  | stop a p (h :: t) = if p = h then [] else stop a p t
+fun stop c _ [] = c
+  | stop c p (h :: t) = if p = h then [] else stop c p t
 
 fun track s _ (Pre (b,i,v)) = stop [s @ [(0,Pre (b,i,v))]] (Pre (not b,i,v)) (map snd s)
   | track s _ (Con (p,q)) = [s @ [(0,p)],s @ [(0,q)]]
@@ -1370,9 +1381,9 @@ fun track s _ (Pre (b,i,v)) = stop [s @ [(0,Pre (b,i,v))]] (Pre (not b,i,v)) (ma
 fun solve [] = [[]]
   | solve (h :: t) = track t (fst h) (snd h)
 
-fun main prover p = prover null (maps solve) [[(0,p)]] 
+fun main a p = a null (maps solve) [[(0,p)]] 
 
-fun prover r f a = if r a then () else prover r f (f a)
+fun prover g f c = if g c then () else prover g f (f c)
 
 val check = main prover
 
@@ -1394,7 +1405,7 @@ SML_export "val SimPro_test = SimPro.test"
 
 ML {*
 
-fun SimPro_prover r f a = if r a then true else SimPro_prover r f (f a)
+fun SimPro_prover g f c = if g c then true else SimPro_prover g f (f c)
 
 val SimPro_check = SimPro_main SimPro_prover
 
