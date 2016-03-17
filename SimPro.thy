@@ -170,6 +170,9 @@ lemma prover_done: "PROVER [] = True"
 unfolding prover_def
 by (metis repeat.simps(1) null.simps(1))
 
+lemma prover_loop: "PROVER c = (if null c then True else PROVER (maps solve c))"
+using prover_next prover_done by (induct c) simp_all
+
 lemma append_simps: "[] @ l = l" "(h # t) @ l = h # t @ l"
 by (rule append.simps(1),rule append.simps(2))
 
