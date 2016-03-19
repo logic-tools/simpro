@@ -2,7 +2,9 @@ section \<open>A Simple Prover in Isabelle\<close>
 
 theory SimPro imports Main begin
 
-datatype nnf = Pre bool nat "nat list" | Con nnf nnf | Dis nnf nnf | Uni nnf | Exi nnf
+type_synonym id = nat
+
+datatype nnf = Pre bool id "nat list" | Con nnf nnf | Dis nnf nnf | Uni nnf | Exi nnf
 
 abbreviation (input) "TEST P Q \<equiv> (\<exists>x. P x \<or> Q x) \<longrightarrow> (\<exists>x. Q x) \<or> (\<exists>x. P x)"
 
@@ -12,14 +14,18 @@ by iprover
 proposition "TEST P Q = (\<forall>x. \<not> P x \<and> \<not> Q x) \<or> (\<exists>x. Q x) \<or> (\<exists>x. P x)"
 by fast
 
+abbreviation (input) "P_id \<equiv> 0"
+
+abbreviation (input) "Q_id \<equiv> Suc 0" 
+
 definition \<comment> \<open>TEST P Q\<close>
   "test \<equiv> Dis
-    (Uni (Con (Pre False 0 [0]) (Pre False (Suc 0) [0]))) 
-    (Dis (Exi (Pre True (Suc 0) [0])) (Exi (Pre True 0 [0])))"
+    (Uni (Con (Pre False P_id [0]) (Pre False Q_id [0])))
+    (Dis (Exi (Pre True Q_id [0])) (Exi (Pre True P_id [0])))"
 
 type_synonym proxy = "unit list"
 
-type_synonym model = "proxy set \<times> (nat \<Rightarrow> proxy list \<Rightarrow> bool)"
+type_synonym model = "proxy set \<times> (id \<Rightarrow> proxy list \<Rightarrow> bool)"
 
 type_synonym environment = "nat \<Rightarrow> proxy"
 
