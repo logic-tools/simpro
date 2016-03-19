@@ -610,8 +610,8 @@ lemma semantics_alternative_cong: "(\<forall>x. x \<in> set (fv_list s) \<longri
 
 section "Soundness"
 
-lemma ball: "\<forall>x \<in> m. P x = Q x \<Longrightarrow> (\<forall>x \<in> m. P x) = (\<forall>x \<in> m. Q x) \<and> (\<exists>x \<in> m. P x) = (\<exists>x \<in> m. Q x)"
-  by simp
+lemma ball: "\<forall>x \<in> m. P x = Q x \<Longrightarrow> (\<forall>x \<in> m. P x) = (\<forall>x \<in> m. Q x)" "\<forall>x \<in> m. P x = Q x \<Longrightarrow> (\<exists>x \<in> m. P x) = (\<exists>x \<in> m. Q x)"
+  by simp_all
 
 definition bump' :: "(nat \<Rightarrow> nat) \<Rightarrow> nat \<Rightarrow> nat" where
   "bump' f x \<equiv> (case x of 0 \<Rightarrow> 0 | Suc n \<Rightarrow> Suc (f n))"
@@ -619,8 +619,54 @@ definition bump' :: "(nat \<Rightarrow> nat) \<Rightarrow> nat \<Rightarrow> nat
 lemma bump'[simp]: "bump f x = bump' f x"
   by (metis Nitpick.case_nat_unfold bump.simps Suc_pred' bump'_def not_gr0)
 
+lemma sss: "semantics m e (sv f p) = semantics m (e \<circ> f) p \<Longrightarrow>
+             (\<And>p e e' m. \<forall>x. x \<in> set (fv p) \<longrightarrow> e x = e' x \<Longrightarrow> semantics m e p = semantics m e' p) \<Longrightarrow>
+             (\<forall>z\<in>fst m. semantics m (case_nat z e \<circ> bump f) p) = (\<forall>z\<in>fst m. semantics m (\<lambda>x. case x of 0 \<Rightarrow> z | Suc n \<Rightarrow> (e \<circ> f) n) p)"
+proof -
+  fix pa :: nnf and ea :: "nat \<Rightarrow> unit list" and fa :: "nat \<Rightarrow> nat"
+  assume a1: "\<And>p e e' m. \<forall>x. x \<in> set (fv p) \<longrightarrow> e x = e' x \<Longrightarrow> semantics m e p = semantics m e' p"
+  obtain uus :: "unit list" and uusa :: "unit list" where
+    f2: "((\<exists>us. us \<in> fst m \<and> \<not> semantics m (case_nat us ea \<circ> bump fa) pa) = (\<forall>us. us \<notin> fst m \<or> semantics m (case_nat us (ea \<circ> fa)) pa)) = (((\<forall>us. us \<notin> fst m \<or> semantics m (case_nat us ea \<circ> bump fa) pa) \<or> (\<forall>us. us \<notin> fst m \<or> semantics m (case_nat us (ea \<circ> fa)) pa)) \<and> (uusa \<in> fst m \<and> \<not> semantics m (case_nat uusa ea \<circ> bump fa) pa \<or> uus \<in> fst m \<and> \<not> semantics m (case_nat uus (ea \<circ> fa)) pa))"
+    by (metis (no_types))
+  have f3: "\<forall>n f fa p. (\<exists>na. na \<in> set (fv n) \<and> f na \<noteq> fa na) \<or> semantics p f n = semantics p fa n"
+    using a1 by blast
+  obtain nn :: "(nat \<Rightarrow> unit list) \<Rightarrow> (nat \<Rightarrow> unit list) \<Rightarrow> nnf \<Rightarrow> nat" where
+    "\<forall>x1 x2 x3. (\<exists>v4. v4 \<in> set (fv x3) \<and> x2 v4 \<noteq> x1 v4) = (nn x1 x2 x3 \<in> set (fv x3) \<and> x2 (nn x1 x2 x3) \<noteq> x1 (nn x1 x2 x3))"
+    by moura
+  then have f4: "\<forall>n f fa p. nn fa f n \<in> set (fv n) \<and> f (nn fa f n) \<noteq> fa (nn fa f n) \<or> semantics p f n = semantics p fa n"
+    using f3 by presburger
+  have f5: "\<forall>us f n. if n = 0 then (case n of 0 \<Rightarrow> us::unit list | Suc x \<Rightarrow> f x) = us else (case n of 0 \<Rightarrow> us | Suc x \<Rightarrow> f x) = f (n - 1)"
+    by (simp add: Nitpick.case_nat_unfold)
+  then have f6: "(case bump fa (nn (case_nat uus ea \<circ> bump fa) (case_nat uus (ea \<circ> fa)) pa) of 0 \<Rightarrow> uus | Suc x \<Rightarrow> ea x) = uus \<and> (case nn (case_nat uus ea \<circ> bump fa) (case_nat uus (ea \<circ> fa)) pa of 0 \<Rightarrow> uus | Suc x \<Rightarrow> (ea \<circ> fa) x) \<noteq> (case_nat uus ea \<circ> bump fa) (nn (case_nat uus ea \<circ> bump fa) (case_nat uus (ea \<circ> fa)) pa) \<longrightarrow> nn (case_nat uus ea \<circ> bump fa) (case_nat uus (ea \<circ> fa)) pa \<noteq> 0"
+    by (metis o_apply)
+  have f7: "\<forall>n f na. if na = 0 then (case na of 0 \<Rightarrow> n::nat | Suc x \<Rightarrow> f x) = n else (case na of 0 \<Rightarrow> n | Suc x \<Rightarrow> f x) = f (na - 1)"
+    by (simp add: Nitpick.case_nat_unfold)
+  have "(case nn (case_nat uus ea \<circ> bump fa) (case_nat uus (ea \<circ> fa)) pa of 0 \<Rightarrow> uus | Suc x \<Rightarrow> (ea \<circ> fa) x) \<noteq> (case_nat uus ea \<circ> bump fa) (nn (case_nat uus ea \<circ> bump fa) (case_nat uus (ea \<circ> fa)) pa) \<longrightarrow> nn (case_nat uus ea \<circ> bump fa) (case_nat uus (ea \<circ> fa)) pa \<noteq> 0"
+    using f6 bump'_def by fastforce
+  then have f8: "(case nn (case_nat uus ea \<circ> bump fa) (case_nat uus (ea \<circ> fa)) pa of 0 \<Rightarrow> uus | Suc x \<Rightarrow> (ea \<circ> fa) x) \<noteq> (case_nat uus ea \<circ> bump fa) (nn (case_nat uus ea \<circ> bump fa) (case_nat uus (ea \<circ> fa)) pa) \<longrightarrow> (case nn (case_nat uus ea \<circ> bump fa) (case_nat uus (ea \<circ> fa)) pa of 0 \<Rightarrow> uus | Suc x \<Rightarrow> (ea \<circ> fa) x) = (case bump fa (nn (case_nat uus ea \<circ> bump fa) (case_nat uus (ea \<circ> fa)) pa) of 0 \<Rightarrow> uus | Suc x \<Rightarrow> ea x)"
+    using f7 f5 bump'_def by fastforce
+  have "bump fa (nn (case_nat uusa ea \<circ> bump fa) (case_nat uusa (ea \<circ> fa)) pa) = (case nn (case_nat uusa ea \<circ> bump fa) (case_nat uusa (ea \<circ> fa)) pa of 0 \<Rightarrow> 0 | Suc n \<Rightarrow> Suc (fa n))"
+    by (metis bump' bump'_def)
+  then have f9: "nn (case_nat uusa ea \<circ> bump fa) (case_nat uusa (ea \<circ> fa)) pa \<noteq> 0 \<longrightarrow> (case nn (case_nat uusa ea \<circ> bump fa) (case_nat uusa (ea \<circ> fa)) pa of 0 \<Rightarrow> uusa | Suc x \<Rightarrow> (ea \<circ> fa) x) = (case_nat uusa ea \<circ> bump fa) (nn (case_nat uusa ea \<circ> bump fa) (case_nat uusa (ea \<circ> fa)) pa)"
+    using f7 f5 by simp
+  then have f10: "(case nn (case_nat uusa ea \<circ> bump fa) (case_nat uusa (ea \<circ> fa)) pa of 0 \<Rightarrow> uusa | Suc x \<Rightarrow> (ea \<circ> fa) x) \<noteq> (case_nat uusa ea \<circ> bump fa) (nn (case_nat uusa ea \<circ> bump fa) (case_nat uusa (ea \<circ> fa)) pa) \<longrightarrow> (case nn (case_nat uusa ea \<circ> bump fa) (case_nat uusa (ea \<circ> fa)) pa of 0 \<Rightarrow> uusa | Suc x \<Rightarrow> (ea \<circ> fa) x) = uusa"
+    using f5 by metis
+  have "(case nn (case_nat uusa ea \<circ> bump fa) (case_nat uusa (ea \<circ> fa)) pa of 0 \<Rightarrow> uusa | Suc x \<Rightarrow> (ea \<circ> fa) x) \<noteq> (case_nat uusa ea \<circ> bump fa) (nn (case_nat uusa ea \<circ> bump fa) (case_nat uusa (ea \<circ> fa)) pa) \<longrightarrow> bump fa (nn (case_nat uusa ea \<circ> bump fa) (case_nat uusa (ea \<circ> fa)) pa) = 0"
+    using f9 f7 by (metis (no_types) bump' bump'_def)
+  then have "(case nn (case_nat uusa ea \<circ> bump fa) (case_nat uusa (ea \<circ> fa)) pa of 0 \<Rightarrow> uusa | Suc x \<Rightarrow> (ea \<circ> fa) x) = (case_nat uusa ea \<circ> bump fa) (nn (case_nat uusa ea \<circ> bump fa) (case_nat uusa (ea \<circ> fa)) pa)"
+    using f10 by fastforce
+  then have "(\<exists>us. us \<in> fst m \<and> \<not> semantics m (case_nat us ea \<circ> bump fa) pa) \<and> (\<exists>us. us \<in> fst m \<and> \<not> semantics m (case_nat us (ea \<circ> fa)) pa) \<or> (uusa \<notin> fst m \<or> semantics m (case_nat uusa ea \<circ> bump fa) pa) \<and> (uus \<notin> fst m \<or> semantics m (case_nat uus (ea \<circ> fa)) pa)"
+    using f8 f4 by (metis (no_types) o_apply)
+  then have "(\<exists>us. us \<in> fst m \<and> \<not> semantics m (case_nat us ea \<circ> bump fa) pa) \<noteq> (\<forall>us. us \<notin> fst m \<or> semantics m (case_nat us (ea \<circ> fa)) pa)"
+    using f2 by blast
+  then have "(\<forall>us. us \<in> fst m \<longrightarrow> semantics m (case_nat us ea \<circ> bump fa) pa) = (\<forall>us. us \<in> fst m \<longrightarrow> semantics m (case_nat us (ea \<circ> fa)) pa)"
+    by auto
+  then show "(\<forall>us\<in>fst m. semantics m (case_nat us ea \<circ> bump fa) pa) = (\<forall>us\<in>fst m. semantics m (\<lambda>n. case n of 0 \<Rightarrow> us | Suc n \<Rightarrow> (ea \<circ> fa) n) pa)"
+    by metis
+qed
+
 lemma eval_subst: "semantics m e (sv f p) = semantics m (e \<circ> f) p"
-  using eval_cong by (induct p arbitrary: e f) (simp_all add: Nitpick.case_nat_unfold bump'_def ball)
+  by (induct p arbitrary: e f) (simp,simp,simp,simp add: sss eval_cong,simp add: Nitpick.case_nat_unfold ball(2) bump'_def eval_cong)
 
 definition bind' :: "nat \<Rightarrow> nat \<Rightarrow> nat" where
   "bind' y x \<equiv> (case x of 0 \<Rightarrow> y | Suc n \<Rightarrow> n)"
