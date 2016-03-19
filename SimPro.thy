@@ -418,7 +418,24 @@ by (simp only: SIMPS)
 section "Basics"
 
 lemma mmm[simp]: "(maxp (maxm n n') n') = (max n n')"
-by (induct n' arbitrary: n) (simp,metis (no_types,lifting) Nitpick.case_nat_unfold maxd.simps Suc_pred' max_Suc2 max_def maxm.simps(2) maxp.simps(2) not_gr0)
+proof (induct n' arbitrary: n)
+  case 0 then show ?case by simp
+next
+  case Suc then show ?case 
+  proof -
+    fix n'a :: nat and na :: nat
+    assume a1: "\<And>n. maxp (maxm n n'a) n'a = max n n'a"
+    have f2: "\<And>n na. n = 0 \<or> Suc (max na (n - 1)) = max (Suc na) n"
+      by (metis (lifting) Nitpick.case_nat_unfold max_Suc1)
+    { assume "na \<noteq> 0"
+      then have "Suc (max n'a (maxd na)) = max na (Suc n'a)"
+        using f2 by (metis (lifting) maxd.simps(2) Suc_pred' max.commute not_gr0) }
+    then have "Suc (max n'a (maxd na)) = max na (Suc n'a)"
+      by (metis max.commute max_0L maxd.simps(1))
+    then show "maxp (maxm na (Suc n'a)) (Suc n'a) = max na (Suc n'a)"
+      using a1 by simp
+  qed
+qed
 
 lemma maps: "maps f = (concat \<circ> map f)" using maps_def comp_apply by fastforce
 
