@@ -124,11 +124,11 @@ primrec repeat :: "('a \<Rightarrow> 'a) \<Rightarrow> 'a \<Rightarrow> nat \<Ri
   "repeat _ c 0 = c" |
   "repeat f c (Suc n) = f (repeat f c n)"
 
-definition prover :: "'a algorithm" where
-  "prover g f c \<equiv> \<exists>n. g (repeat f c n)"
+definition iterator :: "'a algorithm" where
+  "iterator g f c \<equiv> \<exists>n. g (repeat f c n)"
 
 definition check :: "nnf \<Rightarrow> bool" where
-  "check \<equiv> main prover"
+  "check \<equiv> main iterator"
 
 abbreviation (input) "CHECK \<equiv> check = (\<lambda>p. \<forall>m e. is_model_environment m e \<longrightarrow> semantics m e p)"
 
@@ -156,24 +156,24 @@ by auto
 lemma repeat_once: "repeat f (f c) n = f (repeat f c n)"
 by (induct n) simp_all
 
-proposition "prover g f c = (if g c then True else prover g f (f c))"
-unfolding prover_def
+proposition "iterator g f c = (if g c then True else iterator g f (f c))"
+unfolding iterator_def
 by (metis repeat.simps repeat_once not0_implies_Suc)
 
-abbreviation (input) "PROVER \<equiv> prover null (maps solve)"
+abbreviation (input) "PROVER \<equiv> iterator null (maps solve)"
 
 lemma check_prover: "check p \<equiv> PROVER [[(0,p)]]"
-unfolding check_def main_def prover_def by -
+unfolding check_def main_def by -
 
 lemma prover: "PROVER c = PROVER (maps solve c)"
-unfolding prover_def
+unfolding iterator_def
 by (induct c) (simp add: maps_def,metis repeat.simps null.simps(2) old.nat.exhaust repeat_once)
 
 lemma prover_next: "PROVER (h # t) = PROVER (maps solve (h # t))"
 using prover by -
 
 lemma prover_done: "PROVER [] = True"
-unfolding prover_def
+unfolding iterator_def
 by (metis repeat.simps(1) null.simps(1))
 
 lemma prover_loop: "PROVER c = (if null c then True else PROVER (maps solve c))"
@@ -211,15 +211,11 @@ by (rule simp_thms,rule simp_thms)
 
 lemmas simps = check_prover prover_next prover_done solve.simps track.simps maps_def stop.simps
   fresh_def null.simps maxl.simps maxp.simps maxm.simps maxd.simps inst_def bind.simps sv.simps
-  bump.simps fv.simps adjust.simps extend.simps append_simps concat_simps map_simps
-  if_simps not_simps prod_simps nnf.distinct nat.distinct list.distinct bool.distinct
-  nat_simps list_simps bool_simps inject_simps nnf.inject nat.inject list.inject
+  bump.simps fv.simps adjust.simps extend.simps nnf.distinct nnf.inject map_simps concat_simps
+  append_simps if_simps not_simps prod_simps nat.distinct list.distinct bool.distinct nat_simps
+  list_simps bool_simps nat.inject list.inject inject_simps
  
-proposition "check test"
-unfolding test_def
-by (simp only: simps)
-
-theorem SIMPS:
+theorem program:
   "\<And>p. check p \<equiv> PROVER [[(0,p)]]"
   "\<And>h t. PROVER (h # t) \<equiv> PROVER (maps solve (h # t))"
   "PROVER [] \<equiv> True"
@@ -263,58 +259,6 @@ theorem SIMPS:
   "\<And>h t. adjust (h # t) \<equiv> extend (adjust t) h"
   "\<And>l. extend l 0 \<equiv> l"
   "\<And>l n. extend l (Suc n) \<equiv> n # l"
-  "\<And>l. [] @ l \<equiv> l"
-  "\<And>h t l. (h # t) @ l \<equiv> h # t @ l"
-  "concat [] \<equiv> []"
-  "\<And>h t . concat (h # t) \<equiv> h @ concat t"
-  "\<And>f. map f [] \<equiv> []"
-  "\<And>f h t. map f (h # t) \<equiv> f h # map f t"
-  "\<And>x y. if True then x else y \<equiv> x"
-  "\<And>x y. if False then x else y \<equiv> y"
-  "\<not> True \<equiv> False"
-  "\<not> False \<equiv> True"
-  "\<And>b. \<not> \<not> b \<equiv> b"
-  "\<And>x y. fst (x,y) \<equiv> x"
-  "\<And>x y. snd (x,y) \<equiv> y"
-  "\<And>b i v p q. Pre b i v = Con p q \<equiv> False"
-  "\<And>b i v p q. Con p q = Pre b i v \<equiv> False"
-  "\<And>b i v p q. Pre b i v = Dis p q \<equiv> False"
-  "\<And>b i v p q. Dis p q = Pre b i v \<equiv> False"
-  "\<And>b i v p. Pre b i v = Uni p \<equiv> False"
-  "\<And>b i v p. Uni p = Pre b i v \<equiv> False"
-  "\<And>b i v p. Pre b i v = Exi p \<equiv> False"
-  "\<And>b i v p. Exi p = Pre b i v \<equiv> False"
-  "\<And>p q p' q'. Con p q = Dis p' q' \<equiv> False"
-  "\<And>p q p' q'. Dis p' q' = Con p q \<equiv> False"
-  "\<And>p q p'. Con p q = Uni p' \<equiv> False"
-  "\<And>p q p'. Uni p' = Con p q \<equiv> False"
-  "\<And>p q p'. Con p q = Exi p' \<equiv> False"
-  "\<And>p q p'. Exi p' = Con p q \<equiv> False"
-  "\<And>p q p'. Dis p q = Uni p' \<equiv> False"
-  "\<And>p q p'. Uni p' = Dis p q \<equiv> False"
-  "\<And>p q p'. Dis p q = Exi p' \<equiv> False"
-  "\<And>p q p'. Exi p' = Dis p q \<equiv> False"
-  "\<And>p p'. Uni p = Exi p' \<equiv> False"
-  "\<And>p p'. Exi p' = Uni p \<equiv> False"
-  "\<And>n. 0 = Suc n \<equiv> False"
-  "\<And>n. Suc n = 0 \<equiv> False"
-  "\<And>h t. [] = h # t \<equiv> False"
-  "\<And>h t. h # t = [] \<equiv> False"
-  "True = False \<equiv> False"
-  "False = True \<equiv> False"
-  "0 = 0 \<equiv> True"
-  "[] = [] \<equiv> True"
-  "True = True \<equiv> True"
-  "False = False \<equiv> True"
-  "\<And>b. True \<and> b \<equiv> b"
-  "\<And>b. False \<and> b \<equiv> False"
-  "\<And>b i v b' i' v'. Pre b i v = Pre b' i' v' \<equiv> b = b' \<and> i = i' \<and> v = v'"
-  "\<And>p q p' q'. Con p q = Con p' q' \<equiv> p = p' \<and> q = q'"
-  "\<And>p q p' q'. Dis p q = Dis p' q' \<equiv> p = p' \<and> q = q'"
-  "\<And>p p'. Uni p = Uni p' \<equiv> p = p'"
-  "\<And>p p'. Exi p = Exi p' \<equiv> p = p'"
-  "\<And>n n'. Suc n = Suc n' \<equiv> n = n'"
-  "\<And>h t h' t'. h # t = h' # t' \<equiv> h = h' \<and> t = t'"
 by ((simp only: simps(1)),
     (simp only: simps(2)),
     (simp only: simps(3)),
@@ -357,8 +301,35 @@ by ((simp only: simps(1)),
     (simp only: simps(40)),
     (simp only: simps(41)),
     (simp only: simps(42)),
-    (simp only: simps(43)),
-    (simp only: simps(44)),
+    (simp only: simps(43)))
+
+theorem data:
+  "\<And>b i v p q. Pre b i v = Con p q \<equiv> False"
+  "\<And>b i v p q. Con p q = Pre b i v \<equiv> False"
+  "\<And>b i v p q. Pre b i v = Dis p q \<equiv> False"
+  "\<And>b i v p q. Dis p q = Pre b i v \<equiv> False"
+  "\<And>b i v p. Pre b i v = Uni p \<equiv> False"
+  "\<And>b i v p. Uni p = Pre b i v \<equiv> False"
+  "\<And>b i v p. Pre b i v = Exi p \<equiv> False"
+  "\<And>b i v p. Exi p = Pre b i v \<equiv> False"
+  "\<And>p q p' q'. Con p q = Dis p' q' \<equiv> False"
+  "\<And>p q p' q'. Dis p' q' = Con p q \<equiv> False"
+  "\<And>p q p'. Con p q = Uni p' \<equiv> False"
+  "\<And>p q p'. Uni p' = Con p q \<equiv> False"
+  "\<And>p q p'. Con p q = Exi p' \<equiv> False"
+  "\<And>p q p'. Exi p' = Con p q \<equiv> False"
+  "\<And>p q p'. Dis p q = Uni p' \<equiv> False"
+  "\<And>p q p'. Uni p' = Dis p q \<equiv> False"
+  "\<And>p q p'. Dis p q = Exi p' \<equiv> False"
+  "\<And>p q p'. Exi p' = Dis p q \<equiv> False"
+  "\<And>p p'. Uni p = Exi p' \<equiv> False"
+  "\<And>p p'. Exi p' = Uni p \<equiv> False"
+  "\<And>b i v b' i' v'. Pre b i v = Pre b' i' v' \<equiv> b = b' \<and> i = i' \<and> v = v'"
+  "\<And>p q p' q'. Con p q = Con p' q' \<equiv> p = p' \<and> q = q'"
+  "\<And>p q p' q'. Dis p q = Dis p' q' \<equiv> p = p' \<and> q = q'"
+  "\<And>p p'. Uni p = Uni p' \<equiv> p = p'"
+  "\<And>p p'. Exi p = Exi p' \<equiv> p = p'"
+by ((simp only: simps(44)),
     (simp only: simps(45)),
     (simp only: simps(46)),
     (simp only: simps(47)),
@@ -382,8 +353,37 @@ by ((simp only: simps(1)),
     (simp only: simps(65)),
     (simp only: simps(66)),
     (simp only: simps(67)),
-    (simp only: simps(68)),
-    (simp only: simps(69)),
+    (simp only: simps(68)))
+
+theorem library:
+  "\<And>f. map f [] \<equiv> []"
+  "\<And>f h t. map f (h # t) \<equiv> f h # map f t"
+  "concat [] \<equiv> []"
+  "\<And>h t . concat (h # t) \<equiv> h @ concat t"
+  "\<And>l. [] @ l \<equiv> l"
+  "\<And>h t l. (h # t) @ l \<equiv> h # t @ l"
+  "\<And>x y. if True then x else y \<equiv> x"
+  "\<And>x y. if False then x else y \<equiv> y"
+  "\<not> True \<equiv> False"
+  "\<not> False \<equiv> True"
+  "\<And>b. \<not> \<not> b \<equiv> b"
+  "\<And>x y. fst (x,y) \<equiv> x"
+  "\<And>x y. snd (x,y) \<equiv> y"
+  "\<And>n. 0 = Suc n \<equiv> False"
+  "\<And>n. Suc n = 0 \<equiv> False"
+  "\<And>h t. [] = h # t \<equiv> False"
+  "\<And>h t. h # t = [] \<equiv> False"
+  "True = False \<equiv> False"
+  "False = True \<equiv> False"
+  "0 = 0 \<equiv> True"
+  "[] = [] \<equiv> True"
+  "True = True \<equiv> True"
+  "False = False \<equiv> True"
+  "\<And>n n'. Suc n = Suc n' \<equiv> n = n'"
+  "\<And>h t h' t'. h # t = h' # t' \<equiv> h = h' \<and> t = t'"
+  "\<And>b. True \<and> b \<equiv> b"
+  "\<And>b. False \<and> b \<equiv> False"
+by ((simp only: simps(69)),
     (simp only: simps(70)),
     (simp only: simps(71)),
     (simp only: simps(72)),
@@ -413,7 +413,7 @@ by ((simp only: simps(1)),
 
 proposition "check test"
 unfolding test_def
-by (simp only: SIMPS)
+by (simp only: program data library)
 
 section "Basics"
 
@@ -459,15 +459,29 @@ primrec member :: "'a \<Rightarrow> 'a list \<Rightarrow> bool" where
 lemma member_set[simp]: "member a l = (a \<in> set l)"
 by (induct l) auto
 
-lemma stop:"stop [t @ [(0,r)]] (Pre (\<not> b) i v) l = (if member (Pre (\<not> b) i v) l then [] else [t @ [(0,r)]])"
+lemma stop: "stop [t @ [(0,r)]] (Pre (\<not> b) i v) l =
+  (if member (Pre (\<not> b) i v) l then [] else [t @ [(0,r)]])"
 by (induct l) simp_all
 
-lemma pre:  "(n,(m,Pre b i v) # xs) \<in> calculation(nfs) \<Longrightarrow> \<not> is_axiom (list_sequent ((m,Pre b i v) # xs)) \<Longrightarrow> (Suc n,xs@[(0,Pre b i v)]) \<in> calculation(nfs)"
-  and con1: "(n,(m,Con p q) # xs) \<in> calculation(nfs) \<Longrightarrow> \<not> is_axiom (list_sequent ((m,Con p q) # xs)) \<Longrightarrow> (Suc n,xs@[(0,p)]) \<in> calculation(nfs)"
-  and con2: "(n,(m,Con p q) # xs) \<in> calculation(nfs) \<Longrightarrow> \<not> is_axiom (list_sequent ((m,Con p q) # xs)) \<Longrightarrow> (Suc n,xs@[(0,q)]) \<in> calculation(nfs)"
-  and dis:  "(n,(m,Dis p q) # xs) \<in> calculation(nfs) \<Longrightarrow> \<not> is_axiom (list_sequent ((m,Dis p q) # xs)) \<Longrightarrow> (Suc n,xs@[(0,p),(0,q)]) \<in> calculation(nfs)"
-  and uni:  "(n,(m,Uni p) # xs) \<in> calculation(nfs) \<Longrightarrow> \<not> is_axiom (list_sequent ((m,Uni p) # xs)) \<Longrightarrow> (Suc n,xs@[(0,sv (bind (fresh ((concat \<circ> map fv) (list_sequent ((m,Uni p) # xs))))) p)]) \<in> calculation(nfs)"
-  and exi:  "(n,(m,Exi p) # xs) \<in> calculation(nfs) \<Longrightarrow> \<not> is_axiom (list_sequent ((m,Exi p) # xs)) \<Longrightarrow> (Suc n,xs@[(0,sv (bind m) p),(Suc m,Exi p)]) \<in> calculation(nfs)"
+lemma pre: "(n,(m,Pre b i v) # xs) \<in> calculation(nfs) \<Longrightarrow>
+    \<not> is_axiom (list_sequent ((m,Pre b i v) # xs)) \<Longrightarrow>
+    (Suc n,xs@[(0,Pre b i v)]) \<in> calculation(nfs)"
+  and con1: "(n,(m,Con p q) # xs) \<in> calculation(nfs) \<Longrightarrow>
+    \<not> is_axiom (list_sequent ((m,Con p q) # xs)) \<Longrightarrow>
+    (Suc n,xs@[(0,p)]) \<in> calculation(nfs)"
+  and con2: "(n,(m,Con p q) # xs) \<in> calculation(nfs) \<Longrightarrow>
+    \<not> is_axiom (list_sequent ((m,Con p q) # xs)) \<Longrightarrow>
+    (Suc n,xs@[(0,q)]) \<in> calculation(nfs)"
+  and dis: "(n,(m,Dis p q) # xs) \<in> calculation(nfs) \<Longrightarrow>
+    \<not> is_axiom (list_sequent ((m,Dis p q) # xs)) \<Longrightarrow>
+    (Suc n,xs@[(0,p),(0,q)]) \<in> calculation(nfs)"
+  and uni: "(n,(m,Uni p) # xs) \<in> calculation(nfs) \<Longrightarrow>
+    \<not> is_axiom (list_sequent ((m,Uni p) # xs)) \<Longrightarrow>
+    (Suc n,xs@[(0,sv (bind (fresh ((concat \<circ> map fv) (list_sequent ((m,Uni p) # xs))))) p)])
+      \<in> calculation(nfs)"
+  and exi: "(n,(m,Exi p) # xs) \<in> calculation(nfs) \<Longrightarrow>
+    \<not> is_axiom (list_sequent ((m,Exi p) # xs)) \<Longrightarrow>
+    (Suc n,xs@[(0,sv (bind m) p),(Suc m,Exi p)]) \<in> calculation(nfs)"
   by (auto simp: list_sequent_def maps inst_def stop)
 
 lemmas not_is_axiom_subs = pre con1 con2 dis uni exi
@@ -488,7 +502,8 @@ lemma calculation_upwards:
     qed
   qed
 
-lemma calculation_downwards: "(Suc n,k) \<in> calculation s \<Longrightarrow> \<exists>t. (n,t) \<in> calculation s \<and> k \<in> set (solve t) \<and> \<not> is_axiom (list_sequent t)"
+lemma calculation_downwards: "(Suc n,k) \<in> calculation s \<Longrightarrow>
+  \<exists>t. (n,t) \<in> calculation s \<and> k \<in> set (solve t) \<and> \<not> is_axiom (list_sequent t)"
   proof (erule calculation.cases)
     assume "Suc n = 0"
     then show ?thesis using list_sequent_def by simp
@@ -509,7 +524,8 @@ lemma calculation_downwards: "(Suc n,k) \<in> calculation s \<Longrightarrow> \<
   qed
  
 lemma calculation_calculation_child[rule_format]:
-  shows "\<forall>s t. (Suc n,s) \<in> calculation t = (\<exists>k. k \<in> set (solve t) \<and> \<not> is_axiom (list_sequent t) \<and> (n,s) \<in> calculation k)"
+  "\<forall>s t. (Suc n,s) \<in> calculation t =
+    (\<exists>k. k \<in> set (solve t) \<and> \<not> is_axiom (list_sequent t) \<and> (n,s) \<in> calculation k)"
   using calculation_downwards by (induct n) (fastforce,blast)
 
 lemma calculation_progress:
@@ -526,11 +542,13 @@ definition inc :: "nat \<times> sequent \<Rightarrow> nat \<times> sequent" wher
 lemma inj_inc: "inj inc"
   by (simp add: inc_def inj_on_def)
 
-lemma calculation: "calculation s = insert (0,s) (inc ` (\<Union> (calculation ` {k. \<not> is_axiom (list_sequent s) \<and> k \<in> set (solve s)})))"
+lemma calculation: "calculation s =
+  insert (0,s) (inc ` (\<Union> (calculation ` {k. \<not> is_axiom (list_sequent s) \<and> k \<in> set (solve s)})))"
   proof (rule set_eqI,simp add: split_paired_all)
     fix n k
     show "((n,k) \<in> calculation s) =
-           (n = 0 \<and> k = s \<or> (n,k) \<in> inc ` (\<Union>x\<in>{k. \<not> is_axiom (list_sequent s) \<and> k \<in> set (solve s)}. calculation x))"
+      (n = 0 \<and> k = s \<or> (n,k) \<in> inc ` (\<Union>x\<in>{k. \<not> is_axiom (list_sequent s) \<and> k \<in> set (solve s)}.
+        calculation x))"
     by (cases n) (auto simp: calculation_calculation_child inc_def)
   qed
 
@@ -553,15 +571,79 @@ lemma is_axiom_finite_calculation: "is_axiom (list_sequent s) \<Longrightarrow> 
   by (simp add: calculation_is_axiom)
 
 primrec failing_path :: "(nat \<times> sequent) set \<Rightarrow> nat \<Rightarrow> (nat \<times> sequent)" where
-  "failing_path ns 0 = (SOME x. x \<in> ns \<and> fst x = 0 \<and> infinite (calculation (snd x)) \<and> \<not> is_axiom (list_sequent (snd x)))"
+  "failing_path ns 0 = (SOME x. x \<in> ns \<and> fst x = 0 \<and> infinite (calculation (snd x)) \<and>
+    \<not> is_axiom (list_sequent (snd x)))"
 | "failing_path ns (Suc n) = (let fn = failing_path ns n in 
-  (SOME fsucn. fsucn \<in> ns \<and> fst fsucn = Suc n \<and> (snd fsucn) \<in> set (solve (snd fn)) \<and> infinite (calculation (snd fsucn)) \<and> \<not> is_axiom (list_sequent (snd fsucn))))"
+  (SOME fsucn. fsucn \<in> ns \<and> fst fsucn = Suc n \<and> (snd fsucn) \<in> set (solve (snd fn)) \<and>
+    infinite (calculation (snd fsucn)) \<and> \<not> is_axiom (list_sequent (snd fsucn))))"
 
 lemma f0:
   assumes "f = failing_path (calculation s)"
   and "infinite (calculation s)"
-  shows "f 0 \<in> (calculation s) \<and> fst (f 0) = 0 \<and> infinite (calculation (snd (f 0))) \<and> \<not> is_axiom (list_sequent (snd (f 0)))"
-  using assms by (simp,metis (mono_tags,lifting) calculation.init is_axiom_finite_calculation fst_conv snd_conv someI_ex)
+  shows "f 0 \<in> (calculation s) \<and> fst (f 0) = 0 \<and> infinite (calculation (snd (f 0))) \<and>
+    \<not> is_axiom (list_sequent (snd (f 0)))"
+  using assms
+proof -
+  have "\<And>p P. p \<notin> P \<or> fst p \<noteq> (0::nat) \<or> finite (calculation (snd p)) \<or>
+    (SOME p. p \<in> P \<and> fst p = 0 \<and> infinite (calculation (snd p)) \<and>
+      \<not> is_axiom (list_sequent (snd p))) \<in> P \<and> fst (SOME p. p \<in> P \<and> fst p = 0 \<and>
+      infinite (calculation (snd p)) \<and> \<not> is_axiom (list_sequent (snd p))) = 0 \<and>
+      infinite (calculation (snd (SOME p. p \<in> P \<and> fst p = 0 \<and>
+      infinite (calculation (snd p)) \<and> \<not> is_axiom (list_sequent (snd p))))) \<and>
+      \<not> is_axiom (list_sequent (snd (SOME p. p \<in> P \<and> fst p = 0 \<and>
+      infinite (calculation (snd p)) \<and> \<not> is_axiom (list_sequent (snd p)))))"
+  proof -
+    fix p :: "nat \<times> (nat \<times> nnf) list" and P :: "(nat \<times> (nat \<times> nnf) list) set"
+    have f1: "\<forall>p pa. \<not> p (pa::nat \<times> (nat \<times> nnf) list) \<or> p (Eps p)" by (metis someI)
+    { assume "(SOME p. p \<in> P \<and> fst p = 0 \<and> infinite (calculation (snd p)) \<and>
+      \<not> is_axiom (list_sequent (snd p))) \<notin> P \<or> fst (SOME p. p \<in> P \<and> fst p = 0 \<and>
+      infinite (calculation (snd p)) \<and> \<not> is_axiom (list_sequent (snd p))) \<noteq> 0 \<or>
+      finite (calculation (snd (SOME p. p \<in> P \<and> fst p = 0 \<and> infinite (calculation (snd p)) \<and>
+      \<not> is_axiom (list_sequent (snd p))))) \<or> is_axiom (list_sequent (snd (SOME p. p \<in> P \<and>
+      fst p = 0 \<and> infinite (calculation (snd p)) \<and> \<not> is_axiom (list_sequent (snd p)))))"
+      then have "\<not> ((SOME p. p \<in> P \<and> fst p = 0 \<and> infinite (calculation (snd p)) \<and>
+        \<not> is_axiom (list_sequent (snd p))) \<in> P \<and> fst (SOME p. p \<in> P \<and> fst p = 0 \<and>
+        infinite (calculation (snd p)) \<and> \<not> is_axiom (list_sequent (snd p))) = 0 \<and>
+        infinite (calculation (snd (SOME p. p \<in> P \<and> fst p = 0 \<and>
+        infinite (calculation (snd p)) \<and> \<not> is_axiom (list_sequent (snd p))))) \<and>
+        \<not> is_axiom (list_sequent (snd (SOME p. p \<in> P \<and> fst p = 0 \<and>
+        infinite (calculation (snd p)) \<and> \<not> is_axiom (list_sequent (snd p))))))"
+        by metis
+      then have "\<not> (p \<in> P \<and> fst p = 0 \<and> infinite (calculation (snd p)) \<and>
+        \<not> is_axiom (list_sequent (snd p)))"
+        using f1 by (metis (mono_tags, lifting) someI) 
+      then have "p \<notin> P \<or> fst p \<noteq> 0 \<or> finite (calculation (snd p)) \<or>
+        (SOME p. p \<in> P \<and> fst p = 0 \<and> infinite (calculation (snd p)) \<and>
+        \<not> is_axiom (list_sequent (snd p))) \<in> P \<and> fst (SOME p. p \<in> P \<and> fst p = 0 \<and>
+        infinite (calculation (snd p)) \<and> \<not> is_axiom (list_sequent (snd p))) = 0 \<and>
+        infinite (calculation (snd (SOME p. p \<in> P \<and> fst p = 0 \<and>
+        infinite (calculation (snd p)) \<and> \<not> is_axiom (list_sequent (snd p))))) \<and>
+        \<not> is_axiom (list_sequent (snd (SOME p. p \<in> P \<and> fst p = 0 \<and>
+        infinite (calculation (snd p)) \<and> \<not> is_axiom (list_sequent (snd p)))))"
+        by (metis (no_types) is_axiom_finite_calculation) }
+     then show "p \<notin> P \<or> fst p \<noteq> 0 \<or> finite (calculation (snd p)) \<or>
+       (SOME p. p \<in> P \<and> fst p = 0 \<and> infinite (calculation (snd p)) \<and>
+       \<not> is_axiom (list_sequent (snd p))) \<in> P \<and> fst (SOME p. p \<in> P \<and> fst p = 0 \<and>
+       infinite (calculation (snd p)) \<and> \<not> is_axiom (list_sequent (snd p))) = 0 \<and>
+       infinite (calculation (snd (SOME p. p \<in> P \<and> fst p = 0 \<and>
+       infinite (calculation (snd p)) \<and> \<not> is_axiom (list_sequent (snd p))))) \<and>
+       \<not> is_axiom (list_sequent (snd (SOME p. p \<in> P \<and> fst p = 0 \<and>
+       infinite (calculation (snd p)) \<and> \<not> is_axiom (list_sequent (snd p)))))"
+       by blast
+  qed 
+  then have "\<And>ps. fst (0::nat, ps) \<noteq> 0 \<or> finite (calculation (snd (0::nat, ps))) \<or>
+    (SOME p. p \<in> calculation ps \<and> fst p = 0 \<and> infinite (calculation (snd p)) \<and>
+    \<not> is_axiom (list_sequent (snd p))) \<in> calculation ps \<and>
+    fst (SOME p. p \<in> calculation ps \<and> fst p = 0 \<and>
+    infinite (calculation (snd p)) \<and> \<not> is_axiom (list_sequent (snd p))) = 0 \<and>
+    infinite (calculation (snd (SOME p. p \<in> calculation ps \<and> fst p = 0 \<and>
+    infinite (calculation (snd p)) \<and> \<not> is_axiom (list_sequent (snd p))))) \<and>
+    \<not> is_axiom (list_sequent (snd (SOME p. p \<in> calculation ps \<and> fst p = 0 \<and>
+    infinite (calculation (snd p)) \<and> \<not> is_axiom (list_sequent (snd p)))))"
+    by (meson calculation.init)
+  then show ?thesis
+    using assms(1) assms(2) by auto
+qed
 
 lemma infinite_union: "finite Y \<Longrightarrow> infinite (Union (f ` Y)) \<Longrightarrow> \<exists>y. y \<in> Y \<and> infinite (f y)"
   by auto
@@ -571,11 +653,16 @@ lemma finite_subs: "finite {w. \<not> is_axiom (list_sequent y) \<and> w \<in> s
 
 lemma fSuc:
   assumes "f = failing_path (calculation s)"
-  and "f n \<in> calculation s \<and> fst (f n) = n \<and> infinite (calculation (snd (f n))) \<and> \<not> is_axiom (list_sequent (snd (f n)))"
-  shows "f (Suc n) \<in> calculation s \<and> fst (f (Suc n)) = Suc n \<and> (snd (f (Suc n))) \<in> set (solve (snd (f n))) \<and> infinite (calculation (snd (f (Suc n)))) \<and> \<not> is_axiom (list_sequent (snd (f (Suc n))))"
+  and "f n \<in> calculation s \<and> fst (f n) = n \<and> infinite (calculation (snd (f n))) \<and>
+    \<not> is_axiom (list_sequent (snd (f n)))"
+  shows "f (Suc n) \<in> calculation s \<and> fst (f (Suc n)) = Suc n \<and> (snd (f (Suc n)))
+    \<in> set (solve (snd (f n))) \<and> infinite (calculation (snd (f (Suc n)))) \<and>
+    \<not> is_axiom (list_sequent (snd (f (Suc n))))"
   proof -
-    have "infinite (\<Union> (calculation ` {w. \<not> is_axiom (list_sequent (snd (f n))) \<and> w \<in> set (solve (snd (f n)))}))"
-      using assms by (metis (mono_tags,lifting) Collect_cong calculation finite.insertI finite_imageI)
+    have "infinite (\<Union> (calculation ` {w. \<not> is_axiom (list_sequent (snd (f n))) \<and>
+      w \<in> set (solve (snd (f n)))}))"
+      using assms
+      by (metis (mono_tags,lifting) Collect_cong calculation finite.insertI finite_imageI)
     then show ?thesis using assms calculation.step is_axiom_finite_calculation
       by simp (rule someI_ex,simp,metis prod.collapse)
  qed
@@ -586,13 +673,15 @@ lemma is_path_f_0: "infinite (calculation s) \<Longrightarrow> failing_path (cal
 lemma is_path_f':
   assumes "f = failing_path (calculation s)"
   and "infinite (calculation s)"
-  shows "f n \<in> calculation s \<and> fst (f n) = n \<and> infinite (calculation (snd (f n))) \<and> \<not> is_axiom (list_sequent (snd (f n)))"
+  shows "f n \<in> calculation s \<and> fst (f n) = n \<and> infinite (calculation (snd (f n))) \<and>
+    \<not> is_axiom (list_sequent (snd (f n)))"
   using assms f0 fSuc by (induct n) simp_all
 
 lemma is_path_f:
   assumes "f = failing_path (calculation s)"
   and "infinite (calculation s)"
-  shows "\<forall>n. f n \<in> calculation s \<and> fst (f n) = n \<and> (snd (f (Suc n))) \<in> set (solve (snd (f n))) \<and> infinite (calculation (snd (f n)))"
+  shows "\<forall>n. f n \<in> calculation s \<and> fst (f n) = n \<and> (snd (f (Suc n))) \<in> set (solve (snd (f n))) \<and>
+    infinite (calculation (snd (f n)))"
   using assms is_path_f' fSuc by simp
 
 lemma adjust: "Suc n \<in> set l = (n \<in> set (adjust l))"
@@ -603,36 +692,56 @@ lemma adjust: "Suc n \<in> set l = (n \<in> set (adjust l))"
   qed
 
 lemma ttt: "(\<And>e e'. \<forall>x. x \<in> set (fv p) \<longrightarrow> e x = e' x \<Longrightarrow> semantics m e p = semantics m e' p) \<Longrightarrow>
-              \<forall>x. x \<in> set (adjust (fv p)) \<longrightarrow> e x = e' x \<Longrightarrow>
-              (\<forall>z\<in>fst m. semantics m (\<lambda>x. case x of 0 \<Rightarrow> z | Suc n \<Rightarrow> e n) p) = (\<forall>z\<in>fst m. semantics m (\<lambda>x. case x of 0 \<Rightarrow> z | Suc n \<Rightarrow> e' n) p)"
+  \<forall>x. x \<in> set (adjust (fv p)) \<longrightarrow> e x = e' x \<Longrightarrow>
+  (\<forall>z\<in>fst m. semantics m (\<lambda>x. case x of 0 \<Rightarrow> z | Suc n \<Rightarrow> e n) p) =
+    (\<forall>z\<in>fst m. semantics m (\<lambda>x. case x of 0 \<Rightarrow> z | Suc n \<Rightarrow> e' n) p)"
 proof -
   assume a1: "\<And>e e'. \<forall>x. x \<in> set (fv p) \<longrightarrow> e x = e' x \<Longrightarrow> semantics m e p = semantics m e' p"
   assume a2: "\<forall>x. x \<in> set (adjust (fv p)) \<longrightarrow> e x = e' x"
-  have f3: "((\<forall>us. us \<in> fst m \<longrightarrow> semantics m (case_nat us e) p) \<noteq> (\<forall>us. us \<in> fst m \<longrightarrow> semantics m (case_nat us e') p)) = ((\<exists>us. us \<in> fst m \<and> \<not> semantics m (case_nat us e) p) = (\<forall>us. us \<notin> fst m \<or> semantics m (case_nat us e') p))"
+  have f3: "((\<forall>us. us \<in> fst m \<longrightarrow> semantics m (case_nat us e) p) \<noteq> (\<forall>us. us \<in> fst m \<longrightarrow>
+    semantics m (case_nat us e') p)) = ((\<exists>us. us \<in> fst m \<and>
+    \<not> semantics m (case_nat us e) p) = (\<forall>us. us \<notin> fst m \<or> semantics m (case_nat us e') p))"
     by blast
   obtain uus :: "unit list" and uusa :: "unit list" where
-    f4: "((\<exists>us. us \<in> fst m \<and> \<not> semantics m (case_nat us e) p) = (\<forall>us. us \<notin> fst m \<or> semantics m (case_nat us e') p)) = (((\<forall>us. us \<notin> fst m \<or> semantics m (case_nat us e) p) \<or> (\<forall>us. us \<notin> fst m \<or> semantics m (case_nat us e') p)) \<and> (uusa \<in> fst m \<and> \<not> semantics m (case_nat uusa e) p \<or> uus \<in> fst m \<and> \<not> semantics m (case_nat uus e') p))"
+    f4: "((\<exists>us. us \<in> fst m \<and> \<not> semantics m (case_nat us e) p) =
+      (\<forall>us. us \<notin> fst m \<or> semantics m (case_nat us e') p)) =
+      (((\<forall>us. us \<notin> fst m \<or> semantics m (case_nat us e) p) \<or>
+        (\<forall>us. us \<notin> fst m \<or> semantics m (case_nat us e') p)) \<and>
+        (uusa \<in> fst m \<and> \<not> semantics m (case_nat uusa e) p \<or> uus \<in> fst m \<and>
+        \<not> semantics m (case_nat uus e') p))"
     by (metis (no_types))
-  then have "(\<exists>us. us \<in> fst m \<and> \<not> semantics m (case_nat us e) p) \<and> (\<exists>us. us \<in> fst m \<and> \<not> semantics m (case_nat us e') p) \<or> (uusa \<notin> fst m \<or> semantics m (case_nat uusa e) p) \<and> (uus \<notin> fst m \<or> semantics m (case_nat uus e') p)"
+  then have "(\<exists>us. us \<in> fst m \<and> \<not> semantics m (case_nat us e) p) \<and>
+    (\<exists>us. us \<in> fst m \<and> \<not> semantics m (case_nat us e') p) \<or>
+    (uusa \<notin> fst m \<or> semantics m (case_nat uusa e) p) \<and> (uus \<notin> fst m \<or>
+    semantics m (case_nat uus e') p)"
     using a2 a1 by (metis (no_types,lifting) Nitpick.case_nat_unfold Suc_pred' adjust neq0_conv)
-  then have "(\<forall>us. us \<in> fst m \<longrightarrow> semantics m (case_nat us e) p) = (\<forall>us. us \<in> fst m \<longrightarrow> semantics m (case_nat us e') p)"
+  then have "(\<forall>us. us \<in> fst m \<longrightarrow> semantics m (case_nat us e) p) =
+    (\<forall>us. us \<in> fst m \<longrightarrow> semantics m (case_nat us e') p)"
     using f4 f3 by blast
   then show ?thesis
     by blast
 qed
 
 lemma ttt': "(\<And>e e'. \<forall>x. x \<in> set (fv p) \<longrightarrow> e x = e' x \<Longrightarrow> semantics m e p = semantics m e' p) \<Longrightarrow>
-              \<forall>x. x \<in> set (adjust (fv p)) \<longrightarrow> e x = e' x \<Longrightarrow>
-              (\<exists>z\<in>fst m. semantics m (\<lambda>x. case x of 0 \<Rightarrow> z | Suc n \<Rightarrow> e n) p) = (\<exists>z\<in>fst m. semantics m (\<lambda>x. case x of 0 \<Rightarrow> z | Suc n \<Rightarrow> e' n) p)"
+  \<forall>x. x \<in> set (adjust (fv p)) \<longrightarrow> e x = e' x \<Longrightarrow>
+  (\<exists>z\<in>fst m. semantics m (\<lambda>x. case x of 0 \<Rightarrow> z | Suc n \<Rightarrow> e n) p) =
+    (\<exists>z\<in>fst m. semantics m (\<lambda>x. case x of 0 \<Rightarrow> z | Suc n \<Rightarrow> e' n) p)"
 proof -
   assume a1: "\<And>e e'. \<forall>x. x \<in> set (fv p) \<longrightarrow> e x = e' x \<Longrightarrow> semantics m e p = semantics m e' p"
   assume a2: "\<forall>x. x \<in> set (adjust (fv p)) \<longrightarrow> e x = e' x"
-  have f3: "\<forall>us f n. if n = 0 then (case n of 0 \<Rightarrow> us::unit list | Suc x \<Rightarrow> f x) = us else (case n of 0 \<Rightarrow> us | Suc x \<Rightarrow> f x) = f (n - 1)"
+  have f3: "\<forall>us f n. if n = 0 then (case n of 0 \<Rightarrow> us::unit list | Suc x \<Rightarrow> f x) =
+    us else (case n of 0 \<Rightarrow> us | Suc x \<Rightarrow> f x) = f (n - 1)"
     by (simp add: Nitpick.case_nat_unfold)
   obtain uus :: "unit list" and uusa :: "unit list" where
-    f4: "((\<forall>us. us \<notin> fst m \<or> \<not> semantics m (case_nat us e) p) = (\<exists>us. us \<in> fst m \<and> semantics m (case_nat us e') p)) = ((uusa \<in> fst m \<and> semantics m (case_nat uusa e) p \<or> uus \<in> fst m \<and> semantics m (case_nat uus e') p) \<and> ((\<forall>us. us \<notin> fst m \<or> \<not> semantics m (case_nat us e) p) \<or> (\<forall>us. us \<notin> fst m \<or> \<not> semantics m (case_nat us e') p)))"
+    f4: "((\<forall>us. us \<notin> fst m \<or> \<not> semantics m (case_nat us e) p) =
+      (\<exists>us. us \<in> fst m \<and> semantics m (case_nat us e') p)) =
+      ((uusa \<in> fst m \<and> semantics m (case_nat uusa e) p \<or> uus \<in> fst m \<and>
+      semantics m (case_nat uus e') p) \<and> ((\<forall>us. us \<notin> fst m \<or> \<not> semantics m (case_nat us e) p) \<or>
+      (\<forall>us. us \<notin> fst m \<or> \<not> semantics m (case_nat us e') p)))"
     by (metis (no_types))
-  have "(uusa \<notin> fst m \<or> \<not> semantics m (case_nat uusa e) p) \<and> (uus \<notin> fst m \<or> \<not> semantics m (case_nat uus e') p) \<or> (\<exists>us. us \<in> fst m \<and> semantics m (case_nat us e) p) \<and> (\<exists>us. us \<in> fst m \<and> semantics m (case_nat us e') p)"
+  have "(uusa \<notin> fst m \<or> \<not> semantics m (case_nat uusa e) p) \<and> (uus \<notin> fst m \<or>
+    \<not> semantics m (case_nat uus e') p) \<or> (\<exists>us. us \<in> fst m \<and> semantics m (case_nat us e) p) \<and>
+      (\<exists>us. us \<in> fst m \<and> semantics m (case_nat us e') p)"
     using f3 a2 a1 by (metis (no_types,lifting) Suc_pred' adjust neq0_conv)
   then show ?thesis
     using f4 by blast
@@ -654,18 +763,20 @@ lemma eval_cong: "\<forall>x. x \<in> set (fv p) \<longrightarrow> e x = e' x \<
 lemma semantics_alternative_def2: "semantics_alternative m e s = (\<exists>p. p \<in> set s \<and> semantics m e p)"
   by (induct s) auto
 
-lemma semantics_alternative_append: "semantics_alternative m e (s @ s') = ((semantics_alternative m e s) \<or> (semantics_alternative m e s'))"
+lemma semantics_alternative_append: "semantics_alternative m e (s @ s') =
+  ((semantics_alternative m e s) \<or> (semantics_alternative m e s'))"
   by (induct s) auto
 
 lemma fv_list_cons: "fv_list (a # list) = (fv a) @ (fv_list list)"
   by (simp add: fv_list_def maps)
 
-lemma semantics_alternative_cong: "(\<forall>x. x \<in> set (fv_list s) \<longrightarrow> e x = e' x) \<longrightarrow> semantics_alternative m e s = semantics_alternative m e' s" 
+lemma semantics_alternative_cong: "(\<forall>x. x \<in> set (fv_list s) \<longrightarrow> e x = e' x) \<longrightarrow> 
+  semantics_alternative m e s = semantics_alternative m e' s" 
   by (induct s) (simp_all,metis eval_cong Un_iff set_append fv_list_cons)
 
 section "Soundness"
 
-lemma ball: "\<forall>x \<in> m. P x = Q x \<Longrightarrow> (\<forall>x \<in> m. P x) = (\<forall>x \<in> m. Q x)" "\<forall>x \<in> m. P x = Q x \<Longrightarrow> (\<exists>x \<in> m. P x) = (\<exists>x \<in> m. Q x)"
+lemma ball: "\<forall>x \<in> m. P x = Q x \<Longrightarrow> (\<exists>x \<in> m. P x) = (\<exists>x \<in> m. Q x)"
   by simp_all
 
 definition bump' :: "(nat \<Rightarrow> nat) \<Rightarrow> nat \<Rightarrow> nat" where
@@ -675,53 +786,95 @@ lemma bump'[simp]: "bump f x = bump' f x"
   by (metis Nitpick.case_nat_unfold bump.simps Suc_pred' bump'_def not_gr0)
 
 lemma sss: "semantics m e (sv f p) = semantics m (e \<circ> f) p \<Longrightarrow>
-             (\<And>p e e' m. \<forall>x. x \<in> set (fv p) \<longrightarrow> e x = e' x \<Longrightarrow> semantics m e p = semantics m e' p) \<Longrightarrow>
-             (\<forall>z\<in>fst m. semantics m (case_nat z e \<circ> bump f) p) = (\<forall>z\<in>fst m. semantics m (\<lambda>x. case x of 0 \<Rightarrow> z | Suc n \<Rightarrow> (e \<circ> f) n) p)"
+  (\<And>p e e' m. \<forall>x. x \<in> set (fv p) \<longrightarrow> e x = e' x \<Longrightarrow> semantics m e p = semantics m e' p) \<Longrightarrow>
+  (\<forall>z\<in>fst m. semantics m (case_nat z e \<circ> bump f) p) =
+    (\<forall>z\<in>fst m. semantics m (\<lambda>x. case x of 0 \<Rightarrow> z | Suc n \<Rightarrow> (e \<circ> f) n) p)"
 proof -
   fix pa :: nnf and ea :: "nat \<Rightarrow> unit list" and fa :: "nat \<Rightarrow> nat"
   assume a1: "\<And>p e e' m. \<forall>x. x \<in> set (fv p) \<longrightarrow> e x = e' x \<Longrightarrow> semantics m e p = semantics m e' p"
   obtain uus :: "unit list" and uusa :: "unit list" where
-    f2: "((\<exists>us. us \<in> fst m \<and> \<not> semantics m (case_nat us ea \<circ> bump fa) pa) = (\<forall>us. us \<notin> fst m \<or> semantics m (case_nat us (ea \<circ> fa)) pa)) = (((\<forall>us. us \<notin> fst m \<or> semantics m (case_nat us ea \<circ> bump fa) pa) \<or> (\<forall>us. us \<notin> fst m \<or> semantics m (case_nat us (ea \<circ> fa)) pa)) \<and> (uusa \<in> fst m \<and> \<not> semantics m (case_nat uusa ea \<circ> bump fa) pa \<or> uus \<in> fst m \<and> \<not> semantics m (case_nat uus (ea \<circ> fa)) pa))"
+    f2: "((\<exists>us. us \<in> fst m \<and> \<not> semantics m (case_nat us ea \<circ> bump fa) pa) =
+      (\<forall>us. us \<notin> fst m \<or> semantics m (case_nat us (ea \<circ> fa)) pa)) =
+      (((\<forall>us. us \<notin> fst m \<or> semantics m (case_nat us ea \<circ> bump fa) pa) \<or>
+      (\<forall>us. us \<notin> fst m \<or> semantics m (case_nat us (ea \<circ> fa)) pa)) \<and>
+      (uusa \<in> fst m \<and> \<not> semantics m (case_nat uusa ea \<circ> bump fa) pa \<or> uus \<in> fst m \<and>
+      \<not> semantics m (case_nat uus (ea \<circ> fa)) pa))"
     by (metis (no_types))
   have f3: "\<forall>n f fa p. (\<exists>na. na \<in> set (fv n) \<and> f na \<noteq> fa na) \<or> semantics p f n = semantics p fa n"
     using a1 by blast
   obtain nn :: "(nat \<Rightarrow> unit list) \<Rightarrow> (nat \<Rightarrow> unit list) \<Rightarrow> nnf \<Rightarrow> nat" where
-    "\<forall>x1 x2 x3. (\<exists>v4. v4 \<in> set (fv x3) \<and> x2 v4 \<noteq> x1 v4) = (nn x1 x2 x3 \<in> set (fv x3) \<and> x2 (nn x1 x2 x3) \<noteq> x1 (nn x1 x2 x3))"
+    "\<forall>x1 x2 x3. (\<exists>v4. v4 \<in> set (fv x3) \<and> x2 v4 \<noteq> x1 v4) =
+      (nn x1 x2 x3 \<in> set (fv x3) \<and> x2 (nn x1 x2 x3) \<noteq> x1 (nn x1 x2 x3))"
     by moura
-  then have f4: "\<forall>n f fa p. nn fa f n \<in> set (fv n) \<and> f (nn fa f n) \<noteq> fa (nn fa f n) \<or> semantics p f n = semantics p fa n"
+  then have f4: "\<forall>n f fa p. nn fa f n \<in> set (fv n) \<and> f (nn fa f n) \<noteq> fa (nn fa f n) \<or>
+    semantics p f n = semantics p fa n"
     using f3 by presburger
-  have f5: "\<forall>us f n. if n = 0 then (case n of 0 \<Rightarrow> us::unit list | Suc x \<Rightarrow> f x) = us else (case n of 0 \<Rightarrow> us | Suc x \<Rightarrow> f x) = f (n - 1)"
+  have f5: "\<forall>us f n. if n = 0 then (case n of 0 \<Rightarrow> us::unit list | Suc x \<Rightarrow> f x) =
+    us else (case n of 0 \<Rightarrow> us | Suc x \<Rightarrow> f x) = f (n - 1)"
     by (simp add: Nitpick.case_nat_unfold)
-  then have f6: "(case bump fa (nn (case_nat uus ea \<circ> bump fa) (case_nat uus (ea \<circ> fa)) pa) of 0 \<Rightarrow> uus | Suc x \<Rightarrow> ea x) = uus \<and> (case nn (case_nat uus ea \<circ> bump fa) (case_nat uus (ea \<circ> fa)) pa of 0 \<Rightarrow> uus | Suc x \<Rightarrow> (ea \<circ> fa) x) \<noteq> (case_nat uus ea \<circ> bump fa) (nn (case_nat uus ea \<circ> bump fa) (case_nat uus (ea \<circ> fa)) pa) \<longrightarrow> nn (case_nat uus ea \<circ> bump fa) (case_nat uus (ea \<circ> fa)) pa \<noteq> 0"
+  then have f6: "(case bump fa (nn (case_nat uus ea \<circ> bump fa)
+    (case_nat uus (ea \<circ> fa)) pa) of 0 \<Rightarrow> uus | Suc x \<Rightarrow> ea x) = uus \<and>
+    (case nn (case_nat uus ea \<circ> bump fa) (case_nat uus (ea \<circ> fa)) pa of 0 \<Rightarrow>
+    uus | Suc x \<Rightarrow> (ea \<circ> fa) x) \<noteq> (case_nat uus ea \<circ> bump fa)
+    (nn (case_nat uus ea \<circ> bump fa) (case_nat uus (ea \<circ> fa)) pa) \<longrightarrow> nn (case_nat uus ea \<circ> bump fa)
+    (case_nat uus (ea \<circ> fa)) pa \<noteq> 0"
     by (metis o_apply)
-  have f7: "\<forall>n f na. if na = 0 then (case na of 0 \<Rightarrow> n::nat | Suc x \<Rightarrow> f x) = n else (case na of 0 \<Rightarrow> n | Suc x \<Rightarrow> f x) = f (na - 1)"
+  have f7: "\<forall>n f na. if na = 0 then (case na of 0 \<Rightarrow> n::nat | Suc x \<Rightarrow> f x) =
+    n else (case na of 0 \<Rightarrow> n | Suc x \<Rightarrow> f x) = f (na - 1)"
     by (simp add: Nitpick.case_nat_unfold)
-  have "(case nn (case_nat uus ea \<circ> bump fa) (case_nat uus (ea \<circ> fa)) pa of 0 \<Rightarrow> uus | Suc x \<Rightarrow> (ea \<circ> fa) x) \<noteq> (case_nat uus ea \<circ> bump fa) (nn (case_nat uus ea \<circ> bump fa) (case_nat uus (ea \<circ> fa)) pa) \<longrightarrow> nn (case_nat uus ea \<circ> bump fa) (case_nat uus (ea \<circ> fa)) pa \<noteq> 0"
+  have "(case nn (case_nat uus ea \<circ> bump fa) (case_nat uus (ea \<circ> fa)) pa of 0 \<Rightarrow>
+    uus | Suc x \<Rightarrow> (ea \<circ> fa) x) \<noteq> (case_nat uus ea \<circ> bump fa) (nn (case_nat uus ea \<circ> bump fa)
+    (case_nat uus (ea \<circ> fa)) pa) \<longrightarrow> nn (case_nat uus ea \<circ> bump fa) (case_nat uus (ea \<circ> fa)) pa \<noteq> 0"
     using f6 bump'_def by fastforce
-  then have f8: "(case nn (case_nat uus ea \<circ> bump fa) (case_nat uus (ea \<circ> fa)) pa of 0 \<Rightarrow> uus | Suc x \<Rightarrow> (ea \<circ> fa) x) \<noteq> (case_nat uus ea \<circ> bump fa) (nn (case_nat uus ea \<circ> bump fa) (case_nat uus (ea \<circ> fa)) pa) \<longrightarrow> (case nn (case_nat uus ea \<circ> bump fa) (case_nat uus (ea \<circ> fa)) pa of 0 \<Rightarrow> uus | Suc x \<Rightarrow> (ea \<circ> fa) x) = (case bump fa (nn (case_nat uus ea \<circ> bump fa) (case_nat uus (ea \<circ> fa)) pa) of 0 \<Rightarrow> uus | Suc x \<Rightarrow> ea x)"
+  then have f8: "(case nn (case_nat uus ea \<circ> bump fa) (case_nat uus (ea \<circ> fa)) pa of 0 \<Rightarrow>
+    uus | Suc x \<Rightarrow> (ea \<circ> fa) x) \<noteq> (case_nat uus ea \<circ> bump fa) (nn (case_nat uus ea \<circ> bump fa)
+    (case_nat uus (ea \<circ> fa)) pa) \<longrightarrow> (case nn (case_nat uus ea \<circ> bump fa)
+    (case_nat uus (ea \<circ> fa)) pa of 0 \<Rightarrow> uus | Suc x \<Rightarrow> (ea \<circ> fa) x) =
+    (case bump fa (nn (case_nat uus ea \<circ> bump fa) (case_nat uus (ea \<circ> fa)) pa) of 0 \<Rightarrow>
+    uus | Suc x \<Rightarrow> ea x)"
     using f7 f5 bump'_def by fastforce
-  have "bump fa (nn (case_nat uusa ea \<circ> bump fa) (case_nat uusa (ea \<circ> fa)) pa) = (case nn (case_nat uusa ea \<circ> bump fa) (case_nat uusa (ea \<circ> fa)) pa of 0 \<Rightarrow> 0 | Suc n \<Rightarrow> Suc (fa n))"
+  have "bump fa (nn (case_nat uusa ea \<circ> bump fa) (case_nat uusa (ea \<circ> fa)) pa) =
+    (case nn (case_nat uusa ea \<circ> bump fa)
+    (case_nat uusa (ea \<circ> fa)) pa of 0 \<Rightarrow> 0 | Suc n \<Rightarrow> Suc (fa n))"
     by (metis bump' bump'_def)
-  then have f9: "nn (case_nat uusa ea \<circ> bump fa) (case_nat uusa (ea \<circ> fa)) pa \<noteq> 0 \<longrightarrow> (case nn (case_nat uusa ea \<circ> bump fa) (case_nat uusa (ea \<circ> fa)) pa of 0 \<Rightarrow> uusa | Suc x \<Rightarrow> (ea \<circ> fa) x) = (case_nat uusa ea \<circ> bump fa) (nn (case_nat uusa ea \<circ> bump fa) (case_nat uusa (ea \<circ> fa)) pa)"
+  then have f9: "nn (case_nat uusa ea \<circ> bump fa) (case_nat uusa (ea \<circ> fa)) pa \<noteq> 0 \<longrightarrow>
+    (case nn (case_nat uusa ea \<circ> bump fa) (case_nat uusa (ea \<circ> fa)) pa of 0 \<Rightarrow>
+    uusa | Suc x \<Rightarrow> (ea \<circ> fa) x) = (case_nat uusa ea \<circ> bump fa) (nn (case_nat uusa ea \<circ> bump fa)
+    (case_nat uusa (ea \<circ> fa)) pa)"
     using f7 f5 by simp
-  then have f10: "(case nn (case_nat uusa ea \<circ> bump fa) (case_nat uusa (ea \<circ> fa)) pa of 0 \<Rightarrow> uusa | Suc x \<Rightarrow> (ea \<circ> fa) x) \<noteq> (case_nat uusa ea \<circ> bump fa) (nn (case_nat uusa ea \<circ> bump fa) (case_nat uusa (ea \<circ> fa)) pa) \<longrightarrow> (case nn (case_nat uusa ea \<circ> bump fa) (case_nat uusa (ea \<circ> fa)) pa of 0 \<Rightarrow> uusa | Suc x \<Rightarrow> (ea \<circ> fa) x) = uusa"
+  then have f10: "(case nn (case_nat uusa ea \<circ> bump fa) (case_nat uusa (ea \<circ> fa)) pa of 0 \<Rightarrow>
+    uusa | Suc x \<Rightarrow> (ea \<circ> fa) x) \<noteq> (case_nat uusa ea \<circ> bump fa) (nn (case_nat uusa ea \<circ> bump fa)
+    (case_nat uusa (ea \<circ> fa)) pa) \<longrightarrow> (case nn (case_nat uusa ea \<circ> bump fa)
+    (case_nat uusa (ea \<circ> fa)) pa of 0 \<Rightarrow> uusa | Suc x \<Rightarrow> (ea \<circ> fa) x) = uusa"
     using f5 by metis
-  have "(case nn (case_nat uusa ea \<circ> bump fa) (case_nat uusa (ea \<circ> fa)) pa of 0 \<Rightarrow> uusa | Suc x \<Rightarrow> (ea \<circ> fa) x) \<noteq> (case_nat uusa ea \<circ> bump fa) (nn (case_nat uusa ea \<circ> bump fa) (case_nat uusa (ea \<circ> fa)) pa) \<longrightarrow> bump fa (nn (case_nat uusa ea \<circ> bump fa) (case_nat uusa (ea \<circ> fa)) pa) = 0"
+  have "(case nn (case_nat uusa ea \<circ> bump fa) (case_nat uusa (ea \<circ> fa)) pa of 0 \<Rightarrow>
+    uusa | Suc x \<Rightarrow> (ea \<circ> fa) x) \<noteq> (case_nat uusa ea \<circ> bump fa) (nn (case_nat uusa ea \<circ> bump fa)
+    (case_nat uusa (ea \<circ> fa)) pa) \<longrightarrow> bump fa (nn (case_nat uusa ea \<circ> bump fa)
+    (case_nat uusa (ea \<circ> fa)) pa) = 0"
     using f9 f7 by (metis (no_types) bump' bump'_def)
-  then have "(case nn (case_nat uusa ea \<circ> bump fa) (case_nat uusa (ea \<circ> fa)) pa of 0 \<Rightarrow> uusa | Suc x \<Rightarrow> (ea \<circ> fa) x) = (case_nat uusa ea \<circ> bump fa) (nn (case_nat uusa ea \<circ> bump fa) (case_nat uusa (ea \<circ> fa)) pa)"
+  then have "(case nn (case_nat uusa ea \<circ> bump fa) (case_nat uusa (ea \<circ> fa)) pa of 0 \<Rightarrow>
+    uusa | Suc x \<Rightarrow> (ea \<circ> fa) x) = (case_nat uusa ea \<circ> bump fa) (nn (case_nat uusa ea \<circ> bump fa)
+    (case_nat uusa (ea \<circ> fa)) pa)"
     using f10 by fastforce
-  then have "(\<exists>us. us \<in> fst m \<and> \<not> semantics m (case_nat us ea \<circ> bump fa) pa) \<and> (\<exists>us. us \<in> fst m \<and> \<not> semantics m (case_nat us (ea \<circ> fa)) pa) \<or> (uusa \<notin> fst m \<or> semantics m (case_nat uusa ea \<circ> bump fa) pa) \<and> (uus \<notin> fst m \<or> semantics m (case_nat uus (ea \<circ> fa)) pa)"
+  then have "(\<exists>us. us \<in> fst m \<and> \<not> semantics m (case_nat us ea \<circ> bump fa) pa) \<and>
+    (\<exists>us. us \<in> fst m \<and> \<not> semantics m (case_nat us (ea \<circ> fa)) pa) \<or>
+    (uusa \<notin> fst m \<or> semantics m (case_nat uusa ea \<circ> bump fa) pa) \<and>
+    (uus \<notin> fst m \<or> semantics m (case_nat uus (ea \<circ> fa)) pa)"
     using f8 f4 by (metis (no_types) o_apply)
-  then have "(\<exists>us. us \<in> fst m \<and> \<not> semantics m (case_nat us ea \<circ> bump fa) pa) \<noteq> (\<forall>us. us \<notin> fst m \<or> semantics m (case_nat us (ea \<circ> fa)) pa)"
+  then have "(\<exists>us. us \<in> fst m \<and> \<not> semantics m (case_nat us ea \<circ> bump fa) pa) \<noteq>
+    (\<forall>us. us \<notin> fst m \<or> semantics m (case_nat us (ea \<circ> fa)) pa)"
     using f2 by blast
-  then have "(\<forall>us. us \<in> fst m \<longrightarrow> semantics m (case_nat us ea \<circ> bump fa) pa) = (\<forall>us. us \<in> fst m \<longrightarrow> semantics m (case_nat us (ea \<circ> fa)) pa)"
+  then have "(\<forall>us. us \<in> fst m \<longrightarrow> semantics m (case_nat us ea \<circ> bump fa) pa) =
+    (\<forall>us. us \<in> fst m \<longrightarrow> semantics m (case_nat us (ea \<circ> fa)) pa)"
     by auto
-  then show "(\<forall>us\<in>fst m. semantics m (case_nat us ea \<circ> bump fa) pa) = (\<forall>us\<in>fst m. semantics m (\<lambda>n. case n of 0 \<Rightarrow> us | Suc n \<Rightarrow> (ea \<circ> fa) n) pa)"
+  then show "(\<forall>us\<in>fst m. semantics m (case_nat us ea \<circ> bump fa) pa) =
+    (\<forall>us\<in>fst m. semantics m (\<lambda>n. case n of 0 \<Rightarrow> us | Suc n \<Rightarrow> (ea \<circ> fa) n) pa)"
     by metis
 qed
 
 lemma eval_subst: "semantics m e (sv f p) = semantics m (e \<circ> f) p"
-  by (induct p arbitrary: e f) (simp,simp,simp,simp add: sss eval_cong,simp add: Nitpick.case_nat_unfold ball(2) bump'_def eval_cong)
+  by (induct p arbitrary: e f) (simp,simp,simp,
+    simp add: sss eval_cong,simp add: Nitpick.case_nat_unfold ball bump'_def eval_cong)
 
 definition bind' :: "nat \<Rightarrow> nat \<Rightarrow> nat" where
   "bind' y x \<equiv> (case x of 0 \<Rightarrow> y | Suc n \<Rightarrow> n)"
@@ -738,16 +891,20 @@ lemma sound_Uni:
   shows "valid (Uni p # s)"
   proof (clarsimp simp: valid_def)
     fix M I e z
-    show "is_model_environment (M,I) e \<Longrightarrow> \<not> semantics_alternative (M,I) e s \<Longrightarrow> z \<in> M \<Longrightarrow> semantics (M,I) (case_nat z e) p"
+    show "is_model_environment (M,I) e \<Longrightarrow> \<not> semantics_alternative (M,I) e s \<Longrightarrow> z \<in> M \<Longrightarrow>
+      semantics (M,I) (case_nat z e) p"
     proof -
       assume "z \<in> M" and "\<not> semantics_alternative (M,I) e s" and  "is_model_environment (M,I) e"
       have 1: "semantics (M,I) (case_nat z (e(u:=z))) p = semantics (M,I) (case_nat z e) p"
         using assms
         by (clarsimp simp: Nitpick.case_nat_unfold fv_list_cons intro!: eval_cong[rule_format])
            (metis One_nat_def Suc_pred' adjust)
-      have "is_model_environment (M,I) (e(u := z)) \<longrightarrow> semantics_alternative (M,I) (e(u := z)) (s @ [sv (bind u) p])"
+      have "is_model_environment (M,I) (e(u := z)) \<longrightarrow> semantics_alternative (M,I) (e(u := z))
+        
+ (s @ [sv (bind u) p])"
         using assms valid_def by blast
-      then have 2: "(\<forall>n. (if n = u then z else e n) \<in> M) \<longrightarrow> semantics_alternative (M,I) (e(u := z)) s \<or> semantics (M,I) (case_nat z e) p"
+      then have 2: "(\<forall>n. (if n = u then z else e n) \<in> M) \<longrightarrow>
+         semantics_alternative (M,I) (e(u := z)) s \<or> semantics (M,I) (case_nat z e) p"
        using 1 eval_bind is_model_environment_def semantics_alternative_append by simp
       have 3: "u \<notin> set (adjust (fv p)) \<and> u \<notin> set (fv_list s)"
         using assms fv_list_cons by simp
@@ -786,7 +943,8 @@ lemma index0:
       show "(Suc x,k) \<in> calculation s \<Longrightarrow> (m,p) \<in> (set k) \<Longrightarrow> \<not> is_Exi p \<Longrightarrow> m = 0"
       proof -
         assume "(Suc x,k) \<in> calculation s" and 1: "(m,p) \<in> (set k)" and 2: "\<not> is_Exi p"
-        then obtain t where 3: "(x,t) \<in> calculation s \<and> k \<in> set (solve t) \<and> \<not> is_axiom (list_sequent t)"
+        then obtain t
+          where 3: "(x,t) \<in> calculation s \<and> k \<in> set (solve t) \<and> \<not> is_axiom (list_sequent t)"
           using calculation_downwards by blast
         then show ?thesis proof (cases t)
           case Nil then show ?thesis using assms IH 1 3 by simp
@@ -804,7 +962,8 @@ lemma maxl: "\<forall>v \<in> set l. v \<le> maxl l"
   by (induct l) (auto simp: max_def)
 
 lemma fresh: "fresh l \<notin> (set l)"
-  using maxl fresh_def maxl.simps not_less_eq_eq order_refl empty_iff list.set(1) null.simps(2) list.exhaust by metis
+  using maxl fresh_def maxl.simps not_less_eq_eq order_refl empty_iff list.set(1) null.simps(2)
+    list.exhaust by metis
 
 lemma soundness':
   assumes "init s"
@@ -845,7 +1004,8 @@ lemma soundness':
           case True then show ?thesis proof (cases t)
             case Nil then show ?thesis using True list_sequent_def by simp
           next
-            case Cons then show ?thesis using True list_sequent_def valid_def semantics_alternative_def2
+            case Cons then show ?thesis
+              using True list_sequent_def valid_def semantics_alternative_def2
               by simp (metis (no_types,lifting) semantics.simps(1))
           qed
         next
@@ -869,18 +1029,23 @@ lemma soundness':
               then show ?thesis proof (cases t)
                 case Nil
                 then show ?thesis using assms notAxiom IH * ** calculation_upwards
-                   by (metis (no_types,lifting) calculation.step diff_Suc_Suc diff_diff_cancel diff_le_self list.set_intros(1) not_less_eq_eq solve.simps(1))
+                   by (metis (no_types,lifting) calculation.step diff_Suc_Suc diff_diff_cancel
+                     diff_le_self list.set_intros(1) not_less_eq_eq solve.simps(1))
               next
                 case (Cons a list)
-                then show ?thesis using IH proof (simp add: valid_def semantics_alternative_def2,intro allI impI)
+                then show ?thesis
+                  using IH proof (simp add: valid_def semantics_alternative_def2,intro allI impI)
                   fix as gs g
                   show "\<forall>n t. x = m - n \<and> (n,t) \<in> calculation s \<longrightarrow>
-                       (\<forall>a b e. is_model_environment (a,b) e \<longrightarrow> (\<exists>p. p \<in> set (list_sequent t) \<and> semantics (a,b) e p))
-                       \<Longrightarrow> is_model_environment (as,gs) g \<Longrightarrow> \<exists>p. p \<in> set (list_sequent (a # list)) \<and> semantics (as,gs) g p"
+                       (\<forall>a b e. is_model_environment (a,b) e \<longrightarrow> (\<exists>p. p \<in> set (list_sequent t) \<and>
+                         semantics (a,b) e p))
+                       \<Longrightarrow> is_model_environment (as,gs) g \<Longrightarrow> \<exists>p. p \<in> set (list_sequent (a # list))
+                         \<and> semantics (as,gs) g p"
                    proof -
                     assume ***: "is_model_environment (as,gs) g"
-                    and IH': "\<forall>n t. x = m - n \<and> (n,t) \<in> calculation s \<longrightarrow> (\<forall>a b e. is_model_environment (a,b) e \<longrightarrow>
-                             (\<exists>p. p \<in> set (list_sequent t) \<and> semantics (a,b) e p))"
+                    and IH': "\<forall>n t. x = m - n \<and> (n,t) \<in> calculation s \<longrightarrow>
+                               (\<forall>a b e. is_model_environment (a,b) e \<longrightarrow>
+                               (\<exists>p. p \<in> set (list_sequent t) \<and> semantics (a,b) e p))"
                     then show ?thesis proof (cases a)
                       case (Pair _ p) then show ?thesis proof (cases p)
                         case (Pre b i v) then  show ?thesis
@@ -897,8 +1062,8 @@ lemma soundness':
                           then have 4: "x = m - Suc n \<and> (Suc n,list @ [(0,r)]) \<in> calculation s"
                             using * by linarith
                           then have 5: "(Suc n,list @ [(0,q)]) \<in> calculation s \<longrightarrow>
-                                (\<forall>a b e. is_model_environment (a,b) e \<longrightarrow>
-                                (\<exists>p. p \<in> set (list_sequent (list @ [(0,q)])) \<and> semantics (a,b) e p))"
+                              (\<forall>a b e. is_model_environment (a,b) e \<longrightarrow>
+                              (\<exists>p. p \<in> set (list_sequent (list @ [(0,q)])) \<and> semantics (a,b) e p))"
                             using IH' by blast
                           then have "x = m - Suc n \<and> (Suc n,list @ [(0,r)]) \<in> calculation s \<longrightarrow>
                             (\<forall>a b e. is_model_environment (a,b) e \<longrightarrow>
@@ -909,19 +1074,21 @@ lemma soundness':
                               using 1 by simp
                          next
                             show "\<forall>a b e. is_model_environment (a,b) e \<longrightarrow>
-                                  (\<exists>p. p \<in> set (list_sequent (list @ [(0,q)])) \<and> semantics (a,b) e p) \<Longrightarrow>
-                                  x = m - Suc n \<and> (Suc n,list @ [(0,r)]) \<in> calculation s"
+                              (\<exists>p. p \<in> set (list_sequent (list @ [(0,q)])) \<and>
+                                semantics (a,b) e p) \<Longrightarrow>
+                              x = m - Suc n \<and> (Suc n,list @ [(0,r)]) \<in> calculation s"
                               using 2 3 by blast
                          next
                             show "\<forall>a b e. is_model_environment (a,b) e \<longrightarrow>
-                                  (\<exists>p. p \<in> set (list_sequent (list @ [(0,r)])) \<and> semantics (a,b) e p) \<Longrightarrow>
-                                  (Suc n,list @ [(0,q)]) \<in> calculation s"
+                              (\<exists>p. p \<in> set (list_sequent (list @ [(0,r)])) \<and>
+                                 semantics (a,b) e p) \<Longrightarrow>
+                              (Suc n,list @ [(0,q)]) \<in> calculation s"
                               using 1 by blast
                          next show "\<forall>a b e. is_model_environment (a,b) e \<longrightarrow>
-                                     (\<exists>p. p \<in> set (list_sequent (list @ [(0,r)])) \<and> semantics (a,b) e p) \<Longrightarrow>
-                                    \<forall>a b e. is_model_environment (a,b) e \<longrightarrow>
-                                     (\<exists>p. p \<in> set (list_sequent (list @ [(0,q)])) \<and> semantics (a,b) e p) \<Longrightarrow>
-                                    \<exists>p. p \<in> set (list_sequent (a # list)) \<and> semantics (as,gs) g p"
+                           (\<exists>p. p \<in> set (list_sequent (list @ [(0,r)])) \<and> semantics (a,b) e p) \<Longrightarrow>
+                              \<forall>a b e. is_model_environment (a,b) e \<longrightarrow>
+                           (\<exists>p. p \<in> set (list_sequent (list @ [(0,q)])) \<and> semantics (a,b) e p) \<Longrightarrow>
+                              \<exists>p. p \<in> set (list_sequent (a # list)) \<and> semantics (as,gs) g p"
                               using Con *** Pair list_sequent_def
                               by simp (metis (no_types,lifting) semantics.simps(2))
                          qed
@@ -929,7 +1096,8 @@ lemma soundness':
                         case (Dis q r)
                         then have "x = m - Suc n \<and> (Suc n,list @ [(0,q),(0,r)]) \<in> calculation s \<longrightarrow>
                                   (\<forall>a b e. is_model_environment (a,b) e \<longrightarrow>
-                                  (\<exists>p. p \<in> set (list_sequent (list @ [(0,q),(0,r)])) \<and> semantics (a,b) e p))"
+                                  (\<exists>p. p \<in> set (list_sequent (list @ [(0,q),(0,r)])) \<and>
+                                  semantics (a,b) e p))"
                                   using * IH' by blast
                         then show ?thesis proof (elim impE)
                           have 1: "(Suc n,list @ [(0,q),(0,r)]) \<in> calculation s"
@@ -939,8 +1107,9 @@ lemma soundness':
                             using 1 by simp
                         next
                           show "\<forall>a b e. is_model_environment (a,b) e \<longrightarrow>
-                               (\<exists>p. p \<in> set (list_sequent (list @ [(0,q),(0,r)])) \<and> semantics (a,b) e p) \<Longrightarrow>
-                                \<exists>p. p \<in> set (list_sequent (a # list)) \<and> semantics (as,gs) g p"
+                               (\<exists>p. p \<in> set (list_sequent (list @ [(0,q),(0,r)])) \<and>
+                                 semantics (a,b) e p) \<Longrightarrow>
+                                 \<exists>p. p \<in> set (list_sequent (a # list)) \<and> semantics (as,gs) g p"
                             using Dis *** Pair list_sequent_def
                             by simp (metis (no_types,lifting) semantics.simps(3))
                         qed
@@ -1000,12 +1169,12 @@ qed
 lemma contains_considers':
   assumes "f = failing_path (calculation s)"
   and "infinite (calculation s)"
-  shows "\<forall>n y ys. snd (f n) = xs@y # ys \<longrightarrow> (\<exists>m zs'. snd (f (n+m)) = y # zs')"
+  shows "\<forall>n ys. snd (f n) = xs@y # ys \<longrightarrow> (\<exists>m zs'. snd (f (n+m)) = y # zs')"
   proof (induct xs)
-    case Nil then show ?case by simp (metis Nat.add_0_right)
+    case Nil then show ?case using append.simps(1) by (metis Nat.add_0_right)
   next
-    case Cons then show ?case
-      by (metis (no_types,lifting) add_Suc_shift append.simps(2) append_assoc assms progress)
+    case Cons then show ?case using append.simps(2)
+      by (metis (no_types,lifting) add_Suc_shift append_assoc assms progress)
   qed
 
 lemma contains_considers:
@@ -1028,7 +1197,8 @@ lemma contains_propagates_Pre[rule_format]:
     case IH: (Suc q')
     then have "\<exists>ys zs. snd (f (n + q')) = ys @ (0,Pre b i v) # zs \<and> (0,Pre b i v) \<notin> set ys"
       by (meson contains_def split_list_first)
-    then obtain ys and zs where 1: "snd (f (n + q')) = ys @ (0,Pre b i v) # zs \<and> (0,Pre b i v) \<notin> set ys"
+    then obtain ys and zs where 1:
+      "snd (f (n + q')) = ys @ (0,Pre b i v) # zs \<and> (0,Pre b i v) \<notin> set ys"
       by blast
     then have 2: "(snd (f (Suc (n + q')))) \<in> set (solve (snd (f (n + q'))))"
       using assms is_path_f by blast
@@ -1126,7 +1296,8 @@ lemma Exi_downward:
       case 0 then show ?case using assms init_def is_path_f_0 by fastforce
     next
       case IH: (Suc x)
-      then have fxSuc: "f x \<in> calculation s \<and> fst (f x) = x \<and> snd (f (Suc x)) \<in> set (solve (snd (f x))) \<and> infinite (calculation (snd (f x)))"
+      then have fxSuc: "f x \<in> calculation s \<and> fst (f x) = x \<and>
+        snd (f (Suc x)) \<in> set (solve (snd (f x))) \<and> infinite (calculation (snd (f x)))"
         using assms is_path_f by blast
       then show ?case proof (cases "f x")
         case fxPair: (Pair _ l)
@@ -1195,7 +1366,8 @@ lemma ccc[simp]: "uton \<circ> ntou = id" by auto
 section "Falsifying Model From Failing Path"
 
 definition model :: "sequent \<Rightarrow> model" where
-  "model s \<equiv> (range ntou,\<lambda> p ms. (let f = failing_path (calculation s) in (\<forall>n m. \<not> contains f n (m,Pre True p (map uton ms)))))"
+  "model s \<equiv> (range ntou,\<lambda> p ms. (let f = failing_path (calculation s) in
+     (\<forall>n m. \<not> contains f n (m,Pre True p (map uton ms)))))"
 
 lemma is_env_model_ntou: "is_model_environment (model s) ntou"
   using is_model_environment_def model_def by simp
@@ -1224,21 +1396,25 @@ lemma model':
     show "\<forall>m<n. \<forall>p. size p = m \<longrightarrow> (\<forall>m n. contains f n (m,p) \<longrightarrow> \<not> semantics (model s) ntou p) \<Longrightarrow>
            size p = n \<longrightarrow> (\<forall>m n. contains f n (m,p) \<longrightarrow> \<not> semantics (model s) ntou p)"
     proof -
-      assume *: "\<forall>m<n. \<forall>p. size p = m \<longrightarrow> (\<forall>m n. contains f n (m,p) \<longrightarrow> \<not> semantics (model s) ntou p)"
+      assume *: "\<forall>m<n. \<forall>p. size p = m \<longrightarrow> (\<forall>m n. contains f n (m,p) \<longrightarrow>
+        \<not> semantics (model s) ntou p)"
       show ?thesis proof (cases p)
         case (Pre b i v) then show ?thesis proof (cases b)
           case True then show ?thesis using Pre assms model_def by auto
         next
           case False then show ?thesis using Pre proof (clarsimp simp: model_def)
           fix na m nb ma
-          show "n = 0 \<Longrightarrow> contains f na (m,Pre False i v) \<Longrightarrow> contains (failing_path (calculation s)) nb (ma,Pre True i v) \<Longrightarrow> False"
+          show "n = 0 \<Longrightarrow> contains f na (m,Pre False i v) \<Longrightarrow>
+            contains (failing_path (calculation s)) nb (ma,Pre True i v) \<Longrightarrow> False"
           proof -
-            assume 1: "contains f na (m,Pre False i v)" and 2: "contains (failing_path (calculation s)) nb (ma,Pre True i v)"
+            assume 1: "contains f na (m,Pre False i v)" and
+                   2: "contains (failing_path (calculation s)) nb (ma,Pre True i v)"
             then have 3: "m = 0 \<and> ma = 0"
               using assms is_Exi not_is_Exi by simp
             then have "\<exists>y. considers (failing_path (calculation s)) (nb+na+y) (0,Pre True i v)"
               using assms 2 contains_considers contains_propagates_Pre by simp
-            then obtain y where 4: "considers (failing_path (calculation s)) (nb+na+y) (0,Pre True i v)"
+            then obtain y
+              where 4: "considers (failing_path (calculation s)) (nb+na+y) (0,Pre True i v)"
               by blast
             then have 5: "contains (failing_path (calculation s)) (na+nb+y) (0,Pre False i v)"
               using assms 1 3 contains_propagates_Pre by simp
@@ -1258,10 +1434,12 @@ lemma model':
       qed
       next
         case Con then show ?thesis using assms * is_Exi not_is_Exi contains_propagates_Con
-          by (metis Nat.add_0_right add_Suc_right nnf.size(7) less_add_Suc1 less_add_Suc2 semantics.simps(2))
+          by (metis Nat.add_0_right add_Suc_right nnf.size(7)
+                less_add_Suc1 less_add_Suc2 semantics.simps(2))
       next
         case Dis then show ?thesis using assms * contains_propagates_Dis is_Exi not_is_Exi
-          by (metis Nat.add_0_right add_Suc_right nnf.size(8) less_add_Suc1 less_add_Suc2 semantics.simps(3))
+          by (metis Nat.add_0_right add_Suc_right nnf.size(8)
+                less_add_Suc1 less_add_Suc2 semantics.simps(3))
       next
         case (Uni q) then show ?thesis proof (intro impI allI)
           fix na m
@@ -1269,15 +1447,18 @@ lemma model':
           proof -
             assume 1: "size p = n" and 2: "contains f na (m,p)"
             then have "m = 0" using assms Uni is_Exi not_is_Exi by simp
-            then have "\<exists>y. contains f (Suc (na + y)) (0,(sv (bind (fresh (fv_list (map snd (snd (f (na + y))))))) q))"
+            then have "\<exists>y. contains f (Suc (na + y)) (0,(sv (bind (fresh (fv_list
+              (map snd (snd (f (na + y))))))) q))"
               using assms Uni 2 contains_propagates_Uni by simp
-            then obtain y where 3: "contains f (Suc (na + y)) (0,sv (bind (fresh (fv_list (map snd (snd (f (na + y))))))) q)"
+            then obtain y where 3: "contains f (Suc (na + y)) (0,sv (bind (fresh (fv_list
+              (map snd (snd (f (na + y))))))) q)"
               by blast
             have 4: "Suc (size q) = n" using Uni 1 by simp
             then show ?thesis using Uni proof (simp)
               show "\<exists>z\<in>fst (model s). \<not> semantics (model s) (case_nat z ntou) q"
               proof (rule_tac x="ntou (fresh (fv_list (map snd (snd (f (na + y))))))" in bexI)
-                show "\<not> semantics (model s) (case_nat (ntou (fresh (fv_list (map snd (snd (f (na + y))))))) ntou) q"
+                show "\<not> semantics (model s) (case_nat (ntou (fresh (fv_list
+                    (map snd (snd (f (na + y))))))) ntou) q"
                   using * 3 4 eval_bind size_bind lessI by metis
               next
                 show "ntou (fresh (fv_list (map snd (snd (f (na + y)))))) \<in> fst (model s)"
@@ -1313,14 +1494,17 @@ lemma model:
 
 section "Completeness"
 
-lemma completeness': "infinite (calculation s) \<Longrightarrow> init s \<Longrightarrow> \<forall>mA \<in> set s. \<not> semantics (model s) ntou (snd mA)"
+lemma completeness': "infinite (calculation s) \<Longrightarrow> init s \<Longrightarrow>
+    \<forall>mA \<in> set s. \<not> semantics (model s) ntou (snd mA)"
   by (metis contains_def eq_snd_iff is_path_f_0 model)
 
-lemma completeness'': "infinite (calculation (make_sequent s)) \<Longrightarrow> init (make_sequent s) \<Longrightarrow> \<forall>p. p \<in> set s \<longrightarrow> \<not> semantics (model (make_sequent s)) ntou p"
+lemma completeness'': "infinite (calculation (make_sequent s)) \<Longrightarrow>
+    init (make_sequent s) \<Longrightarrow> \<forall>p. p \<in> set s \<longrightarrow> \<not> semantics (model (make_sequent s)) ntou p"
   using completeness' make_sequent_def by fastforce
 
 lemma completeness: "infinite (calculation (make_sequent s)) \<Longrightarrow> \<not> valid s"
-  using valid_def init_def make_sequent_def is_env_model_ntou semantics_alternative_def2 completeness''
+  using valid_def init_def make_sequent_def is_env_model_ntou semantics_alternative_def2
+    completeness''
   by (subgoal_tac "init (make_sequent s)") (metis,simp)
 
 section "Algorithm"
@@ -1346,7 +1530,8 @@ lemma loop: "\<forall>x. ((n,x) \<in> calculation s) = (x \<in> set (loop [s] n)
       assume "(Suc m,x) \<in> calculation s"
       then have "\<exists>t. (m,t) \<in> calculation s \<and> x \<in> set (solve t) \<and> \<not> is_axiom (list_sequent t)"
         using calculation_downwards by blast
-      then obtain t where 1: "(m,t) \<in> calculation s \<and> x \<in> set (solve t) \<and> \<not> is_axiom (list_sequent t)"
+      then obtain t
+        where 1: "(m,t) \<in> calculation s \<and> x \<in> set (solve t) \<and> \<not> is_axiom (list_sequent t)"
         by blast
       then show "(x \<in> set (loop [s] (Suc m)))"
         using Suc loop_def by (clarsimp dest!: split_list_first)
@@ -1386,7 +1571,7 @@ lemma finite_calculation'':
   proof -
     obtain m where "loop [s] m = []" using assms by blast
     then have "\<forall>y. loop [s] (m+y) = []" using loop_upwards by simp
-    then have 1: "(UN x:Collect (op \<le> m). Pair x ` set (loop [s] x)) =  (UN x:Collect (op \<le> m). {})"
+    then have 1: "(UN x:Collect (op \<le> m). Pair x ` set (loop [s] x)) = (UN x:Collect (op \<le> m). {})"
       using SUP_cong image_is_empty le_Suc_ex mem_Collect_eq set_empty
       by (metis (no_types,lifting))
     then have "(UNIV::nat set) = {y. y < m} Un {y. m \<le> y}" by fastforce
@@ -1396,8 +1581,8 @@ lemma finite_calculation'':
 lemma finite_calculation: "finite (calculation s) = (\<exists>m. loop [s] m = [])"
   using finite_calculation' finite_calculation'' by blast
 
-corollary finite_calculation_prover: "finite (calculation s) = prover null (maps solve) [s]"
-  using finite_calculation loop_def prover_def maps null.simps list.exhaust by metis
+corollary finite_calculation_prover: "finite (calculation s) = iterator null (maps solve) [s]"
+  using finite_calculation loop_def iterator_def maps null.simps list.exhaust by metis
 
 section \<open>Correctness\<close>
 
@@ -1504,9 +1689,9 @@ SML_export "val SimPro_test = SimPro.test"
 
 ML {*
 
-fun SimPro_prover g f c = if g c then true else SimPro_prover g f (f c)
+fun SimPro_iterator g f c = if g c then true else SimPro_iterator g f (f c)
 
-val SimPro_check = SimPro_main SimPro_prover
+val SimPro_check = SimPro_main SimPro_iterator
 
 val true = SimPro_check SimPro_test
 
