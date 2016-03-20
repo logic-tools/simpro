@@ -602,6 +602,42 @@ lemma adjust: "Suc n \<in> set l = (n \<in> set (adjust l))"
     case (Cons m _) then show ?case by (cases m) simp_all
   qed
 
+lemma ttt: "(\<And>e e'. \<forall>x. x \<in> set (fv p) \<longrightarrow> e x = e' x \<Longrightarrow> semantics m e p = semantics m e' p) \<Longrightarrow>
+              \<forall>x. x \<in> set (adjust (fv p)) \<longrightarrow> e x = e' x \<Longrightarrow>
+              (\<forall>z\<in>fst m. semantics m (\<lambda>x. case x of 0 \<Rightarrow> z | Suc n \<Rightarrow> e n) p) = (\<forall>z\<in>fst m. semantics m (\<lambda>x. case x of 0 \<Rightarrow> z | Suc n \<Rightarrow> e' n) p)"
+proof -
+  assume a1: "\<And>e e'. \<forall>x. x \<in> set (fv p) \<longrightarrow> e x = e' x \<Longrightarrow> semantics m e p = semantics m e' p"
+  assume a2: "\<forall>x. x \<in> set (adjust (fv p)) \<longrightarrow> e x = e' x"
+  have f3: "((\<forall>us. us \<in> fst m \<longrightarrow> semantics m (case_nat us e) p) \<noteq> (\<forall>us. us \<in> fst m \<longrightarrow> semantics m (case_nat us e') p)) = ((\<exists>us. us \<in> fst m \<and> \<not> semantics m (case_nat us e) p) = (\<forall>us. us \<notin> fst m \<or> semantics m (case_nat us e') p))"
+    by blast
+  obtain uus :: "unit list" and uusa :: "unit list" where
+    f4: "((\<exists>us. us \<in> fst m \<and> \<not> semantics m (case_nat us e) p) = (\<forall>us. us \<notin> fst m \<or> semantics m (case_nat us e') p)) = (((\<forall>us. us \<notin> fst m \<or> semantics m (case_nat us e) p) \<or> (\<forall>us. us \<notin> fst m \<or> semantics m (case_nat us e') p)) \<and> (uusa \<in> fst m \<and> \<not> semantics m (case_nat uusa e) p \<or> uus \<in> fst m \<and> \<not> semantics m (case_nat uus e') p))"
+    by (metis (no_types))
+  then have "(\<exists>us. us \<in> fst m \<and> \<not> semantics m (case_nat us e) p) \<and> (\<exists>us. us \<in> fst m \<and> \<not> semantics m (case_nat us e') p) \<or> (uusa \<notin> fst m \<or> semantics m (case_nat uusa e) p) \<and> (uus \<notin> fst m \<or> semantics m (case_nat uus e') p)"
+    using a2 a1 by (metis (no_types,lifting) Nitpick.case_nat_unfold Suc_pred' adjust neq0_conv)
+  then have "(\<forall>us. us \<in> fst m \<longrightarrow> semantics m (case_nat us e) p) = (\<forall>us. us \<in> fst m \<longrightarrow> semantics m (case_nat us e') p)"
+    using f4 f3 by blast
+  then show ?thesis
+    by blast
+qed
+
+lemma ttt': "(\<And>e e'. \<forall>x. x \<in> set (fv p) \<longrightarrow> e x = e' x \<Longrightarrow> semantics m e p = semantics m e' p) \<Longrightarrow>
+              \<forall>x. x \<in> set (adjust (fv p)) \<longrightarrow> e x = e' x \<Longrightarrow>
+              (\<exists>z\<in>fst m. semantics m (\<lambda>x. case x of 0 \<Rightarrow> z | Suc n \<Rightarrow> e n) p) = (\<exists>z\<in>fst m. semantics m (\<lambda>x. case x of 0 \<Rightarrow> z | Suc n \<Rightarrow> e' n) p)"
+proof -
+  assume a1: "\<And>e e'. \<forall>x. x \<in> set (fv p) \<longrightarrow> e x = e' x \<Longrightarrow> semantics m e p = semantics m e' p"
+  assume a2: "\<forall>x. x \<in> set (adjust (fv p)) \<longrightarrow> e x = e' x"
+  have f3: "\<forall>us f n. if n = 0 then (case n of 0 \<Rightarrow> us::unit list | Suc x \<Rightarrow> f x) = us else (case n of 0 \<Rightarrow> us | Suc x \<Rightarrow> f x) = f (n - 1)"
+    by (simp add: Nitpick.case_nat_unfold)
+  obtain uus :: "unit list" and uusa :: "unit list" where
+    f4: "((\<forall>us. us \<notin> fst m \<or> \<not> semantics m (case_nat us e) p) = (\<exists>us. us \<in> fst m \<and> semantics m (case_nat us e') p)) = ((uusa \<in> fst m \<and> semantics m (case_nat uusa e) p \<or> uus \<in> fst m \<and> semantics m (case_nat uus e') p) \<and> ((\<forall>us. us \<notin> fst m \<or> \<not> semantics m (case_nat us e) p) \<or> (\<forall>us. us \<notin> fst m \<or> \<not> semantics m (case_nat us e') p)))"
+    by (metis (no_types))
+  have "(uusa \<notin> fst m \<or> \<not> semantics m (case_nat uusa e) p) \<and> (uus \<notin> fst m \<or> \<not> semantics m (case_nat uus e') p) \<or> (\<exists>us. us \<in> fst m \<and> semantics m (case_nat us e) p) \<and> (\<exists>us. us \<in> fst m \<and> semantics m (case_nat us e') p)"
+    using f3 a2 a1 by (metis (no_types,lifting) Suc_pred' adjust neq0_conv)
+  then show ?thesis
+    using f4 by blast
+qed
+
 lemma eval_cong: "\<forall>x. x \<in> set (fv p) \<longrightarrow> e x = e' x \<Longrightarrow> semantics m e p = semantics m e' p"
   proof (induct p arbitrary: e e')
     case Pre then show ?case using map_cong fv.simps(1) semantics.simps(1) by metis
@@ -610,13 +646,9 @@ lemma eval_cong: "\<forall>x. x \<in> set (fv p) \<longrightarrow> e x = e' x \<
   next
     case Dis then show ?case using Un_iff fv.simps(3) semantics.simps(3) set_append by metis
   next
-    case Uni then show ?case
-      using Nitpick.case_nat_unfold adjust not_gr0 Suc_pred' fv.simps(4) semantics.simps(4)
-      by (metis (no_types,lifting))
+    case Uni then show ?case using ttt by simp
   next
-    case Exi then show ?case
-      using Nitpick.case_nat_unfold adjust not_gr0 Suc_pred' fv.simps(5) semantics.simps(5)
-      by (metis (no_types,lifting))
+    case Exi then show ?case using ttt' by simp
   qed
 
 lemma semantics_alternative_def2: "semantics_alternative m e s = (\<exists>p. p \<in> set s \<and> semantics m e p)"
