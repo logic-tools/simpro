@@ -163,30 +163,33 @@ by (metis repeat.simps repeat_once not0_implies_Suc)
 abbreviation (input) "PROVER \<equiv> iterator null (maps solve)"
 
 lemma check_prover: "check p \<equiv> PROVER [[(0,p)]]"
-unfolding check_def main_def by -
+unfolding check_def main_def
+by -
 
 lemma prover: "PROVER c = PROVER (maps solve c)"
 unfolding iterator_def
 by (induct c) (simp add: maps_def,metis repeat.simps null.simps(2) old.nat.exhaust repeat_once)
 
 lemma prover_next: "PROVER (h # t) = PROVER (maps solve (h # t))"
-using prover by -
+using prover
+by -
 
 lemma prover_done: "PROVER [] = True"
 unfolding iterator_def
 by (metis repeat.simps(1) null.simps(1))
 
 lemma prover_loop: "PROVER c = (if null c then True else PROVER (maps solve c))"
-using prover_next prover_done by (induct c) simp_all
+using prover_next prover_done
+by (induct c) simp_all
 
-lemma append_simps: "[] @ l = l" "(h # t) @ l = h # t @ l"
-by (rule append.simps(1),rule append.simps(2))
+lemma map_simps: "map f [] = []" "map f (h # t) = f h # map f t"
+by (rule list.map(1),rule list.map(2))
 
 lemma concat_simps: "concat [] = []" "concat (h # t) = h @ concat t"
 by (rule concat.simps(1),rule concat.simps(2))
 
-lemma map_simps: "map f [] = []" "map f (h # t) = f h # map f t"
-by (rule list.map(1),rule list.map(2))
+lemma append_simps: "[] @ l = l" "(h # t) @ l = h # t @ l"
+by (rule append.simps(1),rule append.simps(2))
 
 lemma if_simps: "(if True then x else y) = x" "(if False then x else y) = y"
 by (rule if_True,rule if_False)
@@ -195,7 +198,8 @@ lemma not_simps: "(\<not> True) = False" "(\<not> False) = True" "(\<not> \<not>
 by (rule simp_thms,rule simp_thms,rule nnf_simps)
 
 lemma prod_simps: "fst (x,y) = x" "snd (x,y) = y"
-unfolding fst_def snd_def by (rule prod.case,rule prod.case)
+unfolding fst_def snd_def
+by (rule prod.case,rule prod.case)
 
 lemma nat_simps: "(0 = 0) = True"
 by (rule simp_thms)
@@ -412,8 +416,8 @@ by ((simp only: simps(69)),
     (simp only: simps(95)))
 
 proposition "check test"
-unfolding test_def
-by (simp only: program data library)
+unfolding test_def program data library
+by (rule TrueI)
 
 section "Basics"
 
@@ -437,7 +441,9 @@ next
   qed
 qed
 
-lemma maps: "maps f = (concat \<circ> map f)" using maps_def comp_apply by fastforce
+lemma maps: "maps f = (concat \<circ> map f)"
+using maps_def comp_apply
+by fastforce
 
 definition make_sequent :: "nnf list \<Rightarrow> sequent" where
   "make_sequent l = map (\<lambda>p. (0,p)) l"
@@ -449,8 +455,8 @@ definition fv_list :: "nnf list \<Rightarrow> nat list" where
   "fv_list \<equiv> maps fv"
 
 primrec is_axiom :: "nnf list \<Rightarrow> bool" where
-  "is_axiom [] = False"
-| "is_axiom (p # t) = ((\<exists>b i v. p = Pre b i v \<and> Pre (\<not> b) i v \<in> set t))"
+  "is_axiom [] = False" |
+  "is_axiom (p # t) = ((\<exists>b i v. p = Pre b i v \<and> Pre (\<not> b) i v \<in> set t))"
 
 primrec member :: "'a \<Rightarrow> 'a list \<Rightarrow> bool" where
   "member _ [] = False" |
@@ -482,107 +488,109 @@ lemma pre: "(n,(m,Pre b i v) # xs) \<in> calculation(nfs) \<Longrightarrow>
   and exi: "(n,(m,Exi p) # xs) \<in> calculation(nfs) \<Longrightarrow>
     \<not> is_axiom (list_sequent ((m,Exi p) # xs)) \<Longrightarrow>
     (Suc n,xs@[(0,sv (bind m) p),(Suc m,Exi p)]) \<in> calculation(nfs)"
-  by (auto simp: list_sequent_def maps inst_def stop)
+by (auto simp: list_sequent_def maps inst_def stop)
 
 lemmas not_is_axiom_subs = pre con1 con2 dis uni exi
 
 lemma calculation_init[simp]: "(0,k) \<in> calculation s = (k = s)"
-  using calculation.cases by blast
+using calculation.cases
+by blast
 
 lemma calculation_upwards:
   assumes "(n,k) \<in> calculation s" and "\<not> is_axiom (list_sequent (k))"
   shows "(\<exists>l. (Suc n,l) \<in> calculation s \<and> l \<in> set (solve k))"
-  proof (cases k)
-    case Nil then show ?thesis using assms(1) by auto
+proof (cases k)
+  case Nil then show ?thesis using assms(1) by auto
+next
+  case (Cons a _) then show ?thesis
+  proof (cases a)
+    case (Pair _ p) then show ?thesis
+      using Cons assms by (cases p) (fastforce simp: list_sequent_def stop)+
+  qed
+qed
+
+lemma calculation_downwards: "(Suc n,k) \<in> calculation s \<Longrightarrow>
+  \<exists>t. (n,t) \<in> calculation s \<and> k \<in> set (solve t) \<and> \<not> is_axiom (list_sequent t)"
+proof (erule calculation.cases)
+  assume "Suc n = 0"
+  then show ?thesis using list_sequent_def by simp
+next
+  fix m l k'
+  assume 1: "Suc n = Suc m"
+  and 2: "k = k'"
+  and 3: "(m,l) \<in> calculation s"
+  and 4: "k' \<in> set (solve l)"
+  then show ?thesis
+  proof (cases l)
+    case Nil then show ?thesis using 1 2 3 4 list_sequent_def by fastforce
   next
     case (Cons a _) then show ?thesis
     proof (cases a)
       case (Pair _ p) then show ?thesis
-        using Cons assms by (cases p) (fastforce simp: list_sequent_def stop)+
+        using 1 2 3 4 Cons list_sequent_def by (cases p) (auto simp: stop)
     qed
   qed
-
-lemma calculation_downwards: "(Suc n,k) \<in> calculation s \<Longrightarrow>
-  \<exists>t. (n,t) \<in> calculation s \<and> k \<in> set (solve t) \<and> \<not> is_axiom (list_sequent t)"
-  proof (erule calculation.cases)
-    assume "Suc n = 0"
-    then show ?thesis using list_sequent_def by simp
-  next
-    fix m l k'
-    assume 1: "Suc n = Suc m"
-    and 2: "k = k'"
-    and 3: "(m,l) \<in> calculation s"
-    and 4: "k' \<in> set (solve l)"
-    then show ?thesis proof (cases l)
-      case Nil then show ?thesis using 1 2 3 4 list_sequent_def by fastforce
-    next
-      case (Cons a _) then show ?thesis proof (cases a)
-        case (Pair _ p) then show ?thesis
-          using 1 2 3 4 Cons list_sequent_def by (cases p) (auto simp: stop)
-      qed
-    qed
-  qed
+qed
  
 lemma calculation_calculation_child[rule_format]:
   "\<forall>s t. (Suc n,s) \<in> calculation t =
     (\<exists>k. k \<in> set (solve t) \<and> \<not> is_axiom (list_sequent t) \<and> (n,s) \<in> calculation k)"
-  using calculation_downwards by (induct n) (fastforce,blast)
+using calculation_downwards
+by (induct n) (fastforce,blast)
 
 lemma calculation_progress:
   assumes "(n,a # l) \<in> calculation s" and "\<not> is_axiom (list_sequent (a # l))"
   shows "(\<exists>k. (Suc n,l@k) \<in> calculation s)"
-  proof (cases a)
-    case (Pair _ p) then show ?thesis
-      using assms by (cases p) (auto dest: not_is_axiom_subs)
-  qed
+proof (cases a)
+  case (Pair _ p) then show ?thesis using assms by (cases p) (auto dest: not_is_axiom_subs)
+qed
 
 definition inc :: "nat \<times> sequent \<Rightarrow> nat \<times> sequent" where
   "inc \<equiv> \<lambda>(n,fs). (Suc n,fs)"
 
 lemma inj_inc: "inj inc"
-  by (simp add: inc_def inj_on_def)
+by (simp add: inc_def inj_on_def)
 
 lemma calculation: "calculation s =
   insert (0,s) (inc ` (\<Union> (calculation ` {k. \<not> is_axiom (list_sequent s) \<and> k \<in> set (solve s)})))"
-  proof (rule set_eqI,simp add: split_paired_all)
-    fix n k
-    show "((n,k) \<in> calculation s) =
-      (n = 0 \<and> k = s \<or> (n,k) \<in> inc ` (\<Union>x\<in>{k. \<not> is_axiom (list_sequent s) \<and> k \<in> set (solve s)}.
-        calculation x))"
-    by (cases n) (auto simp: calculation_calculation_child inc_def)
-  qed
+proof (rule set_eqI,simp add: split_paired_all)
+  fix n k
+  show "((n,k) \<in> calculation s) =
+    (n = 0 \<and> k = s \<or> (n,k) \<in> inc ` (\<Union>x\<in>{k. \<not> is_axiom (list_sequent s) \<and> k \<in> set (solve s)}.
+      calculation x))"
+  by (cases n) (auto simp: calculation_calculation_child inc_def)
+qed
 
 lemma calculation_is_axiom:
   assumes "is_axiom (list_sequent s)"
   shows "calculation s = {(0,s)}"
-  proof (rule set_eqI,simp add: split_paired_all)
-    fix n k
-    show "((n,k) \<in> calculation s) = (n = 0 \<and> k = s)"
-    proof (rule iffI)
-      assume "(n,k) \<in> calculation s" then show "(n = 0 \<and> k = s)"
-        using assms calculation.simps calculation_calculation_child by metis
-    next
-      assume "(n = 0 \<and> k = s)" then show "(n,k) \<in> calculation s"
-        using assms by blast
-    qed
+proof (rule set_eqI,simp add: split_paired_all)
+  fix n k
+  show "((n,k) \<in> calculation s) = (n = 0 \<and> k = s)"
+  proof (rule iffI)
+    assume "(n,k) \<in> calculation s" then show "(n = 0 \<and> k = s)"
+      using assms calculation.simps calculation_calculation_child by metis
+  next
+    assume "(n = 0 \<and> k = s)" then show "(n,k) \<in> calculation s"
+      using assms by blast
   qed
+qed
  
 lemma is_axiom_finite_calculation: "is_axiom (list_sequent s) \<Longrightarrow> finite (calculation s)"
-  by (simp add: calculation_is_axiom)
+by (simp add: calculation_is_axiom)
 
 primrec failing_path :: "(nat \<times> sequent) set \<Rightarrow> nat \<Rightarrow> (nat \<times> sequent)" where
   "failing_path ns 0 = (SOME x. x \<in> ns \<and> fst x = 0 \<and> infinite (calculation (snd x)) \<and>
-    \<not> is_axiom (list_sequent (snd x)))"
-| "failing_path ns (Suc n) = (let fn = failing_path ns n in 
-  (SOME fsucn. fsucn \<in> ns \<and> fst fsucn = Suc n \<and> (snd fsucn) \<in> set (solve (snd fn)) \<and>
-    infinite (calculation (snd fsucn)) \<and> \<not> is_axiom (list_sequent (snd fsucn))))"
+    \<not> is_axiom (list_sequent (snd x)))" |
+  "failing_path ns (Suc n) = (let fn = failing_path ns n in 
+    (SOME fsucn. fsucn \<in> ns \<and> fst fsucn = Suc n \<and> (snd fsucn) \<in> set (solve (snd fn)) \<and>
+      infinite (calculation (snd fsucn)) \<and> \<not> is_axiom (list_sequent (snd fsucn))))"
 
 lemma f0:
   assumes "f = failing_path (calculation s)"
   and "infinite (calculation s)"
   shows "f 0 \<in> (calculation s) \<and> fst (f 0) = 0 \<and> infinite (calculation (snd (f 0))) \<and>
     \<not> is_axiom (list_sequent (snd (f 0)))"
-  using assms
 proof -
   have "\<And>p P. p \<notin> P \<or> fst p \<noteq> (0::nat) \<or> finite (calculation (snd p)) \<or>
     (SOME p. p \<in> P \<and> fst p = 0 \<and> infinite (calculation (snd p)) \<and>
@@ -646,10 +654,10 @@ proof -
 qed
 
 lemma infinite_union: "finite Y \<Longrightarrow> infinite (Union (f ` Y)) \<Longrightarrow> \<exists>y. y \<in> Y \<and> infinite (f y)"
-  by auto
+by auto
 
 lemma finite_subs: "finite {w. \<not> is_axiom (list_sequent y) \<and> w \<in> set (solve y)}"
-  by simp
+by simp
 
 lemma fSuc:
   assumes "f = failing_path (calculation s)"
@@ -658,38 +666,41 @@ lemma fSuc:
   shows "f (Suc n) \<in> calculation s \<and> fst (f (Suc n)) = Suc n \<and> (snd (f (Suc n)))
     \<in> set (solve (snd (f n))) \<and> infinite (calculation (snd (f (Suc n)))) \<and>
     \<not> is_axiom (list_sequent (snd (f (Suc n))))"
-  proof -
-    have "infinite (\<Union> (calculation ` {w. \<not> is_axiom (list_sequent (snd (f n))) \<and>
-      w \<in> set (solve (snd (f n)))}))"
-      using assms
-      by (metis (mono_tags,lifting) Collect_cong calculation finite.insertI finite_imageI)
-    then show ?thesis using assms calculation.step is_axiom_finite_calculation
-      by simp (rule someI_ex,simp,metis prod.collapse)
- qed
+proof -
+  have "infinite (\<Union> (calculation ` {w. \<not> is_axiom (list_sequent (snd (f n))) \<and>
+    w \<in> set (solve (snd (f n)))}))"
+    using assms
+    by (metis (mono_tags,lifting) Collect_cong calculation finite.insertI finite_imageI)
+  then show ?thesis using assms calculation.step is_axiom_finite_calculation
+    by simp (rule someI_ex,simp,metis prod.collapse)
+qed
 
 lemma is_path_f_0: "infinite (calculation s) \<Longrightarrow> failing_path (calculation s) 0 = (0,s)"
-  using calculation_init f0 prod.collapse by metis
+using calculation_init f0 prod.collapse
+by metis
 
 lemma is_path_f':
   assumes "f = failing_path (calculation s)"
   and "infinite (calculation s)"
   shows "f n \<in> calculation s \<and> fst (f n) = n \<and> infinite (calculation (snd (f n))) \<and>
     \<not> is_axiom (list_sequent (snd (f n)))"
-  using assms f0 fSuc by (induct n) simp_all
+using assms f0 fSuc
+by (induct n) simp_all
 
 lemma is_path_f:
   assumes "f = failing_path (calculation s)"
   and "infinite (calculation s)"
   shows "\<forall>n. f n \<in> calculation s \<and> fst (f n) = n \<and> (snd (f (Suc n))) \<in> set (solve (snd (f n))) \<and>
     infinite (calculation (snd (f n)))"
-  using assms is_path_f' fSuc by simp
+using assms is_path_f' fSuc
+by simp
 
 lemma adjust: "Suc n \<in> set l = (n \<in> set (adjust l))"
-  proof (induct l)
-    case Nil then show ?case by simp
-  next
-    case (Cons m _) then show ?case by (cases m) simp_all
-  qed
+proof (induct l)
+  case Nil then show ?case by simp
+next
+  case (Cons m _) then show ?case by (cases m) simp_all
+qed
 
 lemma ttt: "(\<And>e e'. \<forall>x. x \<in> set (fv p) \<longrightarrow> e x = e' x \<Longrightarrow> semantics m e p = semantics m e' p) \<Longrightarrow>
   \<forall>x. x \<in> set (adjust (fv p)) \<longrightarrow> e x = e' x \<Longrightarrow>
@@ -738,7 +749,7 @@ proof -
       ((uusa \<in> fst m \<and> semantics m (case_nat uusa e) p \<or> uus \<in> fst m \<and>
       semantics m (case_nat uus e') p) \<and> ((\<forall>us. us \<notin> fst m \<or> \<not> semantics m (case_nat us e) p) \<or>
       (\<forall>us. us \<notin> fst m \<or> \<not> semantics m (case_nat us e') p)))"
-    by (metis (no_types))
+    by blast
   have "(uusa \<notin> fst m \<or> \<not> semantics m (case_nat uusa e) p) \<and> (uus \<notin> fst m \<or>
     \<not> semantics m (case_nat uus e') p) \<or> (\<exists>us. us \<in> fst m \<and> semantics m (case_nat us e) p) \<and>
       (\<exists>us. us \<in> fst m \<and> semantics m (case_nat us e') p)"
@@ -748,42 +759,42 @@ proof -
 qed
 
 lemma eval_cong: "\<forall>x. x \<in> set (fv p) \<longrightarrow> e x = e' x \<Longrightarrow> semantics m e p = semantics m e' p"
-  proof (induct p arbitrary: e e')
-    case Pre then show ?case using map_cong fv.simps(1) semantics.simps(1) by metis
-  next
-    case Con then show ?case using Un_iff fv.simps(2) semantics.simps(2) set_append by metis
-  next
-    case Dis then show ?case using Un_iff fv.simps(3) semantics.simps(3) set_append by metis
-  next
-    case Uni then show ?case using ttt by simp
-  next
-    case Exi then show ?case using ttt' by simp
-  qed
+proof (induct p arbitrary: e e')
+  case Pre then show ?case using map_cong fv.simps(1) semantics.simps(1) by metis
+next
+  case Con then show ?case using Un_iff fv.simps(2) semantics.simps(2) set_append by metis
+next
+  case Dis then show ?case using Un_iff fv.simps(3) semantics.simps(3) set_append by metis
+next
+  case Uni then show ?case using ttt by simp
+next
+  case Exi then show ?case using ttt' by simp
+qed
 
 lemma semantics_alternative_def2: "semantics_alternative m e s = (\<exists>p. p \<in> set s \<and> semantics m e p)"
-  by (induct s) auto
+by (induct s) auto
 
 lemma semantics_alternative_append: "semantics_alternative m e (s @ s') =
   ((semantics_alternative m e s) \<or> (semantics_alternative m e s'))"
-  by (induct s) auto
+by (induct s) auto
 
 lemma fv_list_cons: "fv_list (a # list) = (fv a) @ (fv_list list)"
-  by (simp add: fv_list_def maps)
+by (simp add: fv_list_def maps)
 
 lemma semantics_alternative_cong: "(\<forall>x. x \<in> set (fv_list s) \<longrightarrow> e x = e' x) \<longrightarrow> 
   semantics_alternative m e s = semantics_alternative m e' s" 
-  by (induct s) (simp_all,metis eval_cong Un_iff set_append fv_list_cons)
+by (induct s) (simp_all,metis eval_cong Un_iff set_append fv_list_cons)
 
 section "Soundness"
 
 lemma ball: "\<forall>x \<in> m. P x = Q x \<Longrightarrow> (\<exists>x \<in> m. P x) = (\<exists>x \<in> m. Q x)"
-  by simp_all
+by simp_all
 
 definition bump' :: "(nat \<Rightarrow> nat) \<Rightarrow> nat \<Rightarrow> nat" where
   "bump' f x \<equiv> (case x of 0 \<Rightarrow> 0 | Suc n \<Rightarrow> Suc (f n))"
 
 lemma bump'[simp]: "bump f x = bump' f x"
-  by (metis Nitpick.case_nat_unfold bump.simps Suc_pred' bump'_def not_gr0)
+by (metis Nitpick.case_nat_unfold bump.simps Suc_pred' bump'_def not_gr0)
 
 lemma sss: "semantics m e (sv f p) = semantics m (e \<circ> f) p \<Longrightarrow>
   (\<And>p e e' m. \<forall>x. x \<in> set (fv p) \<longrightarrow> e x = e' x \<Longrightarrow> semantics m e p = semantics m e' p) \<Longrightarrow>
@@ -873,55 +884,56 @@ proof -
 qed
 
 lemma eval_subst: "semantics m e (sv f p) = semantics m (e \<circ> f) p"
-  by (induct p arbitrary: e f) (simp,simp,simp,
-    simp add: sss eval_cong,simp add: Nitpick.case_nat_unfold ball bump'_def eval_cong)
+by (induct p arbitrary: e f) (simp,simp,simp,
+  simp add: sss eval_cong,simp add: Nitpick.case_nat_unfold ball bump'_def eval_cong)
 
 definition bind' :: "nat \<Rightarrow> nat \<Rightarrow> nat" where
   "bind' y x \<equiv> (case x of 0 \<Rightarrow> y | Suc n \<Rightarrow> n)"
 
 lemma bind'[simp]: "bind y x = bind' y x"
-  by (metis Nitpick.case_nat_unfold bind.simps Suc_pred' bind'_def not_gr0)
+by (metis Nitpick.case_nat_unfold bind.simps Suc_pred' bind'_def not_gr0)
 
 lemma eval_bind: "semantics m e (sv (bind n) p) = semantics m (case_nat (e n) e) p"
-  using eval_cong eval_subst by (simp add: Nitpick.case_nat_unfold bind'_def)
+using eval_cong eval_subst
+by (simp add: Nitpick.case_nat_unfold bind'_def)
 
 lemma sound_Uni:
   assumes "u \<notin> set (fv_list (Uni p # s))"
   and "valid (s@[sv (bind u) p])"
   shows "valid (Uni p # s)"
-  proof (clarsimp simp: valid_def)
-    fix M I e z
-    show "is_model_environment (M,I) e \<Longrightarrow> \<not> semantics_alternative (M,I) e s \<Longrightarrow> z \<in> M \<Longrightarrow>
-      semantics (M,I) (case_nat z e) p"
-    proof -
-      assume "z \<in> M" and "\<not> semantics_alternative (M,I) e s" and  "is_model_environment (M,I) e"
-      have 1: "semantics (M,I) (case_nat z (e(u:=z))) p = semantics (M,I) (case_nat z e) p"
-        using assms
-        by (clarsimp simp: Nitpick.case_nat_unfold fv_list_cons intro!: eval_cong[rule_format])
-           (metis One_nat_def Suc_pred' adjust)
-      have "is_model_environment (M,I) (e(u := z)) \<longrightarrow> semantics_alternative (M,I) (e(u := z))
-        
- (s @ [sv (bind u) p])"
-        using assms valid_def by blast
-      then have 2: "(\<forall>n. (if n = u then z else e n) \<in> M) \<longrightarrow>
-         semantics_alternative (M,I) (e(u := z)) s \<or> semantics (M,I) (case_nat z e) p"
-       using 1 eval_bind is_model_environment_def semantics_alternative_append by simp
-      have 3: "u \<notin> set (adjust (fv p)) \<and> u \<notin> set (fv_list s)"
-        using assms fv_list_cons by simp
-      have "\<forall>n. e n \<in> M"
-        using \<open>is_model_environment (M,I) e\<close> is_model_environment_def by simp
-      then show ?thesis
-        using 2 3 \<open>z \<in> M\<close> \<open>\<not> semantics_alternative (M,I) e s\<close>
-        by (metis (no_types,lifting) fun_upd_apply semantics_alternative_cong)
-    qed
+proof (clarsimp simp: valid_def)
+  fix M I e z
+  show "is_model_environment (M,I) e \<Longrightarrow> \<not> semantics_alternative (M,I) e s \<Longrightarrow> z \<in> M \<Longrightarrow>
+    semantics (M,I) (case_nat z e) p"
+  proof -
+    assume "z \<in> M" and "\<not> semantics_alternative (M,I) e s" and  "is_model_environment (M,I) e"
+    have 1: "semantics (M,I) (case_nat z (e(u:=z))) p = semantics (M,I) (case_nat z e) p"
+      using assms
+      by (clarsimp simp: Nitpick.case_nat_unfold fv_list_cons intro!: eval_cong[rule_format])
+        (metis One_nat_def Suc_pred' adjust)
+    have "is_model_environment (M,I) (e(u := z)) \<longrightarrow> semantics_alternative (M,I) (e(u := z))
+      (s @ [sv (bind u) p])"
+      using assms valid_def by blast
+    then have 2: "(\<forall>n. (if n = u then z else e n) \<in> M) \<longrightarrow>
+      semantics_alternative (M,I) (e(u := z)) s \<or> semantics (M,I) (case_nat z e) p"
+      using 1 eval_bind is_model_environment_def semantics_alternative_append by simp
+    have 3: "u \<notin> set (adjust (fv p)) \<and> u \<notin> set (fv_list s)"
+      using assms fv_list_cons by simp
+    have "\<forall>n. e n \<in> M"
+      using \<open>is_model_environment (M,I) e\<close> is_model_environment_def by simp
+    then show ?thesis
+      using 2 3 \<open>z \<in> M\<close> \<open>\<not> semantics_alternative (M,I) e s\<close>
+      by (metis (no_types,lifting) fun_upd_apply semantics_alternative_cong)
   qed
+qed
   
 lemma sound_Exi: "valid (s@[sv (bind u) p,Exi p]) \<Longrightarrow> valid (Exi p # s)"
-  by (simp add: valid_def semantics_alternative_append eval_bind)
-     (metis is_model_environment_def prod.sel(1))
+using valid_def eval_bind
+by (simp add: semantics_alternative_append,metis is_model_environment_def prod.sel(1))
 
 lemma max_exists: "finite (X::nat set) \<Longrightarrow> X \<noteq> {} \<longrightarrow> (\<exists>x. x \<in> X \<and> (\<forall>y. y \<in> X \<longrightarrow> y \<le> x))"
-  using Max.coboundedI Max_in by blast
+using Max.coboundedI Max_in
+by blast
 
 definition init :: "sequent \<Rightarrow> bool" where
   "init s == \<forall>x \<in> (set s). fst x = 0"
@@ -930,15 +942,18 @@ definition is_Exi :: "nnf \<Rightarrow> bool" where
   "is_Exi f \<equiv> case f of Exi _ \<Rightarrow> True | _ \<Rightarrow> False"
 
 lemma is_Exi: "\<not> is_Exi (Pre b i v) \<and> \<not> is_Exi (Con p q) \<and> \<not> is_Exi (Dis p q) \<and> \<not> is_Exi (Uni p)"
-  using is_Exi_def by simp
+using is_Exi_def
+by simp
 
 lemma index0:
   assumes "init s"
   shows "\<forall>k m p. (n,k) \<in> calculation s \<longrightarrow> (m,p) \<in> (set k) \<longrightarrow> \<not> is_Exi p \<longrightarrow> m = 0"
-  proof (induct n)
-    case 0 then show ?case using assms init_def by fastforce
-  next
-    case IH: (Suc x) then show ?case proof (intro allI impI)
+proof (induct n)
+  case 0 then show ?case using assms init_def by fastforce
+next
+  case IH: (Suc x)
+    then show ?case
+    proof (intro allI impI)
       fix k m p
       show "(Suc x,k) \<in> calculation s \<Longrightarrow> (m,p) \<in> (set k) \<Longrightarrow> \<not> is_Exi p \<Longrightarrow> m = 0"
       proof -
@@ -946,79 +961,91 @@ lemma index0:
         then obtain t
           where 3: "(x,t) \<in> calculation s \<and> k \<in> set (solve t) \<and> \<not> is_axiom (list_sequent t)"
           using calculation_downwards by blast
-        then show ?thesis proof (cases t)
+        then show ?thesis
+        proof (cases t)
           case Nil then show ?thesis using assms IH 1 3 by simp
         next
-          case (Cons a _) then show ?thesis proof (cases a)
-            case (Pair _ q) then show ?thesis using 1 2 3 IH Cons
-              by (cases q) (fastforce simp: list_sequent_def stop is_Exi_def)+
-          qed
+         case (Cons a _) then show ?thesis
+         proof (cases a)
+          case (Pair _ q)
+            then show ?thesis using 1 2 3 IH Cons
+            by (cases q) (fastforce simp: list_sequent_def stop is_Exi_def)+
         qed
       qed
     qed
   qed
+qed
 
 lemma maxl: "\<forall>v \<in> set l. v \<le> maxl l"
-  by (induct l) (auto simp: max_def)
+by (induct l) (auto simp: max_def)
 
 lemma fresh: "fresh l \<notin> (set l)"
-  using maxl fresh_def maxl.simps not_less_eq_eq order_refl empty_iff list.set(1) null.simps(2)
-    list.exhaust by metis
+unfolding fresh_def
+using maxl maxl.simps not_less_eq_eq order_refl empty_iff list.set(1) null.simps(2) list.exhaust
+by metis
 
 lemma soundness':
   assumes "init s"
   and "m \<in> (fst ` (calculation s))"
   and "\<forall>y u. (y,u) \<in> (calculation s) \<longrightarrow> y \<le> m"
   shows "\<forall>n t. h = m - n \<and> (n,t) \<in> calculation s \<longrightarrow> valid (list_sequent t)"
-  proof (induct h)
-    case 0 then show ?case proof (intro allI impI)
+proof (induct h)
+  case 0 then show ?case
+    proof (intro allI impI)
       fix n t
       show "0 = m - n \<and> (n,t) \<in> calculation s \<Longrightarrow> valid (list_sequent t)"
       proof -
         assume *: "0 = m - n \<and> (n,t) \<in> calculation s"
-        then show ?thesis proof (cases "is_axiom (list_sequent t)")
-          case True then show ?thesis proof (cases t)
-            case Nil then show ?thesis using True list_sequent_def by simp
-          next
-            case Cons then show ?thesis
+        then show ?thesis
+        proof (cases "is_axiom (list_sequent t)")
+          case True then show ?thesis
+            proof (cases t)
+              case Nil then show ?thesis using True list_sequent_def by simp
+            next
+              case Cons then show ?thesis
               using True list_sequent_def valid_def semantics_alternative_def2
               by simp (metis (no_types,lifting) semantics.simps(1))
-          qed
+            qed
         next
           case False
-          then have "n = m" using assms * by fastforce
-          then show ?thesis using assms * False
+            then have "n = m" using assms * by fastforce
+            then show ?thesis using assms * False
             by (meson calculation_upwards le_SucI le_antisym n_not_Suc_n)
         qed
       qed
     qed
-  next
-    case IH: (Suc x) then show ?case proof (intro allI impI)
+next
+  case IH: (Suc x) then show ?case
+    proof (intro allI impI)
       fix n t
       show "Suc x = m - n \<and> (n,t) \<in> calculation s \<Longrightarrow> valid (list_sequent t)"
       proof -
         assume "Suc x = m - n \<and> (n,t) \<in> calculation s"
         then have *: "Suc x = m - n" and **: "(n,t) \<in> calculation s"
           by (simp,simp)
-        then show ?thesis proof (cases "is_axiom (list_sequent t)")
-          case True then show ?thesis proof (cases t)
-            case Nil then show ?thesis using True list_sequent_def by simp
-          next
-            case Cons then show ?thesis
+        then show ?thesis
+        proof (cases "is_axiom (list_sequent t)")
+          case True then show ?thesis
+            proof (cases t)
+              case Nil then show ?thesis using True list_sequent_def by simp
+            next
+              case Cons then show ?thesis
               using True list_sequent_def valid_def semantics_alternative_def2
               by simp (metis (no_types,lifting) semantics.simps(1))
-          qed
+            qed
         next
-          case notAxiom: False then show ?thesis proof (cases "\<exists>a f list. t = (a,Uni f) # list")
-            case True
-            then obtain a and f and list where 1: "t = (a,Uni f) # list" by blast
-            then show ?thesis using IH assms * ** fv_list_def fresh list_sequent_def inst_def
-              by simp (frule calculation.step,simp add: maps,
-                 metis (no_types,lifting) Suc_leD diff_Suc_Suc diff_diff_cancel diff_le_self
-                  le_SucI list.map map_append snd_conv sound_Uni)
-          next
-            case notUni: False then show ?thesis proof (cases "\<exists>a f list. t = (a,Exi f) # list")
+          case notAxiom: False then show ?thesis
+            proof (cases "\<exists>a f list. t = (a,Uni f) # list")
               case True
+              then obtain a and f and list where 1: "t = (a,Uni f) # list" by blast
+              then show ?thesis using IH assms * ** fv_list_def fresh list_sequent_def inst_def
+              by simp (frule calculation.step,simp add: maps,
+                  metis (no_types,lifting) Suc_leD diff_Suc_Suc diff_diff_cancel diff_le_self
+                  le_SucI list.map map_append snd_conv sound_Uni)
+        next
+          case notUni: False then show ?thesis
+            proof (cases "\<exists>a f list. t = (a,Exi f) # list")
+             case True
               then obtain a and f and list where 1: "t = (a,Exi f) # list" by blast
               then show ?thesis using IH assms * ** fresh list_sequent_def inst_def
                 by simp (frule calculation.step,simp,
@@ -1026,7 +1053,8 @@ lemma soundness':
                     le_SucI list.map map_append snd_conv sound_Exi)
             next
               case notExi: False
-              then show ?thesis proof (cases t)
+              then show ?thesis
+              proof (cases t)
                 case Nil
                 then show ?thesis using assms notAxiom IH * ** calculation_upwards
                    by (metis (no_types,lifting) calculation.step diff_Suc_Suc diff_diff_cancel
@@ -1034,64 +1062,68 @@ lemma soundness':
               next
                 case (Cons a list)
                 then show ?thesis
-                  using IH proof (simp add: valid_def semantics_alternative_def2,intro allI impI)
+                using IH
+                proof (simp add: valid_def semantics_alternative_def2,intro allI impI)
                   fix as gs g
                   show "\<forall>n t. x = m - n \<and> (n,t) \<in> calculation s \<longrightarrow>
                        (\<forall>a b e. is_model_environment (a,b) e \<longrightarrow> (\<exists>p. p \<in> set (list_sequent t) \<and>
                          semantics (a,b) e p))
                        \<Longrightarrow> is_model_environment (as,gs) g \<Longrightarrow> \<exists>p. p \<in> set (list_sequent (a # list))
                          \<and> semantics (as,gs) g p"
-                   proof -
+                  proof -
                     assume ***: "is_model_environment (as,gs) g"
                     and IH': "\<forall>n t. x = m - n \<and> (n,t) \<in> calculation s \<longrightarrow>
                                (\<forall>a b e. is_model_environment (a,b) e \<longrightarrow>
                                (\<exists>p. p \<in> set (list_sequent t) \<and> semantics (a,b) e p))"
-                    then show ?thesis proof (cases a)
-                      case (Pair _ p) then show ?thesis proof (cases p)
-                        case (Pre b i v) then  show ?thesis
+                    then show ?thesis
+                    proof (cases a)
+                      case (Pair _ p) then show ?thesis
+                        proof (cases p)
+                          case (Pre b i v) then show ?thesis
                             using IH' assms * ** Cons notAxiom *** Pair
                             by (fastforce simp: list_sequent_def dest!: pre)
-                      next
-                        case (Con q r)
-                          then have 1: "(Suc n,list @ [(0,q)]) \<in> calculation s"
+                        next
+                          case (Con q r)
+                            then have 1: "(Suc n,list @ [(0,q)]) \<in> calculation s"
                             using ** Pair con1 local.Cons notAxiom by blast
-                          then have 2: "x = m - Suc n \<and> (Suc n,list @ [(0,q)]) \<in> calculation s"
+                            then have 2: "x = m - Suc n \<and> (Suc n,list @ [(0,q)]) \<in> calculation s"
                             using * by linarith
-                          have 3: "(Suc n,list @ [(0,r)]) \<in> calculation s"
+                            have 3: "(Suc n,list @ [(0,r)]) \<in> calculation s"
                             using ** Pair Con con2 local.Cons notAxiom by blast
-                          then have 4: "x = m - Suc n \<and> (Suc n,list @ [(0,r)]) \<in> calculation s"
+                            then have 4: "x = m - Suc n \<and> (Suc n,list @ [(0,r)]) \<in> calculation s"
                             using * by linarith
-                          then have 5: "(Suc n,list @ [(0,q)]) \<in> calculation s \<longrightarrow>
+                            then have 5: "(Suc n,list @ [(0,q)]) \<in> calculation s \<longrightarrow>
                               (\<forall>a b e. is_model_environment (a,b) e \<longrightarrow>
                               (\<exists>p. p \<in> set (list_sequent (list @ [(0,q)])) \<and> semantics (a,b) e p))"
                             using IH' by blast
-                          then have "x = m - Suc n \<and> (Suc n,list @ [(0,r)]) \<in> calculation s \<longrightarrow>
+                            then have "x = m - Suc n \<and> (Suc n,list @ [(0,r)]) \<in> calculation s \<longrightarrow>
                             (\<forall>a b e. is_model_environment (a,b) e \<longrightarrow>
                             (\<exists>p. p \<in> set (list_sequent (list @ [(0,r)])) \<and> semantics (a,b) e p))"
                             using 2 IH' by blast
-                          then show ?thesis using 5 proof (elim impE)
-                            show "(Suc n,list @ [(0,q)]) \<in> calculation s"
-                              using 1 by simp
-                         next
-                            show "\<forall>a b e. is_model_environment (a,b) e \<longrightarrow>
-                              (\<exists>p. p \<in> set (list_sequent (list @ [(0,q)])) \<and>
-                                semantics (a,b) e p) \<Longrightarrow>
-                              x = m - Suc n \<and> (Suc n,list @ [(0,r)]) \<in> calculation s"
+                            then show ?thesis
+                            using 5
+                            proof (elim impE)
+                              show "(Suc n,list @ [(0,q)]) \<in> calculation s" using 1 by simp
+                            next
+                              show "\<forall>a b e. is_model_environment (a,b) e \<longrightarrow>
+                                (\<exists>p. p \<in> set (list_sequent (list @ [(0,q)])) \<and>
+                                  semantics (a,b) e p) \<Longrightarrow>
+                                x = m - Suc n \<and> (Suc n,list @ [(0,r)]) \<in> calculation s"
                               using 2 3 by blast
-                         next
-                            show "\<forall>a b e. is_model_environment (a,b) e \<longrightarrow>
-                              (\<exists>p. p \<in> set (list_sequent (list @ [(0,r)])) \<and>
-                                 semantics (a,b) e p) \<Longrightarrow>
-                              (Suc n,list @ [(0,q)]) \<in> calculation s"
+                            next
+                              show "\<forall>a b e. is_model_environment (a,b) e \<longrightarrow>
+                                (\<exists>p. p \<in> set (list_sequent (list @ [(0,r)])) \<and>
+                                  semantics (a,b) e p) \<Longrightarrow>
+                                 (Suc n,list @ [(0,q)]) \<in> calculation s"
                               using 1 by blast
-                         next show "\<forall>a b e. is_model_environment (a,b) e \<longrightarrow>
-                           (\<exists>p. p \<in> set (list_sequent (list @ [(0,r)])) \<and> semantics (a,b) e p) \<Longrightarrow>
+                            next show "\<forall>a b e. is_model_environment (a,b) e \<longrightarrow>
+                              (\<exists>p. p \<in> set (list_sequent (list @ [(0,r)])) \<and> semantics (a,b) e p) \<Longrightarrow>
                               \<forall>a b e. is_model_environment (a,b) e \<longrightarrow>
-                           (\<exists>p. p \<in> set (list_sequent (list @ [(0,q)])) \<and> semantics (a,b) e p) \<Longrightarrow>
+                              (\<exists>p. p \<in> set (list_sequent (list @ [(0,q)])) \<and> semantics (a,b) e p) \<Longrightarrow>
                               \<exists>p. p \<in> set (list_sequent (a # list)) \<and> semantics (as,gs) g p"
                               using Con *** Pair list_sequent_def
                               by simp (metis (no_types,lifting) semantics.simps(2))
-                         qed
+                            qed
                       next
                         case (Dis q r)
                         then have "x = m - Suc n \<and> (Suc n,list @ [(0,q),(0,r)]) \<in> calculation s \<longrightarrow>
@@ -1099,7 +1131,8 @@ lemma soundness':
                                   (\<exists>p. p \<in> set (list_sequent (list @ [(0,q),(0,r)])) \<and>
                                   semantics (a,b) e p))"
                                   using * IH' by blast
-                        then show ?thesis proof (elim impE)
+                        then show ?thesis
+                        proof (elim impE)
                           have 1: "(Suc n,list @ [(0,q),(0,r)]) \<in> calculation s"
                             using ** Dis Pair dis local.Cons notAxiom by blast
                           have "x = m - Suc n" using "*" by linarith
@@ -1113,13 +1146,12 @@ lemma soundness':
                             using Dis *** Pair list_sequent_def
                             by simp (metis (no_types,lifting) semantics.simps(3))
                         qed
-                      next
-                        case Uni then show ?thesis
-                          using notUni Pair Cons by blast
-                      next
-                        case Exi then show ?thesis
-                          using notExi Pair Cons by blast
-                      qed
+                    next
+                      case Uni then show ?thesis
+                        using notUni Pair Cons by blast
+                    next
+                      case Exi then show ?thesis
+                        using notExi Pair Cons by blast
                     qed
                   qed
                 qed
@@ -1130,18 +1162,20 @@ lemma soundness':
       qed
     qed
   qed
+qed
 
 lemma list_make_sequent_inverse[simp]: "list_sequent (make_sequent s) = s"
-  using list_sequent_def make_sequent_def by (induct s) simp_all
+using list_sequent_def make_sequent_def
+by (induct s) simp_all
 
 lemma soundness:
   assumes "finite (calculation (make_sequent s))"
   shows "valid s"
-  proof -
-    have "init (make_sequent s)" and "finite (fst ` (calculation (make_sequent s)))"
-      using assms by (simp add: init_def make_sequent_def,simp)
-    then show ?thesis using assms calculation.init soundness' list_make_sequent_inverse max_exists
-      by (metis (mono_tags,lifting) empty_iff fst_conv image_eqI)
+proof -
+  have "init (make_sequent s)" and "finite (fst ` (calculation (make_sequent s)))"
+    using assms by (simp add: init_def make_sequent_def,simp)
+  then show ?thesis using assms calculation.init soundness' list_make_sequent_inverse max_exists
+    by (metis (mono_tags,lifting) empty_iff fst_conv image_eqI)
 qed
 
 section "Contains / Considers"
@@ -1156,13 +1190,13 @@ lemma progress:
   assumes "f = failing_path (calculation s)"
   and "infinite (calculation s)"
   shows "snd (f n) = a # l \<longrightarrow> (\<exists>zs'. snd (f (Suc n)) = l@zs')"
-  proof -
-    obtain suc: "(snd (f (Suc n))) \<in> set (solve (snd (f n)))"
-      using assms is_path_f by blast
-    then show ?thesis proof (cases a)
-      case (Pair _ p)
-      then show ?thesis using suc
-        by (induct p,safe,simp_all add: stop split: if_splits) blast
+proof -
+  obtain suc: "(snd (f (Suc n))) \<in> set (solve (snd (f n)))" using assms is_path_f by blast
+  then show ?thesis
+  proof (cases a)
+    case (Pair _ p)
+    then show ?thesis using suc
+    by (induct p,safe,simp_all add: stop split: if_splits) blast
   qed
 qed
 
@@ -1170,176 +1204,186 @@ lemma contains_considers':
   assumes "f = failing_path (calculation s)"
   and "infinite (calculation s)"
   shows "\<forall>n ys. snd (f n) = xs@y # ys \<longrightarrow> (\<exists>m zs'. snd (f (n+m)) = y # zs')"
-  proof (induct xs)
-    case Nil then show ?case using append.simps(1) by (metis Nat.add_0_right)
-  next
-    case Cons then show ?case using append.simps(2)
-      by (metis (no_types,lifting) add_Suc_shift append_assoc assms progress)
-  qed
+proof (induct xs)
+  case Nil then show ?case using append.simps(1) by (metis Nat.add_0_right)
+next
+  case Cons then show ?case using append.simps(2)
+    by (metis (no_types,lifting) add_Suc_shift append_assoc assms progress)
+qed
 
 lemma contains_considers:
   assumes "f = failing_path (calculation s)"
   and "infinite (calculation s)"
   and "contains f n y"
   shows "(\<exists>m. considers f (n+m) y)"
-  using assms 
-  by (clarsimp simp: contains_def considers_def dest!: split_list_first)
-     (frule contains_considers'[rule_format],simp,simp,metis (mono_tags,lifting) list.simps(5))
+using assms 
+by (clarsimp simp: contains_def considers_def dest!: split_list_first)
+  (frule contains_considers'[rule_format],simp,simp,metis (mono_tags,lifting) list.simps(5))
 
 lemma contains_propagates_Pre[rule_format]:
   assumes "f = failing_path (calculation s)"
   and "infinite (calculation s)"
   and "contains f n (0,Pre b i v)"
   shows "contains f (n+q) (0,Pre b i v)"
-  proof (induct q)
-    case 0 then show ?case using assms by simp
+proof (induct q)
+  case 0 then show ?case using assms by simp
+next
+  case IH: (Suc q')
+  then have "\<exists>ys zs. snd (f (n + q')) = ys @ (0,Pre b i v) # zs \<and> (0,Pre b i v) \<notin> set ys"
+    by (meson contains_def split_list_first)
+  then obtain ys and zs where 1:
+    "snd (f (n + q')) = ys @ (0,Pre b i v) # zs \<and> (0,Pre b i v) \<notin> set ys"
+    by blast
+  then have 2: "(snd (f (Suc (n + q')))) \<in> set (solve (snd (f (n + q'))))"
+    using assms is_path_f by blast
+  then show ?case
+  proof (cases ys)
+    case Nil
+    then show ?thesis using 1 2 contains_def
+      by (simp add: stop split: if_splits)
   next
-    case IH: (Suc q')
-    then have "\<exists>ys zs. snd (f (n + q')) = ys @ (0,Pre b i v) # zs \<and> (0,Pre b i v) \<notin> set ys"
-      by (meson contains_def split_list_first)
-    then obtain ys and zs where 1:
-      "snd (f (n + q')) = ys @ (0,Pre b i v) # zs \<and> (0,Pre b i v) \<notin> set ys"
-      by blast
-    then have 2: "(snd (f (Suc (n + q')))) \<in> set (solve (snd (f (n + q'))))"
-      using assms is_path_f by blast
-    then show ?case proof (cases ys)
-      case Nil
-      then show ?thesis using 1 2 contains_def
-        by (simp add: stop split: if_splits)
-    next
-      case (Cons a _) then show ?thesis proof (cases a)
+    case (Cons a _) then show ?thesis
+      proof (cases a)
         case (Pair _ p) then show ?thesis
           using 1 contains_def assms Cons progress by fastforce
       qed
-    qed
   qed
+qed
 
 lemma contains_propagates_Con:
   assumes "f = failing_path (calculation s)"
   and "infinite (calculation s)"
   and "contains f n (0,Con p q)"
   shows "(\<exists>y. contains f (n+y) (0,p) \<or> contains f (n+y) (0,q))"
-  proof -
-    have "(\<exists>l. considers f (n+l) (0,Con p q))" using assms contains_considers by blast
-    then obtain l where 1: "considers f (n+l) (0,Con p q)" by blast
-    then have 2: "(snd (f (Suc (n + l)))) \<in> set (solve (snd (f (n + l))))"
-      using assms is_path_f by blast
-    then show ?thesis proof (cases "snd (f (n + l))")
-      case Nil then show ?thesis using 1 considers_def by simp
-    next
-      case Cons then show ?thesis using 1 2 considers_def contains_def
-        by (rule_tac x="Suc l" in exI) auto
-    qed
+proof -
+  have "(\<exists>l. considers f (n+l) (0,Con p q))" using assms contains_considers by blast
+  then obtain l where 1: "considers f (n+l) (0,Con p q)" by blast
+  then have 2: "(snd (f (Suc (n + l)))) \<in> set (solve (snd (f (n + l))))"
+    using assms is_path_f by blast
+  then show ?thesis
+  proof (cases "snd (f (n + l))")
+    case Nil then show ?thesis using 1 considers_def by simp
+  next
+    case Cons then show ?thesis using 1 2 considers_def contains_def
+      by (rule_tac x="Suc l" in exI) auto
   qed
+qed
 
 lemma contains_propagates_Dis:
   assumes "f = failing_path (calculation s)"
   and "infinite (calculation s)"
   and "contains f n (0,Dis p q)"
   shows "(\<exists>y. contains f (n+y) (0,p) \<and> contains f (n+y) (0,q))"
-  proof -
-    have "(\<exists>l. considers f (n+l) (0,Dis p q))" using assms contains_considers by blast
-    then obtain l where 1: "considers f (n+l) (0,Dis p q)" by blast
-    then have 2: "(snd (f (Suc (n + l)))) \<in> set (solve (snd (f (n + l))))"
-      using assms is_path_f by blast
-    then show ?thesis proof (cases "snd (f (n + l))")
-      case Nil then show ?thesis using 1 considers_def by simp
-    next
-      case Cons then show ?thesis using 1 2 considers_def contains_def
-        by (rule_tac x="Suc l" in exI) simp_all
-    qed
+proof -
+  have "(\<exists>l. considers f (n+l) (0,Dis p q))" using assms contains_considers by blast
+  then obtain l where 1: "considers f (n+l) (0,Dis p q)" by blast
+  then have 2: "(snd (f (Suc (n + l)))) \<in> set (solve (snd (f (n + l))))"
+    using assms is_path_f by blast
+  then show ?thesis
+  proof (cases "snd (f (n + l))")
+    case Nil then show ?thesis using 1 considers_def by simp
+  next
+    case Cons then show ?thesis using 1 2 considers_def contains_def
+      by (rule_tac x="Suc l" in exI) simp_all
   qed
+qed
 
 lemma contains_propagates_Uni:
   assumes "f = failing_path (calculation s)"
   and "infinite (calculation s)"
   and "contains f n (0,Uni p)"
   shows "(\<exists>y. contains f (Suc(n+y)) (0,(sv (bind (fresh (fv_list (map snd (snd (f (n+y))))))) p)))"
-  proof -
-    have "(\<exists>l. considers f (n+l) (0,Uni p))" using assms contains_considers by blast
-    then obtain l where 1: "considers f (n+l) (0,Uni p)" by blast
-    then have 2: "(snd (f (Suc (n + l)))) \<in> set (solve (snd (f (n + l))))"
-      using assms is_path_f by blast
-    then show ?thesis proof (cases "snd (f (n + l))")
-      case Nil then show ?thesis using 1 considers_def by simp
-    next
-      case Cons then show ?thesis using 1 2 considers_def contains_def inst_def
-        by (rule_tac x="l" in exI) (simp add: fv_list_def maps_def)
-    qed
+proof -
+  have "(\<exists>l. considers f (n+l) (0,Uni p))" using assms contains_considers by blast
+  then obtain l where 1: "considers f (n+l) (0,Uni p)" by blast
+  then have 2: "(snd (f (Suc (n + l)))) \<in> set (solve (snd (f (n + l))))"
+    using assms is_path_f by blast
+  then show ?thesis
+  proof (cases "snd (f (n + l))")
+    case Nil then show ?thesis using 1 considers_def by simp
+  next
+    case Cons then show ?thesis using 1 2 considers_def contains_def inst_def
+      by (rule_tac x="l" in exI) (simp add: fv_list_def maps_def)
   qed
+qed
 
 lemma contains_propagates_Exi:
   assumes "f = failing_path (calculation s)"
   and "infinite (calculation s)"
   and "contains f n (m,Exi p)"
   shows "(\<exists>y. (contains f (n+y) (0,(sv (bind m) p)) \<and> (contains f (n+y) (Suc m,Exi p))))"
-  proof -
-    have "(\<exists>l. considers f (n+l) (m,Exi p))" using assms contains_considers by blast
-    then obtain l where 1: "considers f (n+l) (m,Exi p)" by blast
-    then have 2: "(snd (f (Suc (n + l)))) \<in> set (solve (snd (f (n + l))))"
-      using assms is_path_f by blast
-    then show ?thesis proof (cases "snd (f (n + l))")
-      case Nil then show ?thesis using 1 considers_def by simp
-    next
-      case Cons then show ?thesis using 1 2 considers_def contains_def inst_def
-        by (rule_tac x="Suc l" in exI) simp
-    qed
+proof -
+  have "(\<exists>l. considers f (n+l) (m,Exi p))" using assms contains_considers by blast
+  then obtain l where 1: "considers f (n+l) (m,Exi p)" by blast
+  then have 2: "(snd (f (Suc (n + l)))) \<in> set (solve (snd (f (n + l))))"
+    using assms is_path_f by blast
+  then show ?thesis
+  proof (cases "snd (f (n + l))")
+    case Nil then show ?thesis using 1 considers_def by simp
+  next
+    case Cons then show ?thesis using 1 2 considers_def contains_def inst_def
+      by (rule_tac x="Suc l" in exI) simp
   qed
+qed
 
 lemma Exi_downward:
   assumes "f = failing_path (calculation s)"
   and "infinite (calculation s)"
   and "init s"
   shows "\<forall>m. (Suc m,Exi g) \<in> set (snd (f n)) \<longrightarrow> (\<exists>n'. (m,Exi g) \<in> set (snd (f n')))"
-  proof -
-    show ?thesis proof (induct n)
-      case 0 then show ?case using assms init_def is_path_f_0 by fastforce
+proof (induct n)
+  case 0 then show ?case using assms init_def is_path_f_0 by fastforce
+next
+  case IH: (Suc x)
+  then have fxSuc: "f x \<in> calculation s \<and> fst (f x) = x \<and>
+    snd (f (Suc x)) \<in> set (solve (snd (f x))) \<and> infinite (calculation (snd (f x)))"
+    using assms is_path_f by blast
+  then show ?case
+  proof (cases "f x")
+    case fxPair: (Pair _ l)
+    then show ?thesis
+    proof (cases l)
+      case Nil then show ?thesis using fxSuc fxPair by simp
     next
-      case IH: (Suc x)
-      then have fxSuc: "f x \<in> calculation s \<and> fst (f x) = x \<and>
-        snd (f (Suc x)) \<in> set (solve (snd (f x))) \<and> infinite (calculation (snd (f x)))"
-        using assms is_path_f by blast
-      then show ?case proof (cases "f x")
-        case fxPair: (Pair _ l)
-        then show ?thesis proof (cases l)
-          case Nil then show ?thesis using fxSuc fxPair by simp
+      case (Cons a _) then show ?thesis
+      proof (cases a)
+        case (Pair _ p) then show ?thesis
+        proof (cases p)
+          case Pre then show ?thesis using IH fxSuc fxPair Cons Pair
+            by (simp add: stop split: if_splits)
         next
-          case (Cons a _) then show ?thesis proof (cases a)
-            case (Pair _ p) then show ?thesis proof (cases p)
-              case Pre then show ?thesis using IH fxSuc fxPair Cons Pair
-                by (simp add: stop split: if_splits)
-            next
-              case Con then show ?thesis using IH fxSuc fxPair Cons Pair
-                by (simp split: if_splits) fastforce
-            next
-              case Dis then show ?thesis using IH fxSuc fxPair Cons Pair
-                by (simp split: if_splits)
-            next
-              case Uni then show ?thesis using IH fxSuc fxPair Cons Pair
-                by (simp split: if_splits)
-            next
-              case Exi then show ?thesis using IH fxSuc fxPair Cons Pair
-                by (simp split: if_splits) (metis list.set_intros(1) snd_eqD)
-            qed
-          qed
+          case Con then show ?thesis using IH fxSuc fxPair Cons Pair
+            by (simp split: if_splits) fastforce
+        next
+          case Dis then show ?thesis using IH fxSuc fxPair Cons Pair
+            by (simp split: if_splits)
+        next
+          case Uni then show ?thesis using IH fxSuc fxPair Cons Pair
+            by (simp split: if_splits)
+        next
+          case Exi then show ?thesis using IH fxSuc fxPair Cons Pair
+            by (simp split: if_splits) (metis list.set_intros(1) snd_eqD)
         qed
       qed
     qed
   qed
+qed
    
 lemma Exi0:
   assumes "f = failing_path (calculation s)"
   and "infinite (calculation s)"
   and "init s"
   shows "\<forall>n. contains f n (m,Exi g) \<longrightarrow> (\<exists>n'. contains f n' (0,Exi g))"
-  using assms Exi_downward contains_def by (induct m) auto
+using assms Exi_downward contains_def
+by (induct m) auto
      
 lemma Exi_upward':
   assumes "f = failing_path (calculation s)"
   and "infinite (calculation s)"
   and "init s"
   shows "\<forall>n. contains f n (0,Exi g) \<longrightarrow> (\<exists>n'. contains f n' (m,Exi g))"
-  using assms contains_propagates_Exi by (induct m) (simp,blast)
+using assms contains_propagates_Exi
+by (induct m) (simp,blast)
 
 lemma Exi_upward:
   assumes "f = failing_path (calculation s)"
@@ -1347,30 +1391,38 @@ lemma Exi_upward:
   and "init s"
   and "contains f n (m,Exi g)"
   shows "(\<forall>m'. \<exists>n'. contains f n' (0,sv (bind m') g))"
-  proof -
-    fix m'
-    have "\<exists>n'. contains f n' (m',Exi g)" using assms Exi0 Exi_upward' by metis
-    then show ?thesis using assms contains_propagates_Exi Exi0 Exi_upward' by metis
-  qed
+proof -
+  fix m'
+  have "\<exists>n'. contains f n' (m',Exi g)" using assms Exi0 Exi_upward' by metis
+  then show ?thesis using assms contains_propagates_Exi Exi0 Exi_upward' by metis
+qed
 
-definition ntou :: "nat \<Rightarrow> proxy" where "ntou n \<equiv> replicate n ()"
+definition ntou :: "nat \<Rightarrow> proxy" where
+  "ntou n \<equiv> replicate n ()"
 
-definition uton :: "proxy \<Rightarrow> nat" where "uton u \<equiv> length u"
+definition uton :: "proxy \<Rightarrow> nat" where
+  "uton u \<equiv> length u"
 
-lemma aaa[simp]: "ntou (uton u) = u" using ntou_def uton_def by (induct u) auto
+lemma aaa[simp]: "ntou (uton u) = u"
+using ntou_def uton_def
+by (induct u) auto
 
-lemma bbb[simp]: "uton (ntou n) = n" using ntou_def uton_def by (induct n) auto
+lemma bbb[simp]: "uton (ntou n) = n"
+using ntou_def uton_def
+by (induct n) auto
 
-lemma ccc[simp]: "uton \<circ> ntou = id" by auto
+lemma ccc[simp]: "uton \<circ> ntou = id"
+by auto
 
 section "Falsifying Model From Failing Path"
 
 definition model :: "sequent \<Rightarrow> model" where
   "model s \<equiv> (range ntou,\<lambda> p ms. (let f = failing_path (calculation s) in
-     (\<forall>n m. \<not> contains f n (m,Pre True p (map uton ms)))))"
+    (\<forall>n m. \<not> contains f n (m,Pre True p (map uton ms)))))"
 
 lemma is_env_model_ntou: "is_model_environment (model s) ntou"
-  using is_model_environment_def model_def by simp
+using is_model_environment_def model_def
+by simp
 
 lemma not_is_Exi:
   assumes "f = failing_path (calculation s)"
@@ -1378,70 +1430,74 @@ lemma not_is_Exi:
   and "init s"
   and "(contains f n (m,p))"
   shows "\<not> is_Exi p \<Longrightarrow> m = 0"
-  using assms contains_def index0 is_path_f' prod.collapse by metis
+using assms contains_def index0 is_path_f' prod.collapse
+by metis
 
 lemma size_subst[simp]: "size (sv f p) = size p"
-  by (induct p arbitrary: f) simp_all
+by (induct p arbitrary: f) simp_all
 
 lemma size_bind[simp]: "size (sv (bind m) p) = size p"
-  using bind_def by simp
+using bind_def
+by simp
 
 lemma model':
   assumes "f = failing_path (calculation s)"
   and "infinite (calculation s)"
   and "init s"
   shows "\<forall>p. size p = h \<longrightarrow> (\<forall>m n. contains f n (m,p) \<longrightarrow> \<not> (semantics (model s) ntou p))"
-  proof (rule nat_less_induct,rule allI)
-    fix p n
-    show "\<forall>m<n. \<forall>p. size p = m \<longrightarrow> (\<forall>m n. contains f n (m,p) \<longrightarrow> \<not> semantics (model s) ntou p) \<Longrightarrow>
-           size p = n \<longrightarrow> (\<forall>m n. contains f n (m,p) \<longrightarrow> \<not> semantics (model s) ntou p)"
-    proof -
-      assume *: "\<forall>m<n. \<forall>p. size p = m \<longrightarrow> (\<forall>m n. contains f n (m,p) \<longrightarrow>
-        \<not> semantics (model s) ntou p)"
-      show ?thesis proof (cases p)
-        case (Pre b i v) then show ?thesis proof (cases b)
-          case True then show ?thesis using Pre assms model_def by auto
-        next
-          case False then show ?thesis using Pre proof (clarsimp simp: model_def)
+proof (rule nat_less_induct,rule allI)
+  fix p n
+  show "\<forall>m<n. \<forall>p. size p = m \<longrightarrow> (\<forall>m n. contains f n (m,p) \<longrightarrow> \<not> semantics (model s) ntou p) \<Longrightarrow>
+    size p = n \<longrightarrow> (\<forall>m n. contains f n (m,p) \<longrightarrow> \<not> semantics (model s) ntou p)"
+  proof -
+    assume *: "\<forall>m<n. \<forall>p. size p = m \<longrightarrow> (\<forall>m n. contains f n (m,p) \<longrightarrow>
+      \<not> semantics (model s) ntou p)"
+    show ?thesis
+    proof (cases p)
+      case (Pre b i v) then show ?thesis
+      proof (cases b)
+        case True then show ?thesis using Pre assms model_def by auto
+      next
+        case False then show ?thesis using Pre
+        proof (clarsimp simp: model_def)
           fix na m nb ma
           show "n = 0 \<Longrightarrow> contains f na (m,Pre False i v) \<Longrightarrow>
             contains (failing_path (calculation s)) nb (ma,Pre True i v) \<Longrightarrow> False"
           proof -
             assume 1: "contains f na (m,Pre False i v)" and
                    2: "contains (failing_path (calculation s)) nb (ma,Pre True i v)"
-            then have 3: "m = 0 \<and> ma = 0"
-              using assms is_Exi not_is_Exi by simp
+            then have 3: "m = 0 \<and> ma = 0" using assms is_Exi not_is_Exi by simp
             then have "\<exists>y. considers (failing_path (calculation s)) (nb+na+y) (0,Pre True i v)"
-              using assms 2 contains_considers contains_propagates_Pre by simp
+            using assms 2 contains_considers contains_propagates_Pre by simp
             then obtain y
-              where 4: "considers (failing_path (calculation s)) (nb+na+y) (0,Pre True i v)"
-              by blast
+            where 4: "considers (failing_path (calculation s)) (nb+na+y) (0,Pre True i v)"
+            by blast
             then have 5: "contains (failing_path (calculation s)) (na+nb+y) (0,Pre False i v)"
-              using assms 1 3 contains_propagates_Pre by simp
+            using assms 1 3 contains_propagates_Pre by simp
             then have 6: "nb+na=na+nb"
-              by simp
+            by simp
             then have "is_axiom (list_sequent (snd ((failing_path (calculation s)) (na+nb+y))))"
-              proof (cases "snd ((failing_path (calculation s)) (na + nb + y))")
-                case Nil then show ?thesis
-                  using 5 contains_def by simp
-              next
-                case Cons then show ?thesis
-                  using 4 5 6 by (force simp: contains_def list_sequent_def considers_def)
-              qed
+            proof (cases "snd ((failing_path (calculation s)) (na + nb + y))")
+              case Nil then show ?thesis using 5 contains_def by simp
+            next
+              case Cons then show ?thesis
+                using 4 5 6 by (force simp: contains_def list_sequent_def considers_def)
+            qed
             then show ?thesis using assms is_path_f' by blast
           qed
         qed
       qed
-      next
-        case Con then show ?thesis using assms * is_Exi not_is_Exi contains_propagates_Con
-          by (metis Nat.add_0_right add_Suc_right nnf.size(7)
-                less_add_Suc1 less_add_Suc2 semantics.simps(2))
+    next
+      case Con then show ?thesis using assms * is_Exi not_is_Exi contains_propagates_Con
+        by (metis Nat.add_0_right add_Suc_right nnf.size(7)
+          less_add_Suc1 less_add_Suc2 semantics.simps(2))
       next
         case Dis then show ?thesis using assms * contains_propagates_Dis is_Exi not_is_Exi
           by (metis Nat.add_0_right add_Suc_right nnf.size(8)
                 less_add_Suc1 less_add_Suc2 semantics.simps(3))
       next
-        case (Uni q) then show ?thesis proof (intro impI allI)
+        case (Uni q) then show ?thesis
+        proof (intro impI allI)
           fix na m
           show "size p = n \<Longrightarrow> contains f na (m,p) \<Longrightarrow> \<not> semantics (model s) ntou p"
           proof -
@@ -1454,12 +1510,13 @@ lemma model':
               (map snd (snd (f (na + y))))))) q)"
               by blast
             have 4: "Suc (size q) = n" using Uni 1 by simp
-            then show ?thesis using Uni proof (simp)
+            then show ?thesis using Uni
+            proof (simp)
               show "\<exists>z\<in>fst (model s). \<not> semantics (model s) (case_nat z ntou) q"
               proof (rule_tac x="ntou (fresh (fv_list (map snd (snd (f (na + y))))))" in bexI)
                 show "\<not> semantics (model s) (case_nat (ntou (fresh (fv_list
-                    (map snd (snd (f (na + y))))))) ntou) q"
-                  using * 3 4 eval_bind size_bind lessI by metis
+                  (map snd (snd (f (na + y))))))) ntou) q"
+                using * 3 4 eval_bind size_bind lessI by metis
               next
                 show "ntou (fresh (fv_list (map snd (snd (f (na + y)))))) \<in> fst (model s)"
                   using is_env_model_ntou is_model_environment_def by blast
@@ -1468,10 +1525,11 @@ lemma model':
           qed
         qed
       next
-        case (Exi q) then show ?thesis proof (clarsimp)
+        case (Exi q) then show ?thesis
+        proof (clarsimp)
           fix m na ma z
           show "p = Exi q \<Longrightarrow> n = Suc (size q) \<Longrightarrow> z \<in> fst (model s) \<Longrightarrow> contains f na (m,Exi q)
-                \<Longrightarrow> semantics (model s) (case_nat z ntou) q \<Longrightarrow> False"
+            \<Longrightarrow> semantics (model s) (case_nat z ntou) q \<Longrightarrow> False"
           proof -
             assume "n = Suc (size q)" and "contains f na (m,Exi q)"
             and 1: "semantics (model s) (case_nat z ntou) q"
@@ -1480,32 +1538,34 @@ lemma model':
             also have "\<forall>u. ntou (uton u) = u" by simp
             ultimately show ?thesis using 1 eval_bind by metis
           qed
-        qed
       qed
     qed
   qed
+qed
    
 lemma model:
   assumes "f = failing_path (calculation s)"
   and "infinite (calculation s)"
   and "init s"
   shows "(\<forall>p m n. contains f n (m,p) \<longrightarrow> \<not> (semantics (model s) ntou p))"
-  using assms model' by simp
+using assms model'
+by simp
 
 section "Completeness"
 
 lemma completeness': "infinite (calculation s) \<Longrightarrow> init s \<Longrightarrow>
     \<forall>mA \<in> set s. \<not> semantics (model s) ntou (snd mA)"
-  by (metis contains_def eq_snd_iff is_path_f_0 model)
+by (metis contains_def eq_snd_iff is_path_f_0 model)
 
 lemma completeness'': "infinite (calculation (make_sequent s)) \<Longrightarrow>
     init (make_sequent s) \<Longrightarrow> \<forall>p. p \<in> set s \<longrightarrow> \<not> semantics (model (make_sequent s)) ntou p"
-  using completeness' make_sequent_def by fastforce
+using completeness' make_sequent_def
+by fastforce
 
 lemma completeness: "infinite (calculation (make_sequent s)) \<Longrightarrow> \<not> valid s"
-  using valid_def init_def make_sequent_def is_env_model_ntou semantics_alternative_def2
-    completeness''
-  by (subgoal_tac "init (make_sequent s)") (metis,simp)
+using valid_def init_def make_sequent_def is_env_model_ntou semantics_alternative_def2
+  completeness''
+by (subgoal_tac "init (make_sequent s)") (metis,simp)
 
 section "Algorithm"
 
@@ -1513,76 +1573,80 @@ definition loop :: "sequent list \<Rightarrow> nat \<Rightarrow> sequent list" w
   "loop s n \<equiv> repeat (concat \<circ> map solve) s n"
 
 lemma loop_upwards: "loop s n = [] \<Longrightarrow> loop s (n+m) = []"
-  using loop_def by (induct m) auto
+using loop_def
+by (induct m) auto
 
 lemma concat_append: "concat (xs@ys) = ((concat xs) @ (concat ys))"
-  by (induct xs) auto
+by (induct xs) auto
 
 lemma set_concat: "set (concat xs) = \<Union> (set ` set xs)"
-  by (induct xs) auto
+by (induct xs) auto
 
 lemma loop: "\<forall>x. ((n,x) \<in> calculation s) = (x \<in> set (loop [s] n))"
-  proof (induct n)
-    case 0 then show ?case using loop_def by simp
-  next
-    case (Suc m) then show ?case proof (intro allI iffI)
-      fix x ys zs
-      assume "(Suc m,x) \<in> calculation s"
-      then have "\<exists>t. (m,t) \<in> calculation s \<and> x \<in> set (solve t) \<and> \<not> is_axiom (list_sequent t)"
-        using calculation_downwards by blast
-      then obtain t
-        where 1: "(m,t) \<in> calculation s \<and> x \<in> set (solve t) \<and> \<not> is_axiom (list_sequent t)"
-        by blast
+proof (induct n)
+  case 0 then show ?case using loop_def by simp
+next
+  case (Suc m) then show ?case
+  proof (intro allI iffI)
+    fix x ys z
+    assume "(Suc m,x) \<in> calculation s"
+    then have "\<exists>t. (m,t) \<in> calculation s \<and> x \<in> set (solve t) \<and> \<not> is_axiom (list_sequent t)"
+      using calculation_downwards by blast
+    then obtain t
+      where 1: "(m,t) \<in> calculation s \<and> x \<in> set (solve t) \<and> \<not> is_axiom (list_sequent t)"
+      by blast
       then show "(x \<in> set (loop [s] (Suc m)))"
         using Suc loop_def by (clarsimp dest!: split_list_first)
-    next
-      fix x
-      assume "(x \<in> set (loop [s] (Suc m)))"
-      then show "(Suc m,x) \<in> calculation s"
-        using Suc by (fastforce simp: set_concat loop_def)
-    qed
+  next
+    fix x
+    assume "(x \<in> set (loop [s] (Suc m)))"
+    then show "(Suc m,x) \<in> calculation s"
+      using Suc by (fastforce simp: set_concat loop_def)
   qed
+qed
 
 lemma calculation_f: "calculation s = UNION UNIV (\<lambda>x. set (map (\<lambda>y. (x,y)) (loop [s] x)))"
-  using loop by fastforce
+using loop
+by fastforce
 
 lemma finite_calculation':
   assumes "finite (calculation s)"
   shows "(\<exists>m. loop [s] m = [])"
-  proof -
-    show ?thesis proof -
-      have "finite (fst ` (calculation s))" using assms by simp
-      then obtain x where xMax: "x \<in> fst ` calculation s \<and> (\<forall>y. y \<in> fst ` calculation s \<longrightarrow> y \<le> x)"
-        using max_exists by fastforce
-      then show ?thesis proof (cases "loop [s] (Suc x)")
-        assume "loop [s] (Suc x) = []" then show ?thesis by blast
-      next
-        fix a l
-        assume "loop [s] (Suc x) = a # l"
-        then have "(Suc x,a) \<in> calculation s" using loop by simp
-        then show ?thesis using xMax by fastforce
-      qed
-    qed
+proof -
+  have "finite (fst ` (calculation s))" using assms by simp
+  then obtain x where xMax: "x \<in> fst ` calculation s \<and> (\<forall>y. y \<in> fst ` calculation s \<longrightarrow> y \<le> x)"
+    using max_exists by fastforce
+  then show ?thesis
+  proof (cases "loop [s] (Suc x)")
+    assume "loop [s] (Suc x) = []" then show ?thesis by blast
+  next
+    fix a l
+    assume "loop [s] (Suc x) = a # l"
+    then have "(Suc x,a) \<in> calculation s" using loop by simp
+    then show ?thesis using xMax by fastforce
   qed
+qed
 
 lemma finite_calculation'':
   assumes "(\<exists>m. loop [s] m = [])"
   shows "finite (calculation s)"
-  proof -
-    obtain m where "loop [s] m = []" using assms by blast
-    then have "\<forall>y. loop [s] (m+y) = []" using loop_upwards by simp
-    then have 1: "(UN x:Collect (op \<le> m). Pair x ` set (loop [s] x)) = (UN x:Collect (op \<le> m). {})"
-      using SUP_cong image_is_empty le_Suc_ex mem_Collect_eq set_empty
+proof -
+  obtain m where "loop [s] m = []" using assms by blast
+  then have "\<forall>y. loop [s] (m+y) = []" using loop_upwards by simp
+  then have 1: "(UN x:Collect (op \<le> m). Pair x ` set (loop [s] x)) = (UN x:Collect (op \<le> m). {})"
+    using SUP_cong image_is_empty le_Suc_ex mem_Collect_eq set_empty
       by (metis (no_types,lifting))
     then have "(UNIV::nat set) = {y. y < m} Un {y. m \<le> y}" by fastforce
     then show ?thesis using 1 calculation_f by (clarsimp elim!: ssubst)
  qed
 
 lemma finite_calculation: "finite (calculation s) = (\<exists>m. loop [s] m = [])"
-  using finite_calculation' finite_calculation'' by blast
+using finite_calculation' finite_calculation''
+by blast
 
 corollary finite_calculation_prover: "finite (calculation s) = iterator null (maps solve) [s]"
-  using finite_calculation loop_def iterator_def maps null.simps list.exhaust by metis
+using finite_calculation loop_def iterator_def maps null.simps list.exhaust
+by metis
 
 section \<open>Correctness\<close>
 
