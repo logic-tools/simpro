@@ -16,7 +16,7 @@ by fast
 
 abbreviation (input) "P_id \<equiv> 0"
 
-abbreviation (input) "Q_id \<equiv> Suc 0" 
+abbreviation (input) "Q_id \<equiv> Suc 0"
 
 definition \<comment> \<open>TEST P Q\<close>
   "test \<equiv> Dis
@@ -122,7 +122,7 @@ definition main :: "sequent list algorithm \<Rightarrow> nnf \<Rightarrow> bool"
 
 primrec repeat :: "('a \<Rightarrow> 'a) \<Rightarrow> 'a \<Rightarrow> nat \<Rightarrow> 'a" where
   "repeat _ c 0 = c" |
-  "repeat f c (Suc n) = f (repeat f c n)"
+  "repeat f c (Suc n) = repeat f (f c) n"
 
 definition iterator :: "'a algorithm" where
   "iterator g f c \<equiv> \<exists>n. g (repeat f c n)"
@@ -149,16 +149,9 @@ proposition "\<forall>m e. is_model_environment m e \<longrightarrow> fst m \<no
 using is_model_environment_def
 by fast
 
-proposition "\<exists>m. \<forall>e. is_model_environment m e \<and> infinite (fst m)"
-using is_model_environment_def infinite_UNIV_listI
-by auto
-
-lemma repeat_once: "repeat f (f c) n = f (repeat f c n)"
-by (induct n) simp_all
-
 proposition "iterator g f c = (if g c then True else iterator g f (f c))"
 unfolding iterator_def
-by (metis repeat.simps repeat_once not0_implies_Suc)
+by (metis repeat.simps not0_implies_Suc)
 
 abbreviation (input) "PROVER \<equiv> iterator null (maps solve)"
 
@@ -168,7 +161,7 @@ by -
 
 lemma prover: "PROVER c = PROVER (maps solve c)"
 unfolding iterator_def
-by (induct c) (simp add: maps_def,metis repeat.simps null.simps(2) old.nat.exhaust repeat_once)
+by (induct c) (simp add: maps_def,metis repeat.simps null.simps(2) old.nat.exhaust)
 
 lemma prover_next: "PROVER (h # t) = PROVER (maps solve (h # t))"
 using prover
@@ -416,10 +409,50 @@ by ((simp only: simps(69)),
     (simp only: simps(95)))
 
 proposition "check test"
-unfolding test_def program data library
+unfolding test_def
+unfolding program(1)
+unfolding program(2)
+unfolding program(3-) data library
+unfolding program(2)
+unfolding program(3-) data library
+unfolding program(2)
+unfolding program(3-) data library
+unfolding program(2)
+unfolding program(3-) data library
+unfolding program(2)
+unfolding program(3-) data library
+unfolding program(2)
+unfolding program(3-) data library
+unfolding program(2)
+unfolding program(3-) data library
+by (rule TrueI)
+
+lemma "repeat (maps solve) [[(0,test)]] 2016 = []"
+by code_simp
+
+lemma "repeat (maps solve) [[(0,test)]] 2016 = []"
+by normalization
+
+lemma "repeat (maps solve) [[(0,test)]] 2016 = []"
+by eval
+
+lemma "repeat (maps solve) [[(0,test)]] 2016 = []"
+unfolding test_def
+unfolding One_nat_def eval_nat_numeral BitM.simps
+unfolding program data library repeat.simps
 by (rule TrueI)
 
 section "Basics"
+
+primrec repeat' :: "('a \<Rightarrow> 'a) \<Rightarrow> 'a \<Rightarrow> nat \<Rightarrow> 'a" where
+  "repeat' _ c 0 = c" |
+  "repeat' f c (Suc n) = f (repeat' f c n)"
+
+lemma r: "f (repeat f c n) = repeat f (f c) n"
+by (induct n arbitrary: c) simp_all
+
+lemma rr: "repeat' f c n = repeat f c n"
+by (induct n) (simp_all add: r)
 
 lemma mmm[simp]: "(maxp (maxm n n') n') = (max n n')"
 proof (induct n' arbitrary: n)
@@ -713,7 +746,7 @@ proof -
     semantics m (case_nat us e') p)) = ((\<exists>us. us \<in> fst m \<and>
     \<not> semantics m (case_nat us e) p) = (\<forall>us. us \<notin> fst m \<or> semantics m (case_nat us e') p))"
     by blast
-  obtain uus :: "unit list" and uusa :: "unit list" where
+  obtain uus and uusa where
     f4: "((\<exists>us. us \<in> fst m \<and> \<not> semantics m (case_nat us e) p) =
       (\<forall>us. us \<notin> fst m \<or> semantics m (case_nat us e') p)) =
       (((\<forall>us. us \<notin> fst m \<or> semantics m (case_nat us e) p) \<or>
@@ -743,7 +776,7 @@ proof -
   have f3: "\<forall>us f n. if n = 0 then (case n of 0 \<Rightarrow> us::unit list | Suc x \<Rightarrow> f x) =
     us else (case n of 0 \<Rightarrow> us | Suc x \<Rightarrow> f x) = f (n - 1)"
     by (simp add: Nitpick.case_nat_unfold)
-  obtain uus :: "unit list" and uusa :: "unit list" where
+  obtain uus and uusa where
     f4: "((\<forall>us. us \<notin> fst m \<or> \<not> semantics m (case_nat us e) p) =
       (\<exists>us. us \<in> fst m \<and> semantics m (case_nat us e') p)) =
       ((uusa \<in> fst m \<and> semantics m (case_nat uusa e) p \<or> uus \<in> fst m \<and>
@@ -753,7 +786,18 @@ proof -
   have "(uusa \<notin> fst m \<or> \<not> semantics m (case_nat uusa e) p) \<and> (uus \<notin> fst m \<or>
     \<not> semantics m (case_nat uus e') p) \<or> (\<exists>us. us \<in> fst m \<and> semantics m (case_nat us e) p) \<and>
       (\<exists>us. us \<in> fst m \<and> semantics m (case_nat us e') p)"
-    using f3 a2 a1 by (metis (no_types,lifting) Suc_pred' adjust neq0_conv)
+    using f3 a2 a1
+    proof -
+      obtain nn :: "(nat \<Rightarrow> proxy) \<Rightarrow> (nat \<Rightarrow> proxy) \<Rightarrow> nat" where
+        f1: "\<forall>f fa. nn fa f \<in> set (fv p) \<and> f (nn fa f) \<noteq> fa (nn fa f) \<or>
+          semantics m f p = semantics m fa p"
+        using a1 by moura
+      have "\<forall>p f n. if n = 0 then (case n of 0 \<Rightarrow> p::proxy | Suc x \<Rightarrow> f x) = p else
+        (case n of 0 \<Rightarrow> p | Suc x \<Rightarrow> f x) = f (n - 1)"
+        by (simp add: Nitpick.case_nat_unfold)
+      then show ?thesis
+        using f1 by (metis (no_types) Suc_pred' a2 adjust not_gr0)
+    qed
   then show ?thesis
     using f4 by blast
 qed
@@ -801,86 +845,60 @@ lemma sss: "semantics m e (sv f p) = semantics m (e \<circ> f) p \<Longrightarro
   (\<forall>z\<in>fst m. semantics m (case_nat z e \<circ> bump f) p) =
     (\<forall>z\<in>fst m. semantics m (\<lambda>x. case x of 0 \<Rightarrow> z | Suc n \<Rightarrow> (e \<circ> f) n) p)"
 proof -
-  fix pa :: nnf and ea :: "nat \<Rightarrow> unit list" and fa :: "nat \<Rightarrow> nat"
   assume a1: "\<And>p e e' m. \<forall>x. x \<in> set (fv p) \<longrightarrow> e x = e' x \<Longrightarrow> semantics m e p = semantics m e' p"
-  obtain uus :: "unit list" and uusa :: "unit list" where
-    f2: "((\<exists>us. us \<in> fst m \<and> \<not> semantics m (case_nat us ea \<circ> bump fa) pa) =
-      (\<forall>us. us \<notin> fst m \<or> semantics m (case_nat us (ea \<circ> fa)) pa)) =
-      (((\<forall>us. us \<notin> fst m \<or> semantics m (case_nat us ea \<circ> bump fa) pa) \<or>
-      (\<forall>us. us \<notin> fst m \<or> semantics m (case_nat us (ea \<circ> fa)) pa)) \<and>
-      (uusa \<in> fst m \<and> \<not> semantics m (case_nat uusa ea \<circ> bump fa) pa \<or> uus \<in> fst m \<and>
-      \<not> semantics m (case_nat uus (ea \<circ> fa)) pa))"
-    by (metis (no_types))
+  obtain pp :: proxy and ppa :: proxy where
+    f2: "((\<exists>pa. pa \<in> fst m \<and> \<not> semantics m (case_nat pa e \<circ> bump f) p) = (\<forall>pa. pa \<notin> fst m \<or>
+      semantics m (case_nat pa (e \<circ> f)) p)) = (((\<forall>pa. pa \<notin> fst m \<or> semantics m (case_nat pa e \<circ>
+      bump f) p) \<or> (\<forall>pa. pa \<notin> fst m \<or> semantics m (case_nat pa (e \<circ> f)) p)) \<and> (ppa \<in> fst m \<and>
+      \<not> semantics m (case_nat ppa e \<circ> bump f) p \<or> pp \<in> fst m \<and>
+      \<not> semantics m (case_nat pp (e \<circ> f)) p))"
+    by moura
   have f3: "\<forall>n f fa p. (\<exists>na. na \<in> set (fv n) \<and> f na \<noteq> fa na) \<or> semantics p f n = semantics p fa n"
-    using a1 by blast
-  obtain nn :: "(nat \<Rightarrow> unit list) \<Rightarrow> (nat \<Rightarrow> unit list) \<Rightarrow> nnf \<Rightarrow> nat" where
-    "\<forall>x1 x2 x3. (\<exists>v4. v4 \<in> set (fv x3) \<and> x2 v4 \<noteq> x1 v4) =
-      (nn x1 x2 x3 \<in> set (fv x3) \<and> x2 (nn x1 x2 x3) \<noteq> x1 (nn x1 x2 x3))"
+    using a1 by (metis (no_types))
+  obtain nn :: "(nat \<Rightarrow> proxy) \<Rightarrow> (nat \<Rightarrow> proxy) \<Rightarrow> nnf \<Rightarrow> nat" where
+    "\<forall>x1 x2 x3. (\<exists>v4. v4 \<in> set (fv x3) \<and> x2 v4 \<noteq> x1 v4) = (nn x1 x2 x3 \<in> set (fv x3) \<and> x2
+      (nn x1 x2 x3) \<noteq> x1 (nn x1 x2 x3))"
     by moura
   then have f4: "\<forall>n f fa p. nn fa f n \<in> set (fv n) \<and> f (nn fa f n) \<noteq> fa (nn fa f n) \<or>
-    semantics p f n = semantics p fa n"
+      semantics p f n = semantics p fa n"
     using f3 by presburger
-  have f5: "\<forall>us f n. if n = 0 then (case n of 0 \<Rightarrow> us::unit list | Suc x \<Rightarrow> f x) =
-    us else (case n of 0 \<Rightarrow> us | Suc x \<Rightarrow> f x) = f (n - 1)"
-    by (simp add: Nitpick.case_nat_unfold)
-  then have f6: "(case bump fa (nn (case_nat uus ea \<circ> bump fa)
-    (case_nat uus (ea \<circ> fa)) pa) of 0 \<Rightarrow> uus | Suc x \<Rightarrow> ea x) = uus \<and>
-    (case nn (case_nat uus ea \<circ> bump fa) (case_nat uus (ea \<circ> fa)) pa of 0 \<Rightarrow>
-    uus | Suc x \<Rightarrow> (ea \<circ> fa) x) \<noteq> (case_nat uus ea \<circ> bump fa)
-    (nn (case_nat uus ea \<circ> bump fa) (case_nat uus (ea \<circ> fa)) pa) \<longrightarrow> nn (case_nat uus ea \<circ> bump fa)
-    (case_nat uus (ea \<circ> fa)) pa \<noteq> 0"
+  have f5: "\<forall>p f n. if n = 0 then (case n of 0 \<Rightarrow> p::proxy | Suc x \<Rightarrow> f x) = p else
+    (case n of 0 \<Rightarrow> p | Suc x \<Rightarrow> f x) = f (n - 1)"
+    by (metis (no_types) Nitpick.case_nat_unfold)
+  then have f6: "(case bump f (nn (case_nat ppa (e \<circ> f)) (case_nat ppa e \<circ> bump f) p) of 0 \<Rightarrow> ppa |
+      Suc x \<Rightarrow> e x) = ppa \<and> (case_nat ppa e \<circ> bump f) (nn (case_nat ppa (e \<circ> f)) (case_nat ppa e \<circ>
+      bump f) p) \<noteq> (case nn (case_nat ppa (e \<circ> f)) (case_nat ppa e \<circ> bump f) p of 0 \<Rightarrow> ppa |
+      Suc x \<Rightarrow> (e \<circ> f) x) \<longrightarrow> nn (case_nat ppa (e \<circ> f)) (case_nat ppa e \<circ> bump f) p \<noteq> 0"
     by (metis o_apply)
-  have f7: "\<forall>n f na. if na = 0 then (case na of 0 \<Rightarrow> n::nat | Suc x \<Rightarrow> f x) =
-    n else (case na of 0 \<Rightarrow> n | Suc x \<Rightarrow> f x) = f (na - 1)"
+  have f7: "\<forall>n f na. if na = 0 then (case na of 0 \<Rightarrow> n::nat | Suc x \<Rightarrow> f x) = n else
+    (case na of 0 \<Rightarrow> n | Suc x \<Rightarrow> f x) = f (na - 1)"
     by (simp add: Nitpick.case_nat_unfold)
-  have "(case nn (case_nat uus ea \<circ> bump fa) (case_nat uus (ea \<circ> fa)) pa of 0 \<Rightarrow>
-    uus | Suc x \<Rightarrow> (ea \<circ> fa) x) \<noteq> (case_nat uus ea \<circ> bump fa) (nn (case_nat uus ea \<circ> bump fa)
-    (case_nat uus (ea \<circ> fa)) pa) \<longrightarrow> nn (case_nat uus ea \<circ> bump fa) (case_nat uus (ea \<circ> fa)) pa \<noteq> 0"
+  have "(case_nat ppa e \<circ> bump f) (nn (case_nat ppa (e \<circ> f)) (case_nat ppa e \<circ> bump f) p) \<noteq>
+    (case nn (case_nat ppa (e \<circ> f)) (case_nat ppa e \<circ> bump f) p of 0 \<Rightarrow> ppa | Suc x \<Rightarrow> (e \<circ> f) x)
+    \<longrightarrow> nn (case_nat ppa (e \<circ> f)) (case_nat ppa e \<circ> bump f) p \<noteq> 0"
     using f6 bump'_def by fastforce
-  then have f8: "(case nn (case_nat uus ea \<circ> bump fa) (case_nat uus (ea \<circ> fa)) pa of 0 \<Rightarrow>
-    uus | Suc x \<Rightarrow> (ea \<circ> fa) x) \<noteq> (case_nat uus ea \<circ> bump fa) (nn (case_nat uus ea \<circ> bump fa)
-    (case_nat uus (ea \<circ> fa)) pa) \<longrightarrow> (case nn (case_nat uus ea \<circ> bump fa)
-    (case_nat uus (ea \<circ> fa)) pa of 0 \<Rightarrow> uus | Suc x \<Rightarrow> (ea \<circ> fa) x) =
-    (case bump fa (nn (case_nat uus ea \<circ> bump fa) (case_nat uus (ea \<circ> fa)) pa) of 0 \<Rightarrow>
-    uus | Suc x \<Rightarrow> ea x)"
-    using f7 f5 bump'_def by fastforce
-  have "bump fa (nn (case_nat uusa ea \<circ> bump fa) (case_nat uusa (ea \<circ> fa)) pa) =
-    (case nn (case_nat uusa ea \<circ> bump fa)
-    (case_nat uusa (ea \<circ> fa)) pa of 0 \<Rightarrow> 0 | Suc n \<Rightarrow> Suc (fa n))"
-    by (metis bump' bump'_def)
-  then have f9: "nn (case_nat uusa ea \<circ> bump fa) (case_nat uusa (ea \<circ> fa)) pa \<noteq> 0 \<longrightarrow>
-    (case nn (case_nat uusa ea \<circ> bump fa) (case_nat uusa (ea \<circ> fa)) pa of 0 \<Rightarrow>
-    uusa | Suc x \<Rightarrow> (ea \<circ> fa) x) = (case_nat uusa ea \<circ> bump fa) (nn (case_nat uusa ea \<circ> bump fa)
-    (case_nat uusa (ea \<circ> fa)) pa)"
-    using f7 f5 by simp
-  then have f10: "(case nn (case_nat uusa ea \<circ> bump fa) (case_nat uusa (ea \<circ> fa)) pa of 0 \<Rightarrow>
-    uusa | Suc x \<Rightarrow> (ea \<circ> fa) x) \<noteq> (case_nat uusa ea \<circ> bump fa) (nn (case_nat uusa ea \<circ> bump fa)
-    (case_nat uusa (ea \<circ> fa)) pa) \<longrightarrow> (case nn (case_nat uusa ea \<circ> bump fa)
-    (case_nat uusa (ea \<circ> fa)) pa of 0 \<Rightarrow> uusa | Suc x \<Rightarrow> (ea \<circ> fa) x) = uusa"
-    using f5 by metis
-  have "(case nn (case_nat uusa ea \<circ> bump fa) (case_nat uusa (ea \<circ> fa)) pa of 0 \<Rightarrow>
-    uusa | Suc x \<Rightarrow> (ea \<circ> fa) x) \<noteq> (case_nat uusa ea \<circ> bump fa) (nn (case_nat uusa ea \<circ> bump fa)
-    (case_nat uusa (ea \<circ> fa)) pa) \<longrightarrow> bump fa (nn (case_nat uusa ea \<circ> bump fa)
-    (case_nat uusa (ea \<circ> fa)) pa) = 0"
-    using f9 f7 by (metis (no_types) bump' bump'_def)
-  then have "(case nn (case_nat uusa ea \<circ> bump fa) (case_nat uusa (ea \<circ> fa)) pa of 0 \<Rightarrow>
-    uusa | Suc x \<Rightarrow> (ea \<circ> fa) x) = (case_nat uusa ea \<circ> bump fa) (nn (case_nat uusa ea \<circ> bump fa)
-    (case_nat uusa (ea \<circ> fa)) pa)"
-    using f10 by fastforce
-  then have "(\<exists>us. us \<in> fst m \<and> \<not> semantics m (case_nat us ea \<circ> bump fa) pa) \<and>
-    (\<exists>us. us \<in> fst m \<and> \<not> semantics m (case_nat us (ea \<circ> fa)) pa) \<or>
-    (uusa \<notin> fst m \<or> semantics m (case_nat uusa ea \<circ> bump fa) pa) \<and>
-    (uus \<notin> fst m \<or> semantics m (case_nat uus (ea \<circ> fa)) pa)"
-    using f8 f4 by (metis (no_types) o_apply)
-  then have "(\<exists>us. us \<in> fst m \<and> \<not> semantics m (case_nat us ea \<circ> bump fa) pa) \<noteq>
-    (\<forall>us. us \<notin> fst m \<or> semantics m (case_nat us (ea \<circ> fa)) pa)"
+  then have f8: "(case_nat ppa e \<circ> bump f) (nn (case_nat ppa (e \<circ> f)) (case_nat ppa e \<circ> bump f) p)
+    \<noteq> (case nn (case_nat ppa (e \<circ> f)) (case_nat ppa e \<circ> bump f) p of 0 \<Rightarrow> ppa | Suc x \<Rightarrow> (e \<circ> f) x)
+    \<longrightarrow> (case_nat ppa e \<circ> bump f) (nn (case_nat ppa (e \<circ> f)) (case_nat ppa e \<circ> bump f) p) =
+    (case nn (case_nat ppa (e \<circ> f)) (case_nat ppa e \<circ> bump f) p of 0 \<Rightarrow> ppa | Suc x \<Rightarrow> (e \<circ> f) x)"
+    using f7 f5 bump'_def by force
+  have f9: "nn (case_nat pp (e \<circ> f)) (case_nat pp e \<circ> bump f) p \<noteq> 0 \<longrightarrow> (case_nat pp e \<circ> bump f)
+    (nn (case_nat pp (e \<circ> f)) (case_nat pp e \<circ> bump f) p) = (case nn (case_nat pp (e \<circ> f))
+    (case_nat pp e \<circ> bump f) p of 0 \<Rightarrow> pp | Suc x \<Rightarrow> (e \<circ> f) x)"
+    using f7 f5 by (simp add: bump'_def)
+  then have "(case_nat pp e \<circ> bump f) (nn (case_nat pp (e \<circ> f)) (case_nat pp e \<circ> bump f) p) \<noteq>
+    (case nn (case_nat pp (e \<circ> f)) (case_nat pp e \<circ> bump f) p of 0 \<Rightarrow> pp | Suc x \<Rightarrow> (e \<circ> f) x) \<longrightarrow>
+    bump f (nn (case_nat pp (e \<circ> f)) (case_nat pp e \<circ> bump f) p) = 0"
+    using f7 by (metis bump' bump'_def)
+  then have "(case_nat pp e \<circ> bump f) (nn (case_nat pp (e \<circ> f)) (case_nat pp e \<circ> bump f) p) =
+    (case nn (case_nat pp (e \<circ> f)) (case_nat pp e \<circ> bump f) p of 0 \<Rightarrow> pp | Suc x \<Rightarrow> (e \<circ> f) x)"
+    using f9 f5 by (metis (no_types) o_apply)
+  then have "(\<exists>pa. pa \<in> fst m \<and> \<not> semantics m (case_nat pa e \<circ> bump f) p) \<and> (\<exists>pa. pa \<in> fst m \<and>
+    \<not> semantics m (case_nat pa (e \<circ> f)) p) \<or> (ppa \<notin> fst m \<or>
+    semantics m (case_nat ppa e \<circ> bump f) p) \<and> (pp \<notin> fst m \<or> semantics m (case_nat pp (e \<circ> f)) p)"
+    using f8 f4 by blast
+  then show ?thesis
     using f2 by blast
-  then have "(\<forall>us. us \<in> fst m \<longrightarrow> semantics m (case_nat us ea \<circ> bump fa) pa) =
-    (\<forall>us. us \<in> fst m \<longrightarrow> semantics m (case_nat us (ea \<circ> fa)) pa)"
-    by auto
-  then show "(\<forall>us\<in>fst m. semantics m (case_nat us ea \<circ> bump fa) pa) =
-    (\<forall>us\<in>fst m. semantics m (\<lambda>n. case n of 0 \<Rightarrow> us | Suc n \<Rightarrow> (ea \<circ> fa) n) pa)"
-    by metis
 qed
 
 lemma eval_subst: "semantics m e (sv f p) = semantics m (e \<circ> f) p"
@@ -1570,7 +1588,7 @@ by (subgoal_tac "init (make_sequent s)") (metis,simp)
 section "Algorithm"
 
 definition loop :: "sequent list \<Rightarrow> nat \<Rightarrow> sequent list" where
-  "loop s n \<equiv> repeat (concat \<circ> map solve) s n"
+  "loop s n \<equiv> repeat' (concat \<circ> map solve) s n"
 
 lemma loop_upwards: "loop s n = [] \<Longrightarrow> loop s (n+m) = []"
 using loop_def
@@ -1645,7 +1663,7 @@ using finite_calculation' finite_calculation''
 by blast
 
 corollary finite_calculation_prover: "finite (calculation s) = iterator null (maps solve) [s]"
-using finite_calculation loop_def iterator_def maps null.simps list.exhaust
+using finite_calculation loop_def iterator_def maps null.simps list.exhaust rr
 by metis
 
 section \<open>Correctness\<close>
@@ -1659,9 +1677,9 @@ proof -
     unfolding check_def
     using magic valid_def make_sequent_def semantics_alternative.simps main_def
     by (metis (no_types,hide_lams))
-  also have VALID
+  moreover have VALID
     using magic make_sequent_def by fastforce
-  then show CHECK VALID using calculation by simp_all
+  ultimately show CHECK VALID by -
 qed
 
 corollary "\<exists>p. check p" "\<exists>p. \<not> check p"
