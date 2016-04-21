@@ -54,16 +54,16 @@ primrec fv :: "nnf \<Rightarrow> nat list" where
   "fv (Uni p) = adjust (fv p)" |
   "fv (Exi p) = adjust (fv p)"
 
-primrec bump :: "(nat \<Rightarrow> nat) \<Rightarrow> nat \<Rightarrow> nat" where
-  "bump _ 0 = 0" |
-  "bump f (Suc n) = Suc (f n)"
+primrec increase :: "(nat \<Rightarrow> nat) \<Rightarrow> nat \<Rightarrow> nat" where
+  "increase _ 0 = 0" |
+  "increase f (Suc n) = Suc (f n)"
 
 primrec sv :: "(nat \<Rightarrow> nat) \<Rightarrow> nnf \<Rightarrow> nnf" where
   "sv f (Pre b i v) = Pre b i (map f v)" |
   "sv f (Con p q) = Con (sv f p) (sv f q)" |
   "sv f (Dis p q) = Dis (sv f p) (sv f q)" |
-  "sv f (Uni p) = Uni (sv (bump f) p)" |
-  "sv f (Exi p) = Exi (sv (bump f) p)"
+  "sv f (Uni p) = Uni (sv (increase f) p)" |
+  "sv f (Exi p) = Exi (sv (increase f) p)"
 
 primrec bind :: "nat \<Rightarrow> nat \<Rightarrow> nat" where
   "bind x 0 = x" |
@@ -78,7 +78,7 @@ primrec maxd :: "nat \<Rightarrow> nat" where
 
 primrec maxm :: "nat \<Rightarrow> nat \<Rightarrow> nat" where
   "maxm x 0 = x" |
-  "maxm x (Suc n) = maxm (maxd x) n"
+  "maxm x (Suc n) = maxd (maxm x n)"
 
 primrec maxp :: "nat \<Rightarrow> nat \<Rightarrow> nat" where
   "maxp x 0 = x" |
@@ -94,6 +94,13 @@ primrec null :: "'a list \<Rightarrow> bool" where
 
 definition fresh :: "nat list \<Rightarrow> nat" where
   "fresh l \<equiv> if null l then 0 else Suc (maxl l)"
+
+primrec fresh' :: "nat list \<Rightarrow> nat" where
+  "fresh' [] = 0" |
+  "fresh' (h # t) = Suc (maxp (maxm (maxd (fresh' t)) h) h)"
+
+lemma "fresh l = fresh' l"
+unfolding fresh_def by (induct l) (auto, metis null.simps(2) list.exhaust maxd.simps maxl.simps) 
 
 primrec stop :: "'a list \<Rightarrow> 'b \<Rightarrow> 'b list \<Rightarrow> 'a list" where
   "stop c _ [] = c" |
@@ -146,7 +153,7 @@ definition valid :: "nnf list \<Rightarrow> bool" where
 abbreviation (input) "VALID \<equiv> valid = finite \<circ> calculation \<circ> map (Pair 0)"
 
 proposition "\<forall>m e. is_model_environment m e \<longrightarrow> fst m \<noteq> {}"
-using is_model_environment_def
+unfolding is_model_environment_def
 by fast
 
 proposition "iterator g f c = (if g c then True else iterator g f (f c))"
@@ -159,6 +166,10 @@ lemma check_prover: "check p \<equiv> PROVER [[(0,p)]]"
 unfolding check_def main_def
 by -
 
+proposition "PROVER c = (if null c then True else PROVER (maps solve c))"
+unfolding iterator_def
+by (metis repeat.simps old.nat.exhaust)
+
 lemma prover: "PROVER c = PROVER (maps solve c)"
 unfolding iterator_def
 by (induct c) (simp add: maps_def,metis repeat.simps null.simps(2) old.nat.exhaust)
@@ -170,10 +181,6 @@ by -
 lemma prover_done: "PROVER [] = True"
 unfolding iterator_def
 by (metis repeat.simps(1) null.simps(1))
-
-lemma prover_loop: "PROVER c = (if null c then True else PROVER (maps solve c))"
-using prover_next prover_done
-by (induct c) simp_all
 
 lemma map_simps: "map f [] = []" "map f (h # t) = f h # map f t"
 by (rule list.map(1),rule list.map(2))
@@ -208,7 +215,7 @@ by (rule simp_thms,rule simp_thms)
 
 lemmas simps = check_prover prover_next prover_done solve.simps track.simps maps_def stop.simps
   fresh_def null.simps maxl.simps maxp.simps maxm.simps maxd.simps inst_def bind.simps sv.simps
-  bump.simps fv.simps adjust.simps extend.simps nnf.distinct nnf.inject map_simps concat_simps
+  increase.simps fv.simps adjust.simps extend.simps nnf.distinct nnf.inject map_simps concat_simps
   append_simps if_simps not_simps prod_simps nat.distinct list.distinct bool.distinct nat_simps
   list_simps bool_simps nat.inject list.inject inject_simps
  
@@ -234,7 +241,7 @@ theorem program:
   "\<And>x. maxp x 0 \<equiv> x"
   "\<And>x n. maxp x (Suc n) \<equiv> Suc (maxp x n)"
   "\<And>x. maxm x 0 \<equiv> x"
-  "\<And>x n. maxm x (Suc n) \<equiv> maxm (maxd x) n"
+  "\<And>x n. maxm x (Suc n) \<equiv> maxd (maxm x n)"
   "maxd 0 \<equiv> 0"
   "\<And>n. maxd (Suc n) \<equiv> n"
   "\<And>p x. inst p x \<equiv> sv (bind x) p"
@@ -243,10 +250,10 @@ theorem program:
   "\<And>f b i v. sv f (Pre b i v) \<equiv> Pre b i (map f v)"
   "\<And>f p q. sv f (Con p q) \<equiv> Con (sv f p) (sv f q)"
   "\<And>f p q. sv f (Dis p q) \<equiv> Dis (sv f p) (sv f q)"
-  "\<And>f p. sv f (Uni p) \<equiv> Uni (sv (bump f) p)"
-  "\<And>f p. sv f (Exi p) \<equiv> Exi (sv (bump f) p)"
-  "\<And>f. bump f 0 \<equiv> 0"
-  "\<And>f n. bump f (Suc n) \<equiv> Suc (f n)"
+  "\<And>f p. sv f (Uni p) \<equiv> Uni (sv (increase f) p)"
+  "\<And>f p. sv f (Exi p) \<equiv> Exi (sv (increase f) p)"
+  "\<And>f. increase f 0 \<equiv> 0"
+  "\<And>f n. increase f (Suc n) \<equiv> Suc (f n)"
   "\<And>b i v. fv (Pre b i v) \<equiv> v"
   "\<And>p q. fv (Con p q) \<equiv> fv p @ fv q"
   "\<And>p q. fv (Dis p q) \<equiv> fv p @ fv q"
@@ -454,6 +461,25 @@ by (induct n arbitrary: c) simp_all
 lemma rr: "repeat' f c n = repeat f c n"
 by (induct n) (simp_all add: r)
 
+primrec maxm' :: "nat \<Rightarrow> nat \<Rightarrow> nat" where
+  "maxm' x 0 = x" |
+  "maxm' x (Suc n) = maxm' (maxd x) n"
+
+lemma "(x-1)-y = (x-y)-(1::nat)" try
+by simp 
+
+lemma ddd: "maxd x = x-(1::nat)"
+by (simp add: nat_diff_split)
+
+lemma dddd: "maxm' x y = x-(y::nat)"
+using ddd diff_Suc_eq_diff_pred maxm'.simps by (induct y arbitrary: x) presburger+
+
+lemma ddddd: "maxm x y = x-(y::nat)"
+by (induct y arbitrary: x) (simp_all add: ddd)
+
+lemma dx: "maxm x y = maxm' x y"
+by (simp add: dddd ddddd)
+
 lemma mmm[simp]: "(maxp (maxm n n') n') = (max n n')"
 proof (induct n' arbitrary: n)
   case 0 then show ?case by simp
@@ -470,7 +496,7 @@ next
     then have "Suc (max n'a (maxd na)) = max na (Suc n'a)"
       by (metis max.commute max_0L maxd.simps(1))
     then show "maxp (maxm na (Suc n'a)) (Suc n'a) = max na (Suc n'a)"
-      using a1 by simp
+      using a1 dx by simp
   qed
 qed
 
@@ -837,20 +863,20 @@ by simp_all
 definition bump' :: "(nat \<Rightarrow> nat) \<Rightarrow> nat \<Rightarrow> nat" where
   "bump' f x \<equiv> (case x of 0 \<Rightarrow> 0 | Suc n \<Rightarrow> Suc (f n))"
 
-lemma bump'[simp]: "bump f x = bump' f x"
-by (metis Nitpick.case_nat_unfold bump.simps Suc_pred' bump'_def not_gr0)
+lemma bump'[simp]: "increase f x = bump' f x"
+by (metis Nitpick.case_nat_unfold increase.simps Suc_pred' bump'_def not_gr0)
 
 lemma sss: "semantics m e (sv f p) = semantics m (e \<circ> f) p \<Longrightarrow>
   (\<And>p e e' m. \<forall>x. x \<in> set (fv p) \<longrightarrow> e x = e' x \<Longrightarrow> semantics m e p = semantics m e' p) \<Longrightarrow>
-  (\<forall>z\<in>fst m. semantics m (case_nat z e \<circ> bump f) p) =
+  (\<forall>z\<in>fst m. semantics m (case_nat z e \<circ> increase f) p) =
     (\<forall>z\<in>fst m. semantics m (\<lambda>x. case x of 0 \<Rightarrow> z | Suc n \<Rightarrow> (e \<circ> f) n) p)"
 proof -
   assume a1: "\<And>p e e' m. \<forall>x. x \<in> set (fv p) \<longrightarrow> e x = e' x \<Longrightarrow> semantics m e p = semantics m e' p"
   obtain pp :: proxy and ppa :: proxy where
-    f2: "((\<exists>pa. pa \<in> fst m \<and> \<not> semantics m (case_nat pa e \<circ> bump f) p) = (\<forall>pa. pa \<notin> fst m \<or>
+    f2: "((\<exists>pa. pa \<in> fst m \<and> \<not> semantics m (case_nat pa e \<circ> increase f) p) = (\<forall>pa. pa \<notin> fst m \<or>
       semantics m (case_nat pa (e \<circ> f)) p)) = (((\<forall>pa. pa \<notin> fst m \<or> semantics m (case_nat pa e \<circ>
-      bump f) p) \<or> (\<forall>pa. pa \<notin> fst m \<or> semantics m (case_nat pa (e \<circ> f)) p)) \<and> (ppa \<in> fst m \<and>
-      \<not> semantics m (case_nat ppa e \<circ> bump f) p \<or> pp \<in> fst m \<and>
+      increase f) p) \<or> (\<forall>pa. pa \<notin> fst m \<or> semantics m (case_nat pa (e \<circ> f)) p)) \<and> (ppa \<in> fst m \<and>
+      \<not> semantics m (case_nat ppa e \<circ> increase f) p \<or> pp \<in> fst m \<and>
       \<not> semantics m (case_nat pp (e \<circ> f)) p))"
     by moura
   have f3: "\<forall>n f fa p. (\<exists>na. na \<in> set (fv n) \<and> f na \<noteq> fa na) \<or> semantics p f n = semantics p fa n"
@@ -865,37 +891,37 @@ proof -
   have f5: "\<forall>p f n. if n = 0 then (case n of 0 \<Rightarrow> p::proxy | Suc x \<Rightarrow> f x) = p else
     (case n of 0 \<Rightarrow> p | Suc x \<Rightarrow> f x) = f (n - 1)"
     by (metis (no_types) Nitpick.case_nat_unfold)
-  then have f6: "(case bump f (nn (case_nat ppa (e \<circ> f)) (case_nat ppa e \<circ> bump f) p) of 0 \<Rightarrow> ppa |
-      Suc x \<Rightarrow> e x) = ppa \<and> (case_nat ppa e \<circ> bump f) (nn (case_nat ppa (e \<circ> f)) (case_nat ppa e \<circ>
-      bump f) p) \<noteq> (case nn (case_nat ppa (e \<circ> f)) (case_nat ppa e \<circ> bump f) p of 0 \<Rightarrow> ppa |
-      Suc x \<Rightarrow> (e \<circ> f) x) \<longrightarrow> nn (case_nat ppa (e \<circ> f)) (case_nat ppa e \<circ> bump f) p \<noteq> 0"
+  then have f6: "(case increase f (nn (case_nat ppa (e \<circ> f)) (case_nat ppa e \<circ> increase f) p) of 0 \<Rightarrow> ppa |
+      Suc x \<Rightarrow> e x) = ppa \<and> (case_nat ppa e \<circ> increase f) (nn (case_nat ppa (e \<circ> f)) (case_nat ppa e \<circ>
+      increase f) p) \<noteq> (case nn (case_nat ppa (e \<circ> f)) (case_nat ppa e \<circ> increase f) p of 0 \<Rightarrow> ppa |
+      Suc x \<Rightarrow> (e \<circ> f) x) \<longrightarrow> nn (case_nat ppa (e \<circ> f)) (case_nat ppa e \<circ> increase f) p \<noteq> 0"
     by (metis o_apply)
   have f7: "\<forall>n f na. if na = 0 then (case na of 0 \<Rightarrow> n::nat | Suc x \<Rightarrow> f x) = n else
     (case na of 0 \<Rightarrow> n | Suc x \<Rightarrow> f x) = f (na - 1)"
     by (simp add: Nitpick.case_nat_unfold)
-  have "(case_nat ppa e \<circ> bump f) (nn (case_nat ppa (e \<circ> f)) (case_nat ppa e \<circ> bump f) p) \<noteq>
-    (case nn (case_nat ppa (e \<circ> f)) (case_nat ppa e \<circ> bump f) p of 0 \<Rightarrow> ppa | Suc x \<Rightarrow> (e \<circ> f) x)
-    \<longrightarrow> nn (case_nat ppa (e \<circ> f)) (case_nat ppa e \<circ> bump f) p \<noteq> 0"
+  have "(case_nat ppa e \<circ> increase f) (nn (case_nat ppa (e \<circ> f)) (case_nat ppa e \<circ> increase f) p) \<noteq>
+    (case nn (case_nat ppa (e \<circ> f)) (case_nat ppa e \<circ> increase f) p of 0 \<Rightarrow> ppa | Suc x \<Rightarrow> (e \<circ> f) x)
+    \<longrightarrow> nn (case_nat ppa (e \<circ> f)) (case_nat ppa e \<circ> increase f) p \<noteq> 0"
     using f6 bump'_def by fastforce
-  then have f8: "(case_nat ppa e \<circ> bump f) (nn (case_nat ppa (e \<circ> f)) (case_nat ppa e \<circ> bump f) p)
-    \<noteq> (case nn (case_nat ppa (e \<circ> f)) (case_nat ppa e \<circ> bump f) p of 0 \<Rightarrow> ppa | Suc x \<Rightarrow> (e \<circ> f) x)
-    \<longrightarrow> (case_nat ppa e \<circ> bump f) (nn (case_nat ppa (e \<circ> f)) (case_nat ppa e \<circ> bump f) p) =
-    (case nn (case_nat ppa (e \<circ> f)) (case_nat ppa e \<circ> bump f) p of 0 \<Rightarrow> ppa | Suc x \<Rightarrow> (e \<circ> f) x)"
+  then have f8: "(case_nat ppa e \<circ> increase f) (nn (case_nat ppa (e \<circ> f)) (case_nat ppa e \<circ> increase f) p)
+    \<noteq> (case nn (case_nat ppa (e \<circ> f)) (case_nat ppa e \<circ> increase f) p of 0 \<Rightarrow> ppa | Suc x \<Rightarrow> (e \<circ> f) x)
+    \<longrightarrow> (case_nat ppa e \<circ> increase f) (nn (case_nat ppa (e \<circ> f)) (case_nat ppa e \<circ> increase f) p) =
+    (case nn (case_nat ppa (e \<circ> f)) (case_nat ppa e \<circ> increase f) p of 0 \<Rightarrow> ppa | Suc x \<Rightarrow> (e \<circ> f) x)"
     using f7 f5 bump'_def by force
-  have f9: "nn (case_nat pp (e \<circ> f)) (case_nat pp e \<circ> bump f) p \<noteq> 0 \<longrightarrow> (case_nat pp e \<circ> bump f)
-    (nn (case_nat pp (e \<circ> f)) (case_nat pp e \<circ> bump f) p) = (case nn (case_nat pp (e \<circ> f))
-    (case_nat pp e \<circ> bump f) p of 0 \<Rightarrow> pp | Suc x \<Rightarrow> (e \<circ> f) x)"
+  have f9: "nn (case_nat pp (e \<circ> f)) (case_nat pp e \<circ> increase f) p \<noteq> 0 \<longrightarrow> (case_nat pp e \<circ> increase f)
+    (nn (case_nat pp (e \<circ> f)) (case_nat pp e \<circ> increase f) p) = (case nn (case_nat pp (e \<circ> f))
+    (case_nat pp e \<circ> increase f) p of 0 \<Rightarrow> pp | Suc x \<Rightarrow> (e \<circ> f) x)"
     using f7 f5 by (simp add: bump'_def)
-  then have "(case_nat pp e \<circ> bump f) (nn (case_nat pp (e \<circ> f)) (case_nat pp e \<circ> bump f) p) \<noteq>
-    (case nn (case_nat pp (e \<circ> f)) (case_nat pp e \<circ> bump f) p of 0 \<Rightarrow> pp | Suc x \<Rightarrow> (e \<circ> f) x) \<longrightarrow>
-    bump f (nn (case_nat pp (e \<circ> f)) (case_nat pp e \<circ> bump f) p) = 0"
+  then have "(case_nat pp e \<circ> increase f) (nn (case_nat pp (e \<circ> f)) (case_nat pp e \<circ> increase f) p) \<noteq>
+    (case nn (case_nat pp (e \<circ> f)) (case_nat pp e \<circ> increase f) p of 0 \<Rightarrow> pp | Suc x \<Rightarrow> (e \<circ> f) x) \<longrightarrow>
+    increase f (nn (case_nat pp (e \<circ> f)) (case_nat pp e \<circ> increase f) p) = 0"
     using f7 by (metis bump' bump'_def)
-  then have "(case_nat pp e \<circ> bump f) (nn (case_nat pp (e \<circ> f)) (case_nat pp e \<circ> bump f) p) =
-    (case nn (case_nat pp (e \<circ> f)) (case_nat pp e \<circ> bump f) p of 0 \<Rightarrow> pp | Suc x \<Rightarrow> (e \<circ> f) x)"
+  then have "(case_nat pp e \<circ> increase f) (nn (case_nat pp (e \<circ> f)) (case_nat pp e \<circ> increase f) p) =
+    (case nn (case_nat pp (e \<circ> f)) (case_nat pp e \<circ> increase f) p of 0 \<Rightarrow> pp | Suc x \<Rightarrow> (e \<circ> f) x)"
     using f9 f5 by (metis (no_types) o_apply)
-  then have "(\<exists>pa. pa \<in> fst m \<and> \<not> semantics m (case_nat pa e \<circ> bump f) p) \<and> (\<exists>pa. pa \<in> fst m \<and>
+  then have "(\<exists>pa. pa \<in> fst m \<and> \<not> semantics m (case_nat pa e \<circ> increase f) p) \<and> (\<exists>pa. pa \<in> fst m \<and>
     \<not> semantics m (case_nat pa (e \<circ> f)) p) \<or> (ppa \<notin> fst m \<or>
-    semantics m (case_nat ppa e \<circ> bump f) p) \<and> (pp \<notin> fst m \<or> semantics m (case_nat pp (e \<circ> f)) p)"
+    semantics m (case_nat ppa e \<circ> increase f) p) \<and> (pp \<notin> fst m \<or> semantics m (case_nat pp (e \<circ> f)) p)"
     using f8 f4 by blast
   then show ?thesis
     using f2 by blast
@@ -1716,26 +1742,25 @@ fun fv (Pre (_,_,v)) = v
   | fv (Uni p) = adjust (fv p)
   | fv (Exi p) = adjust (fv p)
 
-fun bump _ 0 = 0
-  | bump f n = (f n-1)+1
+fun increase _ 0 = 0
+  | increase f n = (f n-1)+1
 
 fun sv f (Pre (b,i,v)) = Pre (b,i,map f v)
   | sv f (Con (p,q)) = Con (sv f p,sv f q)
   | sv f (Dis (p,q)) = Dis (sv f p,sv f q)
-  | sv f (Uni p) = Uni (sv (bump f) p)
-  | sv f (Exi p) = Exi (sv (bump f) p)
+  | sv f (Uni p) = Uni (sv (increase f) p)
+  | sv f (Exi p) = Exi (sv (increase f) p)
 
 fun bind x 0 = x
   | bind _ n = n-1
 
 fun inst p x = sv (bind x) p
 
-fun max x y = if x > y then x else y
+fun helper x [] = x
+  | helper x (h :: t) = helper (if x > h then x else h) t
 
-fun maxl [] = 0
-  | maxl (h :: t) = max h (maxl t)
-
-fun fresh l = if null l then 0 else (maxl l)+1
+fun fresh [] = 0
+  | fresh (h :: t) = (helper h t)+1
 
 fun stop c _ [] = c
   | stop c p (h :: t) = if p = h then [] else stop c p t
