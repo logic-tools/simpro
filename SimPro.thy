@@ -72,21 +72,21 @@ primrec bind :: "nat \<Rightarrow> nat \<Rightarrow> nat" where
 definition inst :: "nnf \<Rightarrow> nat \<Rightarrow> nnf" where
   "inst p x \<equiv> sv (bind x) p"
 
-primrec maxd :: "nat \<Rightarrow> nat" where
-  "maxd 0 = 0" |
-  "maxd (Suc n) = n"
+primrec dec :: "nat \<Rightarrow> nat" where
+  "dec 0 = 0" |
+  "dec (Suc n) = n"
 
-primrec maxm :: "nat \<Rightarrow> nat \<Rightarrow> nat" where
-  "maxm x 0 = x" |
-  "maxm x (Suc n) = maxd (maxm x n)"
+primrec sub :: "nat \<Rightarrow> nat \<Rightarrow> nat" where
+  "sub x 0 = x" |
+  "sub x (Suc n) = dec (sub x n)"
 
-primrec maxp :: "nat \<Rightarrow> nat \<Rightarrow> nat" where
-  "maxp x 0 = x" |
-  "maxp x (Suc n) = Suc (maxp x n)"
+primrec add :: "nat \<Rightarrow> nat \<Rightarrow> nat" where
+  "add x 0 = x" |
+  "add x (Suc n) = Suc (add x n)"
 
 primrec fresh :: "nat list \<Rightarrow> nat" where
   "fresh [] = 0" |
-  "fresh (h # t) = Suc (maxp (maxm (maxd (fresh t)) h) h)"
+  "fresh (h # t) = Suc (add (sub (dec (fresh t)) h) h)"
 
 primrec stop :: "'a list \<Rightarrow> 'b \<Rightarrow> 'b list \<Rightarrow> 'a list" where
   "stop c _ [] = c" |
@@ -204,10 +204,10 @@ lemma inject_simps: "(True \<and> b) = b" "(False \<and> b) = False"
 by (rule simp_thms,rule simp_thms)
 
 lemmas simps = check_prover prover_next prover_done solve.simps track.simps maps_def stop.simps
-  fresh.simps maxp.simps maxm.simps maxd.simps inst_def bind.simps sv.simps
-  increase.simps fv.simps adjust.simps extend.simps nnf.distinct nnf.inject map_simps concat_simps
-  append_simps if_simps not_simps prod_simps nat.distinct list.distinct bool.distinct nat_simps
-  list_simps bool_simps nat.inject list.inject inject_simps
+  fresh.simps add.simps sub.simps dec.simps inst_def bind.simps sv.simps increase.simps fv.simps
+  adjust.simps extend.simps nnf.distinct nnf.inject map_simps concat_simps append_simps if_simps
+  not_simps prod_simps nat.distinct list.distinct bool.distinct nat_simps list_simps bool_simps
+  nat.inject list.inject inject_simps
  
 theorem program:
   "\<And>p. check p \<equiv> PROVER [[(0,p)]]"
@@ -224,13 +224,13 @@ theorem program:
   "\<And>c p. stop c p [] \<equiv> c"
   "\<And>c p h t. stop c p (h # t) \<equiv> (if p = h then [] else stop c p t)"
   "fresh [] = 0"
-  "\<And>h t. fresh (h # t) = Suc (maxp (maxm (maxd (fresh t)) h) h)"
-  "\<And>x. maxp x 0 \<equiv> x"
-  "\<And>x n. maxp x (Suc n) \<equiv> Suc (maxp x n)"
-  "\<And>x. maxm x 0 \<equiv> x"
-  "\<And>x n. maxm x (Suc n) \<equiv> maxd (maxm x n)"
-  "maxd 0 \<equiv> 0"
-  "\<And>n. maxd (Suc n) \<equiv> n"
+  "\<And>h t. fresh (h # t) = Suc (add (sub (dec (fresh t)) h) h)"
+  "\<And>x. add x 0 \<equiv> x"
+  "\<And>x n. add x (Suc n) \<equiv> Suc (add x n)"
+  "\<And>x. sub x 0 \<equiv> x"
+  "\<And>x n. sub x (Suc n) \<equiv> dec (sub x n)"
+  "dec 0 \<equiv> 0"
+  "\<And>n. dec (Suc n) \<equiv> n"
   "\<And>p x. inst p x \<equiv> sv (bind x) p"
   "\<And>x. bind x 0 \<equiv> x"
   "\<And>x n. bind x (Suc n) \<equiv> n"
@@ -437,7 +437,7 @@ section "Basics"
 
 primrec maxl :: "nat list \<Rightarrow> nat" where
   "maxl [] = 0" |
-  "maxl (h # t) = maxp (maxm (maxl t) h) h"
+  "maxl (h # t) = add (sub (maxl t) h) h"
 
 definition fresh' :: "nat list \<Rightarrow> nat" where
   "fresh' l \<equiv> if null l then 0 else Suc (maxl l)"
@@ -455,41 +455,41 @@ by (induct n arbitrary: c) simp_all
 lemma rr: "repeat' f c n = repeat f c n"
 by (induct n) (simp_all add: r)
 
-primrec maxm' :: "nat \<Rightarrow> nat \<Rightarrow> nat" where
-  "maxm' x 0 = x" |
-  "maxm' x (Suc n) = maxm' (maxd x) n"
+primrec sub' :: "nat \<Rightarrow> nat \<Rightarrow> nat" where
+  "sub' x 0 = x" |
+  "sub' x (Suc n) = sub' (dec x) n"
 
 lemma "(x-1)-y = (x-y)-(1::nat)" try
 by simp 
 
-lemma ddd: "maxd x = x-(1::nat)"
+lemma ddd: "dec x = x-(1::nat)"
 by (simp add: nat_diff_split)
 
-lemma dddd: "maxm' x y = x-(y::nat)"
-using ddd diff_Suc_eq_diff_pred maxm'.simps by (induct y arbitrary: x) presburger+
+lemma dddd: "sub' x y = x-(y::nat)"
+using ddd diff_Suc_eq_diff_pred sub'.simps by (induct y arbitrary: x) presburger+
 
-lemma ddddd: "maxm x y = x-(y::nat)"
+lemma ddddd: "sub x y = x-(y::nat)"
 by (induct y arbitrary: x) (simp_all add: ddd)
 
-lemma dx: "maxm x y = maxm' x y"
+lemma dx: "sub x y = sub' x y"
 by (simp add: dddd ddddd)
 
-lemma mmm: "(maxp (maxm n n') n') = (max n n')"
+lemma mmm: "(add (sub n n') n') = (max n n')"
 proof (induct n' arbitrary: n)
   case 0 then show ?case by simp
 next
   case Suc then show ?case 
   proof -
     fix n'a :: nat and na :: nat
-    assume a1: "\<And>n. maxp (maxm n n'a) n'a = max n n'a"
+    assume a1: "\<And>n. add (sub n n'a) n'a = max n n'a"
     have f2: "\<And>n na. n = 0 \<or> Suc (max na (n - 1)) = max (Suc na) n"
       by (metis (lifting) Nitpick.case_nat_unfold max_Suc1)
     { assume "na \<noteq> 0"
-      then have "Suc (max n'a (maxd na)) = max na (Suc n'a)"
-        using f2 by (metis (lifting) maxd.simps(2) Suc_pred' max.commute not_gr0) }
-    then have "Suc (max n'a (maxd na)) = max na (Suc n'a)"
-      by (metis max.commute max_0L maxd.simps(1))
-    then show "maxp (maxm na (Suc n'a)) (Suc n'a) = max na (Suc n'a)"
+      then have "Suc (max n'a (dec na)) = max na (Suc n'a)"
+        using f2 by (metis (lifting) dec.simps(2) Suc_pred' max.commute not_gr0) }
+    then have "Suc (max n'a (dec na)) = max na (Suc n'a)"
+      by (metis max.commute max_0L dec.simps(1))
+    then show "add (sub na (Suc n'a)) (Suc n'a) = max na (Suc n'a)"
       using a1 dx by simp
   qed
 qed
