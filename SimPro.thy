@@ -1779,6 +1779,27 @@ val () = check test
 
 text \<open>Code generation\<close>
 
+code_reflect SimPro
+  datatypes nnf = Pre | Con | Dis | Uni | Exi and nat = "0::nat" | Suc
+  functions main test
+
+ML
+
+{*
+
+  fun iterator g f c = if g c then true else iterator g f (f c)
+
+  val true = SimPro.main iterator SimPro.test
+
+  val true = SimPro.main iterator (
+    SimPro.Dis (SimPro.Uni (SimPro.Con (
+        SimPro.Pre (false,SimPro.Zero_nat,[SimPro.Zero_nat]),
+        SimPro.Pre (false,SimPro.Suc SimPro.Zero_nat,[SimPro.Zero_nat]))),
+      SimPro.Dis (SimPro.Exi (SimPro.Pre (true,SimPro.Suc SimPro.Zero_nat,[SimPro.Zero_nat])),
+                  SimPro.Exi (SimPro.Pre (true,SimPro.Zero_nat,[SimPro.Zero_nat])))))
+
+*}
+
 (*
 
 export_code main test in SML module_name SimPro file "SimPro.sml"

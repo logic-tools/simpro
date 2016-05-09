@@ -84,17 +84,26 @@ fun fv (Pre (uu, uv, v)) = v
   | fv (Uni p) = adjust (fv p)
   | fv (Exi p) = adjust (fv p);
 
+fun increase uu Zero_nat = Zero_nat
+  | increase f (Suc n) = Suc (f n);
+
 fun map f [] = []
   | map f (x21 :: x22) = f x21 :: map f x22;
-
-fun bump uu Zero_nat = Zero_nat
-  | bump f (Suc n) = Suc (f n);
 
 fun sv f (Pre (b, i, v)) = Pre (b, i, map f v)
   | sv f (Con (p, q)) = Con (sv f p, sv f q)
   | sv f (Dis (p, q)) = Dis (sv f p, sv f q)
-  | sv f (Uni p) = Uni (sv (bump f) p)
-  | sv f (Exi p) = Exi (sv (bump f) p);
+  | sv f (Uni p) = Uni (sv (increase f) p)
+  | sv f (Exi p) = Exi (sv (increase f) p);
+
+fun add x Zero_nat = x
+  | add x (Suc n) = Suc (add x n);
+
+fun dec Zero_nat = Zero_nat
+  | dec (Suc n) = n;
+
+fun sub x Zero_nat = x
+  | sub x (Suc n) = dec (sub x n);
 
 fun bind x Zero_nat = x
   | bind uu (Suc n) = n;
@@ -105,22 +114,8 @@ fun snd (x1, x2) = x2;
 
 fun fst (x1, x2) = x1;
 
-fun null [] = true
-  | null (uu :: uv) = false;
-
-fun maxp x Zero_nat = x
-  | maxp x (Suc n) = Suc (maxp x n);
-
-fun maxd Zero_nat = Zero_nat
-  | maxd (Suc n) = n;
-
-fun maxm x Zero_nat = x
-  | maxm x (Suc n) = maxm (maxd x) n;
-
-fun maxl [] = Zero_nat
-  | maxl (h :: t) = maxp (maxm (maxl t) h) h;
-
-fun fresh l = (if null l then Zero_nat else Suc (maxl l));
+fun fresh [] = Zero_nat
+  | fresh (h :: t) = Suc (add (sub (dec (fresh t)) h) h);
 
 fun stop B_ c uu [] = c
   | stop B_ c p (h :: t) = (if eq B_ p h then [] else stop B_ c p t);
@@ -138,6 +133,9 @@ fun track s uu (Pre (b, i, v)) =
 
 fun solve [] = [[]]
   | solve (h :: t) = track t (fst h) (snd h);
+
+fun null [] = true
+  | null (uu :: uv) = false;
 
 fun main a p = a null (mapsa solve) [[(Zero_nat, p)]];
 
