@@ -418,19 +418,16 @@ unfolding program(2)
 unfolding program(3-) data library
 by (rule TrueI)
 
-lemma "repeat (maps solve) [[(0,test)]] 2016 = []"
+proposition "check test"
 by code_simp
 
-lemma "repeat (maps solve) [[(0,test)]] 2016 = []"
-by normalization
+proposition "map length (map (repeat (maps solve) [[(0,test)]]) [1,2,3,4,5,6,7]) = [1,1,1,2,2,2,0]"
+by code_simp
 
-lemma "repeat (maps solve) [[(0,test)]] 2016 = []"
-by eval
-
-lemma "repeat (maps solve) [[(0,test)]] 2016 = []"
+proposition "repeat (maps solve) [[(0,test)]] (Suc (Suc (Suc (Suc (Suc (Suc (Suc 0))))))) = []"
+unfolding repeat.simps
 unfolding test_def
-unfolding One_nat_def eval_nat_numeral BitM.simps
-unfolding program data library repeat.simps
+unfolding program data library
 by (rule TrueI)
 
 section "Basics"
@@ -458,9 +455,6 @@ by (induct n) (simp_all add: r)
 primrec sub' :: "nat \<Rightarrow> nat \<Rightarrow> nat" where
   "sub' x 0 = x" |
   "sub' x (Suc n) = sub' (dec x) n"
-
-lemma "(x-1)-y = (x-y)-(1::nat)" try
-by simp 
 
 lemma ddd: "dec x = x-(1::nat)"
 by (simp add: nat_diff_split)
@@ -1769,32 +1763,36 @@ val () = check (Dis (Uni (Con (Pre (false,"P",[0]),Pre (false,"Q",[0]))),
 
 text \<open>Code generation\<close>
 
-code_reflect SimPro
-datatypes
-  nnf = Pre | Con | Dis | Uni | Exi and nat = "0::nat" | Suc
-functions
-  check test
+(*
+
+value "check test"
+
+proposition "check test"
+by normalization
+
+proposition "check test"
+by eval
+
+code_reflect SimPro functions check test
+
+ML {* val true = SimPro.check SimPro.test *}
+
+*)
+
+code_reflect X datatypes nnf = Pre | Con | Dis | Uni | Exi and nat = "0::nat" | Suc functions check
 
 ML
 
 {*
 
-val true = SimPro.check SimPro.test
-
-val true = SimPro.check (
-  SimPro.Dis (SimPro.Uni (SimPro.Con (
-      SimPro.Pre (false,SimPro.Zero_nat,[SimPro.Zero_nat]),
-      SimPro.Pre (false,SimPro.Suc SimPro.Zero_nat,[SimPro.Zero_nat]))),
-    SimPro.Dis (SimPro.Exi (SimPro.Pre (true,SimPro.Suc SimPro.Zero_nat,[SimPro.Zero_nat])),
-                SimPro.Exi (SimPro.Pre (true,SimPro.Zero_nat,[SimPro.Zero_nat])))))
+val true = X.check (X.Dis (X.Uni (X.Con (X.Pre (false,X.Zero_nat,[X.Zero_nat]),
+                                         X.Pre (false,X.Suc X.Zero_nat,[X.Zero_nat]))),
+                           X.Dis (X.Exi (X.Pre (true,X.Suc X.Zero_nat,[X.Zero_nat])),
+                                  X.Exi (X.Pre (true,X.Zero_nat,[X.Zero_nat])))))
 
 *}
 
-(*
-
-export_code check test in SML module_name SimPro file "SimPro.sml"
-
-*)
+(* export_code check test in SML module_name SimPro file "SimPro.sml" *)
 
 (*
 
