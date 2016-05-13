@@ -1,12 +1,8 @@
 structure SimPro : sig
   type nat
   type nnf
-  val main :
-    ((((nat * nnf) list) list -> bool) ->
-      (((nat * nnf) list) list -> ((nat * nnf) list) list) ->
-        ((nat * nnf) list) list -> bool) ->
-      nnf -> bool
   val test : nnf
+  val check : nnf -> bool
 end = struct
 
 datatype nat = Zero_nat | Suc of nat;
@@ -144,5 +140,9 @@ val test : nnf =
                   Pre (false, Suc Zero_nat, [Zero_nat]))),
         Dis (Exi (Pre (true, Suc Zero_nat, [Zero_nat])),
               Exi (Pre (true, Zero_nat, [Zero_nat]))));
+
+fun iterator g f c = (if g c then true else iterator g f (f c));
+
+fun check x = main iterator x;
 
 end; (*struct SimPro*)

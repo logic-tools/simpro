@@ -146,7 +146,7 @@ proposition "\<forall>m e. is_model_environment m e \<longrightarrow> fst m \<no
 unfolding is_model_environment_def
 by fast
 
-proposition "iterator g f c = (if g c then True else iterator g f (f c))"
+proposition [code]: "iterator g f c = (if g c then True else iterator g f (f c))"
 unfolding iterator_def
 by (metis repeat.simps not0_implies_Suc)
 
@@ -208,7 +208,7 @@ lemmas simps = check_prover prover_next prover_done solve.simps track.simps maps
   adjust.simps extend.simps nnf.distinct nnf.inject map_simps concat_simps append_simps if_simps
   not_simps prod_simps nat.distinct list.distinct bool.distinct nat_simps list_simps bool_simps
   nat.inject list.inject inject_simps
- 
+
 theorem program:
   "\<And>p. check p \<equiv> PROVER [[(0,p)]]"
   "\<And>h t. PROVER (h # t) \<equiv> PROVER (maps solve (h # t))"
@@ -1722,14 +1722,9 @@ ML
 datatype nnf = Pre of bool * string * int list | Con of nnf * nnf | Uni of nnf
                                                | Dis of nnf * nnf | Exi of nnf
 
-val test = Dis (Uni (Con (Pre (false,"P",[0]),Pre (false,"Q",[0]))),
-                Dis (Exi (Pre (true,"Q",[0])),Exi (Pre (true,"P",[0]))))
+fun extend l 0 = l | extend l n = n-1 :: l
 
-fun extend l 0 = l
-  | extend l n = n-1 :: l
-
-fun adjust [] = []
-  | adjust (h :: t) = extend (adjust t) h
+fun adjust [] = [] | adjust (h :: t) = extend (adjust t) h
 
 fun fv (Pre (_,_,v)) = v
   | fv (Con (p,q)) = fv p @ fv q
@@ -1737,8 +1732,7 @@ fun fv (Pre (_,_,v)) = v
   | fv (Uni p) = adjust (fv p)
   | fv (Exi p) = adjust (fv p)
 
-fun increase _ 0 = 0
-  | increase f n = (f n-1)+1
+fun increase _ 0 = 0 | increase f n = (f n-1)+1
 
 fun sv f (Pre (b,i,v)) = Pre (b,i,map f v)
   | sv f (Con (p,q)) = Con (sv f p,sv f q)
@@ -1746,19 +1740,15 @@ fun sv f (Pre (b,i,v)) = Pre (b,i,map f v)
   | sv f (Uni p) = Uni (sv (increase f) p)
   | sv f (Exi p) = Exi (sv (increase f) p)
 
-fun bind x 0 = x
-  | bind _ n = n-1
+fun bind x 0 = x | bind _ n = n-1
 
 fun inst p x = sv (bind x) p
 
-fun helper x [] = x
-  | helper x (h :: t) = helper (if x > h then x else h) t
+fun helper x [] = x | helper x (h :: t) = helper (if x > h then x else h) t
 
-fun fresh [] = 0
-  | fresh (h :: t) = (helper h t)+1
+fun fresh [] = 0 | fresh (h :: t) = (helper h t)+1
 
-fun stop c _ [] = c
-  | stop c p (h :: t) = if p = h then [] else stop c p t
+fun stop c _ [] = c | stop c p (h :: t) = if p = h then [] else stop c p t
 
 fun track s _ (Pre (b,i,v)) = stop [s @ [(0,Pre (b,i,v))]] (Pre (not b,i,v)) (map snd s)
   | track s _ (Con (p,q)) = [s @ [(0,p)],s @ [(0,q)]]
@@ -1766,59 +1756,53 @@ fun track s _ (Pre (b,i,v)) = stop [s @ [(0,Pre (b,i,v))]] (Pre (not b,i,v)) (ma
   | track s _ (Uni p) = [s @ [(0,inst p (fresh (maps fv (Uni p :: map snd s))))]]
   | track s n (Exi p) = [s @ [(0,inst p n),(n+1,Exi p)]]
 
-fun solve [] = [[]]
-  | solve (h :: t) = track t (fst h) (snd h)
+fun solve [] = [[]] | solve (h :: t) = track t (fst h) (snd h)
 
 fun prover c = if null c then () else prover (maps solve c)
 
 fun check p = prover [[(0,p)]]
 
-val () = check test
+val () = check (Dis (Uni (Con (Pre (false,"P",[0]),Pre (false,"Q",[0]))),
+                     Dis (Exi (Pre (true,"Q",[0])),Exi (Pre (true,"P",[0])))))
 
 *}
 
 text \<open>Code generation\<close>
 
 code_reflect SimPro
-  datatypes nnf = Pre | Con | Dis | Uni | Exi and nat = "0::nat" | Suc
-  functions main test
+datatypes
+  nnf = Pre | Con | Dis | Uni | Exi and nat = "0::nat" | Suc
+functions
+  check test
 
 ML
 
 {*
 
-  fun iterator g f c = if g c then true else iterator g f (f c)
+val true = SimPro.check SimPro.test
 
-  val true = SimPro.main iterator SimPro.test
-
-  val true = SimPro.main iterator (
-    SimPro.Dis (SimPro.Uni (SimPro.Con (
-        SimPro.Pre (false,SimPro.Zero_nat,[SimPro.Zero_nat]),
-        SimPro.Pre (false,SimPro.Suc SimPro.Zero_nat,[SimPro.Zero_nat]))),
-      SimPro.Dis (SimPro.Exi (SimPro.Pre (true,SimPro.Suc SimPro.Zero_nat,[SimPro.Zero_nat])),
-                  SimPro.Exi (SimPro.Pre (true,SimPro.Zero_nat,[SimPro.Zero_nat])))))
+val true = SimPro.check (
+  SimPro.Dis (SimPro.Uni (SimPro.Con (
+      SimPro.Pre (false,SimPro.Zero_nat,[SimPro.Zero_nat]),
+      SimPro.Pre (false,SimPro.Suc SimPro.Zero_nat,[SimPro.Zero_nat]))),
+    SimPro.Dis (SimPro.Exi (SimPro.Pre (true,SimPro.Suc SimPro.Zero_nat,[SimPro.Zero_nat])),
+                SimPro.Exi (SimPro.Pre (true,SimPro.Zero_nat,[SimPro.Zero_nat])))))
 
 *}
 
 (*
 
-export_code main test in SML module_name SimPro file "SimPro.sml"
+export_code check test in SML module_name SimPro file "SimPro.sml"
+
+*)
+
+(*
 
 SML_file "SimPro.sml"
 
-SML_export "val SimPro_main = SimPro.main"
+SML_export "val SimPro_check = SimPro.check val SimPro_test = SimPro.test"
 
-SML_export "val SimPro_test = SimPro.test"
-
-ML {*
-
-fun SimPro_iterator g f c = if g c then true else SimPro_iterator g f (f c)
-
-val SimPro_check = SimPro_main SimPro_iterator
-
-val true = SimPro_check SimPro_test
-
-*}
+ML {* val true = SimPro_check SimPro_test *}
 
 *)
 
