@@ -146,7 +146,7 @@ proposition "\<forall>m e. is_model_environment m e \<longrightarrow> fst m \<no
 unfolding is_model_environment_def
 by fast
 
-proposition [code]: "iterator g f c = (if g c then True else iterator g f (f c))"
+proposition iterator[code]: "iterator g f c = (if g c then True else iterator g f (f c))"
 unfolding iterator_def
 by (metis repeat.simps not0_implies_Suc)
 
@@ -157,20 +157,19 @@ unfolding check_def main_def
 by -
 
 proposition "PROVER c = (if null c then True else PROVER (maps solve c))"
-unfolding iterator_def
-by (metis repeat.simps old.nat.exhaust)
+using iterator
+by - 
 
 lemma prover: "PROVER c = PROVER (maps solve c)"
-unfolding iterator_def
-by (induct c) (simp add: maps_def,metis repeat.simps null.simps(2) old.nat.exhaust)
+using iterator maps_def concat.simps(1) list.map(1) null.simps(2) list.exhaust
+by metis
 
 lemma prover_next: "PROVER (h # t) = PROVER (maps solve (h # t))"
 using prover
 by -
 
 lemma prover_done: "PROVER [] = True"
-unfolding iterator_def
-by (metis repeat.simps(1) null.simps(1))
+by (simp add: iterator)
 
 lemma map_simps: "map f [] = []" "map f (h # t) = f h # map f t"
 by (rule list.map(1),rule list.map(2))
@@ -1763,15 +1762,25 @@ val () = check (Dis (Uni (Con (Pre (false,"P",[0]),Pre (false,"Q",[0]))),
 
 text \<open>Code generation\<close>
 
-(*
-
 value "check test"
+
+value "check (Dis (Pre True 0 []) (Pre False 0 []))"
+
+(* value "check (Pre True 0 [])" *)
+
+proposition "check test"
+by eval
+
+proposition "check (Dis (Pre True 0 []) (Pre False 0 []))"
+by eval
 
 proposition "check test"
 by normalization
 
-proposition "check test"
-by eval
+proposition "check (Dis (Pre b i v) (Pre (\<not> b) i v))"
+by normalization
+
+(*
 
 code_reflect SimPro functions check test
 
