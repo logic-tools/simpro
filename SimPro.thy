@@ -418,6 +418,12 @@ unfolding program(3-) data library
 by (rule TrueI)
 
 proposition "check test"
+unfolding check_def
+unfolding main_def
+unfolding test_def
+by (simp add: maps_def inst_def iterator)
+
+proposition "check test"
 by code_simp
 
 proposition "map length (map (repeat (maps solve) [[(0,test)]]) [1,2,3,4,5,6,7]) = [1,1,1,2,2,2,0]"
