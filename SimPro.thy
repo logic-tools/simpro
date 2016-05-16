@@ -206,7 +206,7 @@ lemmas simps = check_prover prover_next prover_done solve.simps track.simps maps
   fresh.simps add.simps sub.simps dec.simps inst_def bind.simps sv.simps increase.simps fv.simps
   adjust.simps extend.simps nnf.distinct nnf.inject map_simps concat_simps append_simps if_simps
   not_simps prod_simps nat.distinct list.distinct bool.distinct nat_simps list_simps bool_simps
-  nat.inject list.inject inject_simps
+  prod.inject nat.inject list.inject inject_simps
 
 theorem program:
   "\<And>p. check p \<equiv> PROVER [[(0,p)]]"
@@ -366,6 +366,7 @@ theorem library:
   "[] = [] \<equiv> True"
   "True = True \<equiv> True"
   "False = False \<equiv> True"
+  "\<And>x y x' y'. (x,y) = (x',y') \<equiv> x = x' \<and> y = y'"
   "\<And>n n'. Suc n = Suc n' \<equiv> n = n'"
   "\<And>h t h' t'. h # t = h' # t' \<equiv> h = h' \<and> t = t'"
   "\<And>b. True \<and> b \<equiv> b"
@@ -396,7 +397,8 @@ by ((simp only: simps(66)),
     (simp only: simps(89)),
     (simp only: simps(90)),
     (simp only: simps(91)),
-    (simp only: simps(92)))
+    (simp only: simps(92)),
+    (simp only: simps(93)))
 
 proposition "check test"
 unfolding test_def
