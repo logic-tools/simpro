@@ -184,7 +184,7 @@ lemma if_simps: "(if True then x else y) = x" "(if False then x else y) = y"
 by (rule if_True,rule if_False)
 
 lemma not_simps: "(\<not> True) = False" "(\<not> False) = True" "(\<not> \<not> b) = b"
-by (rule simp_thms,rule simp_thms,rule nnf_simps)
+by (rule not_True_eq_False,rule not_False_eq_True,rule not_not)
 
 lemma prod_simps: "fst (x,y) = x" "snd (x,y) = y"
 unfolding fst_def snd_def
