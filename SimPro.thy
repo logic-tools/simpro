@@ -1809,7 +1809,7 @@ val true = X.check (X.Dis (X.Uni (X.Con (X.Pre (false,X.Zero_nat,[X.Zero_nat]),
 
 *}
 
-(* export_code check test in SML module_name SimPro file "SimPro.sml" *)
+export_code check test in SML module_name SimPro (* file "SimPro.sml" *)
 
 (*
 
