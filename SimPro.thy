@@ -1,3 +1,5 @@
+(* Authors: Jørgen Villadsen, Anders Schlichtkrull, Andreas Halkjær From *)
+
 section \<open>A Simple Prover in Isabelle\<close>
 
 theory SimPro imports Main begin
@@ -115,7 +117,7 @@ primrec null :: "'a list \<Rightarrow> bool" where
   "null (_ # _) = False"
 
 definition main :: "sequent list algorithm \<Rightarrow> nnf \<Rightarrow> bool" where
-  "main a p \<equiv> a null (maps solve) [[(0,p)]]" 
+  "main a p \<equiv> a null (maps solve) [[(0,p)]]"
 
 primrec repeat :: "('a \<Rightarrow> 'a) \<Rightarrow> 'a \<Rightarrow> nat \<Rightarrow> 'a" where
   "repeat _ c 0 = c" |
@@ -158,7 +160,7 @@ by -
 
 proposition "PROVER c = (if null c then True else PROVER (maps solve c))"
 using iterator
-by - 
+by -
 
 lemma prover: "PROVER c = PROVER (maps solve c)"
 using iterator maps_def concat.simps(1) list.map(1) null.simps(2) list.exhaust
@@ -447,7 +449,7 @@ definition fresh' :: "nat list \<Rightarrow> nat" where
   "fresh' l \<equiv> if null l then 0 else Suc (maxl l)"
 
 lemma fresh': "fresh l = fresh' l"
-unfolding fresh'_def by (induct l) (auto, metis null.simps(2) list.exhaust maxl.simps) 
+unfolding fresh'_def by (induct l) (auto, metis null.simps(2) list.exhaust maxl.simps)
 
 primrec repeat' :: "('a \<Rightarrow> 'a) \<Rightarrow> 'a \<Rightarrow> nat \<Rightarrow> 'a" where
   "repeat' _ c 0 = c" |
@@ -479,7 +481,7 @@ lemma mmm: "(add (sub n n') n') = (max n n')"
 proof (induct n' arbitrary: n)
   case 0 then show ?case by simp
 next
-  case Suc then show ?case 
+  case Suc then show ?case
   proof -
     fix n'a :: nat and na :: nat
     assume a1: "\<And>n. add (sub n n'a) n'a = max n n'a"
@@ -586,7 +588,7 @@ next
     qed
   qed
 qed
- 
+
 lemma calculation_calculation_child:
   "\<forall>s t. (Suc n,s) \<in> calculation t =
     (\<exists>k. k \<in> set (solve t) \<and> \<not> is_axiom (list_sequent t) \<and> (n,s) \<in> calculation k)"
@@ -630,14 +632,14 @@ proof (rule set_eqI,simp add: split_paired_all)
       using assms calculation.simps by blast
   qed
 qed
- 
+
 lemma is_axiom_finite_calculation: "is_axiom (list_sequent s) \<Longrightarrow> finite (calculation s)"
 by (simp add: calculation_is_axiom)
 
 primrec failing_path :: "(nat \<times> sequent) set \<Rightarrow> nat \<Rightarrow> (nat \<times> sequent)" where
   "failing_path ns 0 = (SOME x. x \<in> ns \<and> fst x = 0 \<and> infinite (calculation (snd x)) \<and>
     \<not> is_axiom (list_sequent (snd x)))" |
-  "failing_path ns (Suc n) = (let fn = failing_path ns n in 
+  "failing_path ns (Suc n) = (let fn = failing_path ns n in
     (SOME fsucn. fsucn \<in> ns \<and> fst fsucn = Suc n \<and> (snd fsucn) \<in> set (solve (snd fn)) \<and>
       infinite (calculation (snd fsucn)) \<and> \<not> is_axiom (list_sequent (snd fsucn))))"
 
@@ -674,7 +676,7 @@ proof -
         by metis
       then have "\<not> (p \<in> P \<and> fst p = 0 \<and> infinite (calculation (snd p)) \<and>
         \<not> is_axiom (list_sequent (snd p)))"
-        using f1 by (metis (mono_tags, lifting) someI) 
+        using f1 by (metis (mono_tags, lifting) someI)
       then have "p \<notin> P \<or> fst p \<noteq> 0 \<or> finite (calculation (snd p)) \<or>
         (SOME p. p \<in> P \<and> fst p = 0 \<and> infinite (calculation (snd p)) \<and>
         \<not> is_axiom (list_sequent (snd p))) \<in> P \<and> fst (SOME p. p \<in> P \<and> fst p = 0 \<and>
@@ -693,7 +695,7 @@ proof -
        \<not> is_axiom (list_sequent (snd (SOME p. p \<in> P \<and> fst p = 0 \<and>
        infinite (calculation (snd p)) \<and> \<not> is_axiom (list_sequent (snd p)))))"
        by blast
-  qed 
+  qed
   then have "\<And>ps. fst (0::nat, ps) \<noteq> 0 \<or> finite (calculation (snd (0::nat, ps))) \<or>
     (SOME p. p \<in> calculation ps \<and> fst p = 0 \<and> infinite (calculation (snd p)) \<and>
     \<not> is_axiom (list_sequent (snd p))) \<in> calculation ps \<and>
@@ -847,8 +849,8 @@ by (induct s) auto
 lemma fv_list_cons: "fv_list (a # list) = (fv a) @ (fv_list list)"
 by (simp add: fv_list_def maps)
 
-lemma semantics_alternative_cong: "(\<forall>x. x \<in> set (fv_list s) \<longrightarrow> e x = e' x) \<longrightarrow> 
-  semantics_alternative m e s = semantics_alternative m e' s" 
+lemma semantics_alternative_cong: "(\<forall>x. x \<in> set (fv_list s) \<longrightarrow> e x = e' x) \<longrightarrow>
+  semantics_alternative m e s = semantics_alternative m e' s"
 by (induct s) (simp_all,metis eval_cong Un_iff set_append fv_list_cons)
 
 section "Soundness"
@@ -966,7 +968,7 @@ proof (clarsimp simp: valid_def)
       by (metis (no_types,lifting) fun_upd_apply semantics_alternative_cong)
   qed
 qed
-  
+
 lemma sound_Exi: "valid (s@[sv (bind u) p,Exi p]) \<Longrightarrow> valid (Exi p # s)"
 using valid_def eval_bind
 by (simp add: semantics_alternative_append,metis is_model_environment_def prod.sel(1))
@@ -1256,7 +1258,7 @@ lemma contains_considers:
   and "infinite (calculation s)"
   and "contains f n y"
   shows "(\<exists>m. considers f (n+m) y)"
-using assms 
+using assms
 by (clarsimp simp: contains_def considers_def dest!: split_list_first)
   (frule contains_considers'[rule_format],simp,simp,metis (mono_tags,lifting) list.simps(5))
 
@@ -1408,7 +1410,7 @@ next
     qed
   qed
 qed
-   
+
 lemma Exi0:
   assumes "f = failing_path (calculation s)"
   and "infinite (calculation s)"
@@ -1416,7 +1418,7 @@ lemma Exi0:
   shows "\<forall>n. contains f n (m,Exi g) \<longrightarrow> (\<exists>n'. contains f n' (0,Exi g))"
 using assms Exi_downward contains_def
 by (induct m) auto
-     
+
 lemma Exi_upward':
   assumes "f = failing_path (calculation s)"
   and "infinite (calculation s)"
@@ -1443,16 +1445,16 @@ definition ntou :: "nat \<Rightarrow> proxy" where
 definition uton :: "proxy \<Rightarrow> nat" where
   "uton u \<equiv> length u"
 
-lemma aaa: "ntou (uton u) = u"
+lemma ntou_uton: "ntou (uton u) = u"
 using ntou_def uton_def
 by (induct u) auto
 
-lemma bbb: "uton (ntou n) = n"
+lemma uton_ntou: "uton (ntou n) = n"
 using ntou_def uton_def
 by (induct n) auto
 
-lemma ccc: "uton \<circ> ntou = id"
-using bbb by auto
+lemma uton_ntou_id: "uton \<circ> ntou = id"
+using uton_ntou by auto
 
 section "Falsifying Model From Failing Path"
 
@@ -1496,10 +1498,10 @@ proof (rule nat_less_induct,rule allI)
     proof (cases p)
       case (Pre b i v) then show ?thesis
       proof (cases b)
-        case True then show ?thesis using Pre assms model_def ccc by auto
+        case True then show ?thesis using Pre assms model_def uton_ntou_id by auto
       next
         case False then show ?thesis using Pre
-        proof (clarsimp simp: model_def ccc)
+        proof (clarsimp simp: model_def uton_ntou_id)
           fix na m nb ma
           show "n = 0 \<Longrightarrow> contains f na (m,Pre False i v) \<Longrightarrow>
             contains (failing_path (calculation s)) nb (ma,Pre True i v) \<Longrightarrow> False"
@@ -1575,14 +1577,14 @@ proof (rule nat_less_induct,rule allI)
             and 1: "semantics (model s) (case_nat z ntou) q"
             then have "\<forall>m'. \<not> semantics (model s) ntou (sv (bind m') q)"
               using assms * by (meson Exi_upward eval_cong id_apply lessI size_bind)
-            also have "\<forall>u. ntou (uton u) = u" using aaa by simp
+            also have "\<forall>u. ntou (uton u) = u" using ntou_uton by simp
             ultimately show ?thesis using 1 eval_bind by metis
           qed
       qed
     qed
   qed
 qed
-   
+
 lemma model:
   assumes "f = failing_path (calculation s)"
   and "infinite (calculation s)"
@@ -1655,7 +1657,7 @@ lemma finite_calculation':
 proof -
   have "finite (fst ` (calculation s))" using assms by simp
   then obtain x where xMax: "x \<in> fst ` calculation s \<and> (\<forall>y. y \<in> fst ` calculation s \<longrightarrow> y \<le> x)"
-    using max_exists calculation.simps by (metis empty_iff image_is_empty) 
+    using max_exists calculation.simps by (metis empty_iff image_is_empty)
   then show ?thesis
   proof (cases "loop [s] (Suc x)")
     assume "loop [s] (Suc x) = []" then show ?thesis by blast
