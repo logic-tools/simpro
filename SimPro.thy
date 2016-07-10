@@ -131,47 +131,26 @@ definition check :: "nnf \<Rightarrow> bool" where
 
 abbreviation (input) "CHECK \<equiv> check = (\<lambda>p. \<forall>m e. is_model_environment m e \<longrightarrow> semantics m e p)"
 
-inductive_set calculation :: "sequent \<Rightarrow> (nat \<times> sequent) set" for s where
-  "(0,s) \<in> calculation s" |
-  "(n,k) \<in> calculation s \<Longrightarrow> l \<in> set (solve k) \<Longrightarrow> (Suc n,l) \<in> calculation s"
-
-primrec semantics_alternative :: "model \<Rightarrow> environment \<Rightarrow> nnf list \<Rightarrow> bool" where
-  "semantics_alternative _ _ [] = False" |
-  "semantics_alternative m e (h # t) = (semantics m e h \<or> semantics_alternative m e t)"
-
-definition valid :: "nnf list \<Rightarrow> bool" where
-  "valid l \<equiv> \<forall>m e. is_model_environment m e \<longrightarrow> semantics_alternative m e l"
-
-abbreviation (input) "VALID \<equiv> valid = finite \<circ> calculation \<circ> map (Pair 0)"
-
-proposition "\<forall>m e. is_model_environment m e \<longrightarrow> fst m \<noteq> {}"
-unfolding is_model_environment_def
-by fast
-
-proposition iterator[code]: "iterator g f c = (if g c then True else iterator g f (f c))"
+lemma iterator[code]: "iterator g f c = (if g c then True else iterator g f (f c))"
 unfolding iterator_def
-by (metis repeat.simps not0_implies_Suc)
+using repeat.simps not0_implies_Suc
+by metis
 
 abbreviation (input) "PROVER \<equiv> iterator null (maps solve)"
 
 lemma check_prover: "check p \<equiv> PROVER [[(0,p)]]"
-unfolding check_def main_def
-by -
+unfolding check_def main_def .
 
-proposition "PROVER c = (if null c then True else PROVER (maps solve c))"
-using iterator
-by -
-
-lemma prover: "PROVER c = PROVER (maps solve c)"
-using iterator maps_def concat.simps(1) list.map(1) null.simps(2) list.exhaust
-by metis
+lemma prover: "PROVER c = (if null c then True else PROVER (maps solve c))"
+using iterator .
 
 lemma prover_next: "PROVER (h # t) = PROVER (maps solve (h # t))"
 using prover
-by -
+by simp
 
 lemma prover_done: "PROVER [] = True"
-by (simp add: iterator)
+using prover
+by simp
 
 lemma map_simps: "map f [] = []" "map f (h # t) = f h # map f t"
 by (rule list.map(1),rule list.map(2))
@@ -185,8 +164,8 @@ by (rule append.simps(1),rule append.simps(2))
 lemma if_simps: "(if True then x else y) = x" "(if False then x else y) = y"
 by (rule if_True,rule if_False)
 
-lemma not_simps: "(\<not> True) = False" "(\<not> False) = True" "(\<not> \<not> b) = b"
-by (rule not_True_eq_False,rule not_False_eq_True,rule not_not)
+lemma not_simps: "(\<not> True) = False" "(\<not> False) = True"
+by (rule not_True_eq_False,rule not_False_eq_True)
 
 lemma prod_simps: "fst (x,y) = x" "snd (x,y) = y"
 unfolding fst_def snd_def
@@ -355,7 +334,6 @@ theorem library:
   "\<And>x y. if False then x else y \<equiv> y"
   "\<not> True \<equiv> False"
   "\<not> False \<equiv> True"
-  "\<And>b. \<not> \<not> b \<equiv> b"
   "\<And>x y. fst (x,y) \<equiv> x"
   "\<And>x y. snd (x,y) \<equiv> y"
   "\<And>n. 0 = Suc n \<equiv> False"
@@ -399,8 +377,7 @@ by ((simp only: simps(66)),
     (simp only: simps(89)),
     (simp only: simps(90)),
     (simp only: simps(91)),
-    (simp only: simps(92)),
-    (simp only: simps(93)))
+    (simp only: simps(92)))
 
 proposition "check test"
 unfolding test_def
@@ -438,6 +415,23 @@ unfolding repeat.simps
 unfolding test_def
 unfolding program data library
 by (rule TrueI)
+
+proposition "\<forall>m e. is_model_environment m e \<longrightarrow> fst m \<noteq> {}"
+unfolding is_model_environment_def
+by fast
+
+inductive_set calculation :: "sequent \<Rightarrow> (nat \<times> sequent) set" for s where
+  "(0,s) \<in> calculation s" |
+  "(n,k) \<in> calculation s \<Longrightarrow> l \<in> set (solve k) \<Longrightarrow> (Suc n,l) \<in> calculation s"
+
+primrec semantics_alternative :: "model \<Rightarrow> environment \<Rightarrow> nnf list \<Rightarrow> bool" where
+  "semantics_alternative _ _ [] = False" |
+  "semantics_alternative m e (h # t) = (semantics m e h \<or> semantics_alternative m e t)"
+
+definition valid :: "nnf list \<Rightarrow> bool" where
+  "valid l \<equiv> \<forall>m e. is_model_environment m e \<longrightarrow> semantics_alternative m e l"
+
+abbreviation (input) "VALID \<equiv> valid = finite \<circ> calculation \<circ> map (Pair 0)"
 
 section "Basics"
 
@@ -1703,7 +1697,7 @@ proof -
     by (metis (no_types,hide_lams))
   moreover have VALID
     using magic make_sequent_def by fastforce
-  ultimately show CHECK VALID by -
+  ultimately show CHECK VALID .
 qed
 
 corollary "\<exists>p. check p" "\<exists>p. \<not> check p"
