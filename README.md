@@ -5,8 +5,7 @@ SimPro - Simple Prover
 
 The verification in Isabelle of SimPro is described here:
 
-Jørgen Villadsen, Anders Schlichtkrull, Andreas Halkjær From: *Code Generation for a Simple First-Order Prover*
-Isabelle Workshop 2016: http://www21.in.tum.de/~nipkow/Isabelle2016/
+Jørgen Villadsen, Anders Schlichtkrull, Andreas Halkjær From: Code Generation for a Simple First-Order Prover. Isabelle Workshop 2016: http://www21.in.tum.de/~nipkow/Isabelle2016/
 
 Please provide feedback to Associate Professor Jørgen Villadsen, DTU Compute, Denmark: http://people.compute.dtu.dk/jovi/
 
