@@ -1798,7 +1798,7 @@ ML {* val true = SimPro.check SimPro.test *}
 
 code_reflect X datatypes nnf = Pre | Con | Dis | Uni | Exi and nat = "0::nat" | Suc functions check
 
-ML
+ML_val
 
 {*
 
