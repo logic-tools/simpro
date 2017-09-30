@@ -9,6 +9,8 @@ Jørgen Villadsen, Anders Schlichtkrull, Andreas Halkjær From: Code Generation 
 
 Please provide feedback to Associate Professor Jørgen Villadsen, DTU Compute, Denmark: http://people.compute.dtu.dk/jovi/
 
+Development continued here: https://bitbucket.org/isafol/isafol/src/master/Simple_Prover/
+
 ---
 
 Based on:
