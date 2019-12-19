@@ -1823,12 +1823,6 @@ lemma loop_upwards: \<open>loop s n = [] \<Longrightarrow> loop s (n+m) = []\<cl
   using loop_def
   by (induct \<open>m\<close>) auto
 
-lemma concat_append: \<open>concat (xs@ys) = ((concat xs) @ (concat ys))\<close>
-  by (induct \<open>xs\<close>) auto
-
-lemma set_concat: \<open>set (concat xs) = \<Union> (set ` set xs)\<close>
-  by (induct \<open>xs\<close>) auto
-
 lemma loop: \<open>\<forall>x. ((n,x) \<in> calculation s) = (x \<in> set (loop [s] n))\<close>
 proof (induct \<open>n\<close>)
   case 0 then show \<open>?case\<close> using loop_def calculation_init by simp
@@ -1848,7 +1842,7 @@ next
     fix x
     assume \<open>(x \<in> set (loop [s] (Suc m)))\<close>
     then show \<open>(Suc m,x) \<in> calculation s\<close>
-      using Suc by (fastforce simp: set_concat loop_def calculation.intros(2))
+      using Suc by (fastforce simp: loop_def calculation.intros(2))
   qed
 qed
 
@@ -1968,17 +1962,17 @@ proposition \<open>EXAMPLE P\<close>
 proposition \<open>EXAMPLE P = ((\<exists>x. \<not> P x) \<or> (\<exists>x. P x))\<close>
   by fast
 
-definition OK where \<open>OK c \<equiv> \<exists>n. null (repeat solves c n)\<close>
+definition \<open>simple_prover c \<equiv> \<exists>n. null (repeat solves c n)\<close>
 
-lemma \<open>OK [[(0,p)]] = (\<forall>m e. (\<forall>n. e n \<in> fst m) \<longrightarrow> semantics m e p)\<close>
-  using check_prover correctness unfolding OK_def is_model_environment_def iterator_def by meson
+lemma \<open>simple_prover [[(0,p)]] = (\<forall>m e. is_model_environment m e \<longrightarrow> semantics m e p)\<close>
+  using check_prover correctness unfolding simple_prover_def iterator_def by meson
 
-lemma [code]: \<open>OK c = (if null c then True else OK (solves c))\<close>
-  using iterator unfolding OK_def iterator_def by metis
+lemma [code]: \<open>simple_prover c = (if null c then True else simple_prover (solves c))\<close>
+  using iterator unfolding simple_prover_def iterator_def by metis
 
 definition \<open>example \<equiv> Dis (Exi (Pre False 0 [0])) (Exi (Pre True 0 [0]))\<close>
 
-value \<open>OK [[(0,example)]]\<close>
+value \<open>simple_prover [[(0,example)]]\<close>
 
 section \<open>Acknowledgements\<close>
 
