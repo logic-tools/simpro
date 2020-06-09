@@ -1,6 +1,6 @@
-(* Authors: Jørgen Villadsen, Anders Schlichtkrull, Andreas Halkjær From *)
+(* Authors: Jørgen Villadsen, Anders Schlichtkrull, Asta Halkjær From *)
 
-section \<open>A Certified Simple Prover for First-Order Logic\<close>
+section \<open>Simple Prover for First-Order Logic\<close>
 
 theory Simple_Prover imports Main begin
 
@@ -471,30 +471,10 @@ primrec bind :: \<open>nat \<Rightarrow> nat \<Rightarrow> nat\<close> where
 definition inst :: \<open>nnf \<Rightarrow> nat \<Rightarrow> nnf\<close> where
   \<open>inst p x \<equiv> sv (bind x) p\<close>
 
-lemma j1: \<open>(if h < x then h else if h = x then s else h - 1) =
- (if h - x = 0 then (if x - h = 0 then s else h) else dec h)\<close> for h :: \<open>nat\<close>
-proof -
-  obtain bb :: \<open>bool\<close> where
-    f1: \<open>bb = (h - x = 0 \<longrightarrow> (x - h = 0 \<longrightarrow> (h < x \<longrightarrow> h = s) \<and> (\<not> h < x \<longrightarrow> h \<noteq> x \<longrightarrow> h - 1 = s))
-        \<and> (x - h \<noteq> 0 \<longrightarrow> \<not> h < x \<longrightarrow> (h = x \<longrightarrow> s = h) \<and> (h \<noteq> x \<longrightarrow> h - 1 = h)))\<close>
-    by metis
-  then have \<open>bb \<and> (h - x = 0 \<or> (\<not> h < x \<or> h = dec h) \<and> (h < x \<or> (h \<noteq> x \<or> s = dec h)
-            \<and> (h = x \<or> h - 1 = dec h)))\<close>
-    by (metis dec.simps(2) diff_Suc_1 diffs0_imp_equal less_SucI not_less_eq old.nat.exhaust
-        zero_less_Suc zero_less_diff)
-  then show \<open>?thesis\<close>
-    using f1 by presburger
-qed
-
-lemma j2: \<open>(sub h x) = (h - x)\<close> for h :: \<open>nat\<close>
-  by (induct \<open>x\<close>) (simp_all,simp add: nat_diff_split)
-
-lemma j3: \<open>(if h < x then h else if h = x then s else h - 1) = (if sub h x = 0 then
-          (if sub x h = 0 then s else h) else dec h)\<close> for h :: \<open>nat\<close>
-  by (simp add: j1 j2)
+lemma j2: \<open>sub h x = h - x\<close>
+  by (induct \<open>x\<close>) (simp_all split: nat_diff_split)
 
 lemma j4: \<open>more x s h (sub h x) = (if sub h x = 0 then (if sub x h = 0 then s else h) else dec h)\<close>
-  for h :: \<open>nat\<close>
   by (metis over.simps(1) over.simps(2) more.simps(1) more.simps(2) old.nat.exhaust)
 
 lemma j5: \<open>mend x s v = map (\<lambda>n. (if n < x then n else if n = x then s else n - 1)) v\<close>
@@ -598,10 +578,10 @@ primrec sub' :: \<open>nat \<Rightarrow> nat \<Rightarrow> nat\<close> where
   \<open>sub' x 0 = x\<close> |
   \<open>sub' x (Suc n) = sub' (dec x) n\<close>
 
-lemma d0: \<open>dec x = x-(1::nat)\<close>
+lemma d0: \<open>dec x = x - 1\<close>
   by (simp add: nat_diff_split)
 
-lemma d1: \<open>sub' x y = x-(y::nat)\<close>
+lemma d1: \<open>sub' x y = x - y\<close>
   using d0 diff_Suc_eq_diff_pred sub'.simps by (induct \<open>y\<close> arbitrary: \<open>x\<close>) presburger+
 
 lemma dx: \<open>sub x y = sub' x y\<close>
@@ -630,9 +610,6 @@ qed
 lemma maps: \<open>maps f = (concat \<circ> map f)\<close>
   using maps_def comp_apply
   by fastforce
-
-definition make_sequent :: \<open>nnf list \<Rightarrow> sequent\<close> where
-  \<open>make_sequent l = map (\<lambda>p. (0,p)) l\<close>
 
 definition list_sequent :: \<open>sequent \<Rightarrow> nnf list\<close> where
   \<open>list_sequent s = map snd s\<close>
@@ -676,8 +653,6 @@ lemma pre: \<open>(n,(m,Pre b i v) # xs) \<in> calculation(nfs) \<Longrightarrow
     (Suc n,xs@[(0,sv (bind m) p),(Suc m,Exi p)]) \<in> calculation(nfs)\<close>
   using instt_def
   by (auto simp: instt list_sequent_def maps inst_def stop member_set calculation.intros base frees)
-
-lemmas not_is_axiom_subs = pre con1 con2 dis uni exi
 
 lemma calculation_init: \<open>(0,k) \<in> calculation s = (k = s)\<close>
   using calculation.simps
@@ -726,18 +701,8 @@ lemma calculation_calculation_child:
   by (induct \<open>n\<close>) (metis calculation.intros(2) calculation_downwards calculation_init,
       meson calculation.intros(2) calculation_downwards)
 
-lemma calculation_progress:
-  assumes \<open>(n,a # l) \<in> calculation s\<close> and \<open>\<not> is_axiom (list_sequent (a # l))\<close>
-  shows \<open>(\<exists>k. (Suc n,l@k) \<in> calculation s)\<close>
-proof (cases \<open>a\<close>)
-  case (Pair _ p) then show \<open>?thesis\<close> using assms by (cases \<open>p\<close>) (auto dest: not_is_axiom_subs)
-qed
-
 definition inc :: \<open>nat \<times> sequent \<Rightarrow> nat \<times> sequent\<close> where
   \<open>inc \<equiv> \<lambda>(n,fs). (Suc n,fs)\<close>
-
-lemma inj_inc: \<open>inj inc\<close>
-  by (simp add: inc_def inj_on_def)
 
 lemma calculation: \<open>calculation s =
   insert (0,s) (inc ` (\<Union> (calculation ` {k. \<not> is_axiom (list_sequent s) \<and> k \<in> set (solve s)})))\<close>
@@ -840,12 +805,6 @@ proof -
   then show \<open>?thesis\<close>
     using assms(1) assms(2) by auto
 qed
-
-lemma infinite_union: \<open>finite Y \<Longrightarrow> infinite (Union (f ` Y)) \<Longrightarrow> \<exists>y. y \<in> Y \<and> infinite (f y)\<close>
-  by auto
-
-lemma finite_subs: \<open>finite {w. \<not> is_axiom (list_sequent y) \<and> w \<in> set (solve y)}\<close>
-  by simp
 
 lemma fSuc:
   assumes \<open>f = failing_path (calculation s)\<close>
@@ -1154,7 +1113,7 @@ lemma max_exists: \<open>finite (X::nat set) \<Longrightarrow> X \<noteq> {} \<l
   by blast
 
 definition init :: \<open>sequent \<Rightarrow> bool\<close> where
-  \<open>init s == \<forall>x \<in> (set s). fst x = 0\<close>
+  \<open>init s \<equiv> \<forall>x \<in> (set s). fst x = 0\<close>
 
 definition is_Exi :: \<open>nnf \<Rightarrow> bool\<close> where
   \<open>is_Exi f \<equiv> case f of Exi _ \<Rightarrow> True | _ \<Rightarrow> False\<close>
@@ -1331,11 +1290,8 @@ next
                     case (Pair _ p) then show \<open>?thesis\<close>
                     proof (cases \<open>p\<close>)
                       case (Pre b i v) then show \<open>?thesis\<close>
-                        using IH' * ** Cons notAxiom *** Pair list_sequent_def Suc_diff_le Suc_leD
-                          Un_iff assms(3) base base.simps(1) diff_Suc_Suc diff_diff_cancel
-                          diff_le_self imageE image_eqI insert_iff list.set(2) notAxiom prod.sel(2)
-                          semantics_alternative.simps(1) set_append pre
-                        by (smt semantics_alternative_def2 set_map)
+                        using IH' assms(2,3) * ** *** Cons notAxiom Pair list_sequent_def
+                        by (fastforce simp del: ex_image_cong_iff dest!: pre)
                     next
                       case (Con q r)
                       then have 1: \<open>(Suc n,list @ [(0,q)]) \<in> calculation s\<close>
@@ -1418,16 +1374,16 @@ next
   qed
 qed
 
-lemma list_make_sequent_inverse: \<open>list_sequent (make_sequent s) = s\<close>
-  using list_sequent_def make_sequent_def
+lemma list_make_sequent_inverse: \<open>list_sequent (map (\<lambda>p. (0,p)) s) = s\<close>
+  using list_sequent_def
   by (induct \<open>s\<close>) simp_all
 
 lemma soundness:
-  assumes \<open>finite (calculation (make_sequent s))\<close>
+  assumes \<open>finite (calculation (map (\<lambda>p. (0,p)) s))\<close>
   shows \<open>valid s\<close>
 proof -
-  have \<open>init (make_sequent s)\<close> and \<open>finite (fst ` (calculation (make_sequent s)))\<close>
-    using assms by (simp add: init_def make_sequent_def,simp)
+  have \<open>init (map (\<lambda>p. (0,p)) s)\<close> and \<open>finite (fst ` (calculation (map (\<lambda>p. (0,p)) s)))\<close>
+    using assms by (simp add: init_def,simp)
   then show \<open>?thesis\<close> using assms soundness' list_make_sequent_inverse max_exists
     by (metis (mono_tags,lifting) empty_iff fst_conv image_eqI calculation.intros(1))
 qed
@@ -1804,15 +1760,15 @@ lemma completeness': \<open>infinite (calculation s) \<Longrightarrow> init s \<
     \<forall>mA \<in> set s. \<not> semantics (model s) ntou (snd mA)\<close>
   by (metis contains_def eq_snd_iff is_path_f_0 model)
 
-lemma completeness'': \<open>infinite (calculation (make_sequent s)) \<Longrightarrow>
-    init (make_sequent s) \<Longrightarrow> \<forall>p. p \<in> set s \<longrightarrow> \<not> semantics (model (make_sequent s)) ntou p\<close>
-  using completeness' make_sequent_def
+lemma completeness'': \<open>infinite (calculation (map (\<lambda>p. (0,p)) s)) \<Longrightarrow>
+    init (map (\<lambda>p. (0,p)) s) \<Longrightarrow> \<forall>p. p \<in> set s \<longrightarrow> \<not> semantics (model (map (\<lambda>p. (0,p)) s)) ntou p\<close>
+  using completeness'
   by fastforce
 
-lemma completeness: \<open>infinite (calculation (make_sequent s)) \<Longrightarrow> \<not> valid s\<close>
-  using valid_def init_def make_sequent_def is_env_model_ntou semantics_alternative_def2
+lemma completeness: \<open>infinite (calculation (map (\<lambda>p. (0,p)) s)) \<Longrightarrow> \<not> valid s\<close>
+  using valid_def init_def is_env_model_ntou semantics_alternative_def2
     completeness''
-  by (subgoal_tac \<open>init (make_sequent s)\<close>) (metis,simp)
+  by (subgoal_tac \<open>init (map (\<lambda>p. (0,p)) s)\<close>) (metis,simp)
 
 subsection \<open>Algorithm\<close>
 
@@ -1846,7 +1802,7 @@ next
   qed
 qed
 
-lemma calculation_f: \<open>calculation s = UNION UNIV (\<lambda>x. set (map (\<lambda>y. (x,y)) (loop [s] x)))\<close>
+lemma calculation_f: \<open>calculation s = (\<Union>x. set (map (\<lambda>y. (x,y)) (loop [s] x)))\<close>
   using loop
   by fastforce
 
@@ -1902,10 +1858,10 @@ proof -
   have \<open>\<forall>p. [[(0,p)]] = [map (Pair 0) [p]]\<close> by simp
   then have \<open>CHECK\<close>
     unfolding check_def
-    using magic valid_def make_sequent_def semantics_alternative.simps main_def
+    using magic valid_def semantics_alternative.simps main_def
     by (metis (no_types,hide_lams))
   moreover have \<open>VALID\<close>
-    using magic make_sequent_def by fastforce
+    using magic by fastforce
   ultimately show \<open>CHECK\<close> \<open>VALID\<close> .
 qed
 
@@ -1976,6 +1932,6 @@ value \<open>simple_prover [[(0,example)]]\<close>
 
 section \<open>Acknowledgements\<close>
 
-text \<open>Based on the Archive of Formal Proofs entry Verified_Prover by Tom Ridge (TPHOLs 2005)\<close>
+text \<open>Based on the Archive of Formal Proofs entry Verified-Prover by Tom Ridge (TPHOLs 2005)\<close>
 
 end

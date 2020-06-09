@@ -9,7 +9,11 @@ Jørgen Villadsen, Anders Schlichtkrull, Andreas Halkjær From: Code Generation 
 
 Please provide feedback to Associate Professor Jørgen Villadsen, DTU Compute, Denmark: http://people.compute.dtu.dk/jovi/
 
-Development continued here: https://bitbucket.org/isafol/isafol/src/master/Simple_Prover/
+---
+
+Our PAAR 2018 version is here: https://bitbucket.org/isafol/isafol/src/master/Simple_Prover/
+
+The newest version is here: https://github.com/logic-tools/simpro/blob/master/Simple_Prover.thy
 
 ---
 
