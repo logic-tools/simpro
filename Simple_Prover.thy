@@ -1,8 +1,8 @@
 (* Authors: Jørgen Villadsen, Anders Schlichtkrull, Asta Halkjær From *)
 
-(* Latest version here: https://github.com/logic-tools/simpro/blob/master/Simple_Prover.thy *)
+(* Source: https://github.com/logic-tools/simpro/blob/master/Simple_Prover.thy *)
 
-(* Thanks to Jens Carl Moesgård Eschen for updates to the soundness and completeness proofs *)
+(* Thanks to Agnes Moesgård Eschen for updates to the soundness and completeness proofs *)
 
 section \<open>Simple Prover for First-Order Logic\<close>
 
@@ -626,7 +626,7 @@ proof -
           ic (snd x) \<and> \<not> is_axiom (base (snd x))\<close>
     by simp
   ultimately show \<open>?thesis\<close>
-    by (metis (mono_tags, lifting) failing_path.simps(2) is_axiom_finite_calculation someI)
+    by (metis (mono_tags, lifting) failing_path.simps(2) someI)
 qed
 
 lemma is_path_f_0: assumes \<open>ic s\<close> shows \<open>fp s 0 = (0,s)\<close>
@@ -1313,7 +1313,7 @@ lemma finite_calculation: \<open>finite (calculation s) = (\<exists>m. loop [s] 
 corollary finite_calculation_prover':
   \<open>finite (calculation s) = iterator null ((concat \<circ> map solve)) [s]\<close>
   using finite_calculation repeat_compower unfolding loop_def iterator_def
-  by (metis (no_types, hide_lams) null.simps list.exhaust)
+  by (metis (no_types, opaque_lifting) null.simps list.exhaust)
 
 corollary finite_calculation_prover: \<open>finite (calculation s) = iterator null solves [s]\<close>
   using finite_calculation_prover' solves_alt by presburger
@@ -1329,7 +1329,7 @@ proof -
   then have \<open>CHECK\<close>
     unfolding check_def
     using magic valid_def semantics_alternative.simps main_def
-    by (metis (no_types,hide_lams))
+    by (metis (no_types, opaque_lifting))
   moreover have \<open>VALID\<close>
     using magic by fastforce
   ultimately show \<open>CHECK\<close> \<open>VALID\<close> .
